@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+  "esperanto-core",
+  "esperanto-javascriptcore",
+]

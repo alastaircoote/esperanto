@@ -1,0 +1,14 @@
+[package]
+build = "build.rs"
+edition = "2018"
+links = "javascriptcore"
+name = "esperanto_javscriptcore"
+version = "0.1.0"
+
+[dependencies]
+esperanto_traits = {path = "../esperanto-traits"}
+fragile = "1.0.0"
+
+[build-dependencies]
+bindgen = "0.54.1"
+cc = {version = "1.0", features = ["parallel"]}

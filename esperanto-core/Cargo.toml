@@ -1,0 +1,18 @@
+[package]
+authors = ["Alastair Coote <alastair.coote@nytimes.com>"]
+edition = "2018"
+name = "esperanto_core"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+esperanto_traits = {path = "../esperanto-traits"}
+log = "0.4.8"
+tokio = {version = "0.2", features = ["rt-threaded", "sync", "macros", "io-util"]}
+
+[dev-dependencies]
+simple_logger = "1.6.0"
+
+[profile.release]
+lto = true

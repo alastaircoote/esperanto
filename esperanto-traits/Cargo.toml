@@ -1,0 +1,4 @@
+[package]
+edition = "2018"
+name = "esperanto_traits"
+version = "0.1.0"
