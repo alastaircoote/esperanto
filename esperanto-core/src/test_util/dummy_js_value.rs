@@ -1,21 +1,20 @@
 use esperanto_traits::js_traits::{JSEnvError, JSRuntime, JSValue};
 use std::any::Any;
 
-pub struct DummyJSValue<'a> {
-    underlying_value: &'a (dyn Any + Send + Sync),
+pub struct DummyJSValue {
+    underlying_value: Box<dyn Any + Send + Sync>,
 }
 
-impl<'a> DummyJSValue<'a> {
-    pub fn new<A: Any + Send + Sync>(underlying_value: &'a A) -> Self {
+impl DummyJSValue {
+    pub fn new<T: Any + Send + Sync>(obj: T) -> Self {
         DummyJSValue {
-            underlying_value: underlying_value,
+            underlying_value: Box::new(obj),
         }
     }
 }
 
-impl<'a> JSValue for DummyJSValue<'a> {
+impl JSValue for DummyJSValue {
     fn to_string<'b>(&self) -> Result<&'b str, JSEnvError> {
-        // self.underlying_value.
         match self.underlying_value.downcast_ref::<&str>() {
             Some(str_val) => Ok(str_val),
             None => Ok("dummy string value"),
@@ -23,14 +22,32 @@ impl<'a> JSValue for DummyJSValue<'a> {
     }
 }
 
-pub struct DummyJSRuntime {}
+pub struct DummyJSRuntime {
+    value_store: Vec<DummyJSValue>,
+}
 
 impl JSRuntime for DummyJSRuntime {
-    type ValueType = DummyJSValue<'static>;
-    fn evaluate(&self, _: &str) -> Result<Self::ValueType, JSEnvError> {
-        Ok(DummyJSValue::new(&()))
+    type ValueType = DummyJSValue;
+    type StoreKey = usize;
+    fn evaluate<O: From<Self::ValueType>>(&self, _: &str) -> Result<O, JSEnvError> {
+        Ok(DummyJSValue::new(Box::new(())).into())
     }
+
     fn new() -> Self {
-        DummyJSRuntime {}
+        DummyJSRuntime {
+            value_store: Vec::new(),
+        }
+    }
+
+    fn store_value(&mut self, value: Self::ValueType) -> Self::StoreKey {
+        let pos = self.value_store.len();
+        self.value_store.push(value);
+        pos
+    }
+    fn get_value_ref(&self, key: Self::StoreKey) -> Result<&Self::ValueType, JSEnvError> {
+        Ok(&self.value_store[key])
+    }
+    fn pull_value(&mut self, key: Self::StoreKey) -> Result<Self::ValueType, JSEnvError> {
+        Ok(self.value_store.remove(key))
     }
 }

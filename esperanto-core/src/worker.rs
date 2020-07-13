@@ -1,5 +1,6 @@
 use esperanto_traits::js_traits::{JSRuntime,JSEnvError};
 use crate::worker_state::{StateStore, WorkerState};
+use crate::jsvalue_wrapper::JSValueWrapper;
 use log::info;
 use std::sync::Arc;
 use std::thread;
@@ -7,7 +8,7 @@ use std::thread::ThreadId;
 use tokio::sync::{mpsc, oneshot, RwLock};
 use tokio::sync::Mutex;
 
-type RunloopOperation<Runtime> = Box<dyn Send + FnOnce(&Runtime) -> ()>;
+type RunloopOperation<Runtime> = Box<dyn Send + FnOnce(&mut Runtime) -> ()>;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum WorkerError {
@@ -65,7 +66,7 @@ impl<Runtime: JSRuntime + 'static> Worker<Runtime> {
                 // We lock the mutex while the worker is running
                 let mut shutdown_complete_lock = shutdown_complete_in_task.lock().await;
     
-                let runtime = Runtime::new();
+                let mut runtime = Runtime::new();
     
                 *state.write().await = WorkerState::Active;
     
@@ -101,7 +102,7 @@ impl<Runtime: JSRuntime + 'static> Worker<Runtime> {
                                     // We've received an operation to run on-thread, so let's go
                                     // ahead and execute it.
                                     info!("Received operation, running...");
-                                    operation(&runtime);
+                                    operation(&mut runtime);
                                 }
                             }
                         }
@@ -113,7 +114,7 @@ impl<Runtime: JSRuntime + 'static> Worker<Runtime> {
                                     *state.write().await = WorkerState::ShutdownComplete;
                                 }
                                 Ok(operation) => {
-                                    operation(&runtime);
+                                    operation(&mut runtime);
                                 }
                             }
                         }
@@ -148,7 +149,7 @@ impl<Runtime: JSRuntime + 'static> Worker<Runtime> {
     }
 
     /// Add an operation to the run loop queue
-    pub async fn enqueue<T: Send + 'static, F: (FnOnce(&Runtime) -> T) + Send + 'static>(
+    pub async fn enqueue<T: Send + 'static, F: (FnOnce(&mut Runtime) -> T) + Send + 'static>(
         &self,
         operation: F,
     ) -> Result<T, WorkerError> {
@@ -212,15 +213,14 @@ impl<Runtime: JSRuntime + 'static> Worker<Runtime> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::AlwaysReturnRuntime;
-    use crate::test_util::EmptyJSValue;
+    use crate::test_util::DummyJSRuntime;
 
-    type EmptyRuntime = AlwaysReturnRuntime<EmptyJSValue>;
+    // type EmptyRuntime = AlwaysReturnRuntime<EmptyJSValue>;
 
     #[tokio::test]
     async fn workers_run_on_the_right_thread() {
         // This is mostly a sanity check to make sure that tokio tasks work the way I think they do
-        let worker = Worker::<EmptyRuntime>::new().await.unwrap();
+        let worker = Worker::<DummyJSRuntime>::new().await.unwrap();
         let result = worker
             .enqueue(|_| return std::thread::current().id())
             .await
@@ -232,7 +232,7 @@ mod tests {
 
     #[tokio::test]
     async fn cannot_enqueue_when_shutdown() {
-        let worker = Worker::<EmptyRuntime>::new().await.unwrap();
+        let worker = Worker::<DummyJSRuntime>::new().await.unwrap();
         worker.request_shutdown().await.unwrap();
         let err = worker.enqueue(|_| {}).await.unwrap_err();
         assert_eq!(err, WorkerError::CannotEnqueueInThisState);
@@ -244,7 +244,7 @@ mod tests {
 
     #[tokio::test]
     async fn states_are_correct_during_lifecycle() {
-        let worker = Worker::<EmptyRuntime>::new().await.unwrap();
+        let worker = Worker::<DummyJSRuntime>::new().await.unwrap();
         assert_eq!(*worker.state.read().await, WorkerState::Active);
         worker.request_shutdown().await.unwrap();
         assert_eq!(*worker.state.read().await, WorkerState::ShutdownRequested);

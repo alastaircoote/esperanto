@@ -1,6 +1,6 @@
-use crate::test_util::ConstructableJSValue;
 use esperanto_traits::js_traits::{JSEnvError, JSValue};
 
+#[derive(Clone, Copy)]
 pub struct EmptyJSValue {}
 
 impl JSValue for EmptyJSValue {
@@ -9,7 +9,7 @@ impl JSValue for EmptyJSValue {
     }
 }
 
-impl ConstructableJSValue for EmptyJSValue {
+impl EmptyJSValue {
     fn new() -> Self {
         return EmptyJSValue {};
     }
