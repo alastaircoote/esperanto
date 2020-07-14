@@ -1,6 +1,5 @@
-use esperanto_traits::js_traits::{JSRuntime,JSEnvError};
+use esperanto_traits::js_traits::{JSRuntime,JSEnvError, JSConversionError};
 use crate::worker_state::{StateStore, WorkerState};
-use crate::jsvalue_wrapper::JSValueWrapper;
 use log::info;
 use std::sync::Arc;
 use std::thread;
@@ -18,7 +17,8 @@ pub enum WorkerError {
     CannotEnqueueInThisState,
     NotInActiveState,
     WorkerStoppedUnexpectedly,
-    InternalRuntimeError(JSEnvError)
+    InternalRuntimeError(JSEnvError),
+    ConversionError(JSConversionError)
 }
 
 pub struct Worker<Runtime: JSRuntime + 'static> {

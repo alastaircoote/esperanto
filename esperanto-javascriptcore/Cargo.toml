@@ -1,13 +1,12 @@
 [package]
-build = "build.rs"
 edition = "2018"
-links = "javascriptcore"
 name = "esperanto_javscriptcore"
 version = "0.1.0"
 
 [dependencies]
 esperanto_traits = {path = "../esperanto-traits"}
 # libc = "0.2.72"
+javascriptcore-sys = "0.0.4"
 slotmap = "0.4.0"
 
 [build-dependencies]

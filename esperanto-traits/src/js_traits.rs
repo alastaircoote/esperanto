@@ -10,6 +10,7 @@ pub enum JSType {
 pub enum JSConversionError {
     CouldNotConvertStringToSuitableFormat,
     StringWasTooLong,
+    ConversionFailed,
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -21,7 +22,7 @@ pub enum JSEnvError {
     IncorrectTypeForThisOperation(JSType, JSType),
 }
 pub trait JSValue {
-    fn to_string<'a>(&self) -> Result<&'a str, JSEnvError>;
+    // fn to_string<'a>(&self) -> Result<&'a str, JSEnvError>;
 }
 
 pub trait JSRuntime {

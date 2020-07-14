@@ -1,25 +1,27 @@
 use crate::worker::WorkerError;
 use crate::Worker;
-use esperanto_traits::js_traits::JSRuntime;
-use esperanto_traits::js_traits::JSValue;
+use esperanto_traits::js_traits::{JSConversionError, JSRuntime};
+use std::convert::TryFrom;
 use std::sync::Arc;
-
 pub struct JSValueWrapper<Runtime: JSRuntime + 'static> {
     worker: Arc<Worker<Runtime>>,
     js_value_key: Runtime::StoreKey,
 }
 
 impl<Runtime: JSRuntime + 'static> JSValueWrapper<Runtime> {
-    pub async fn to_string<'b>(&self) -> Result<&'b str, WorkerError> {
+    pub async fn try_into<O: 'static + Send + Default + TryFrom<Runtime::ValueType>>(
+        &self,
+    ) -> Result<O, WorkerError> {
         let key = self.js_value_key;
-        self.worker
+        let value = self
+            .worker
             .enqueue(move |r| {
-                let jsvalue = r.get_value_ref(key).unwrap();
-                jsvalue
-                    .to_string()
-                    .map_err(|e| WorkerError::InternalRuntimeError(e))
+                let jsvalue = r.pull_value(key).unwrap();
+                O::try_from(jsvalue).map_err(|_| JSConversionError::ConversionFailed)
             })
-            .await?
+            .await?;
+
+        value.map_err(|e| WorkerError::ConversionError(e))
     }
 
     pub fn new(
@@ -52,7 +54,7 @@ mod test {
 
         let wrapper = JSValueWrapper::new(key, Arc::new(worker));
 
-        let result = wrapper.to_string().await.unwrap();
+        let result: &str = wrapper.try_into().await.unwrap();
         assert_eq!(result, "this is a string");
     }
 }

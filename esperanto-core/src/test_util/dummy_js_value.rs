@@ -1,5 +1,6 @@
-use esperanto_traits::js_traits::{JSEnvError, JSRuntime, JSValue};
+use esperanto_traits::js_traits::{JSConversionError, JSEnvError, JSRuntime, JSValue};
 use std::any::Any;
+use std::convert::TryFrom;
 
 pub struct DummyJSValue {
     underlying_value: Box<dyn Any + Send + Sync>,
@@ -14,8 +15,18 @@ impl DummyJSValue {
 }
 
 impl JSValue for DummyJSValue {
-    fn to_string<'b>(&self) -> Result<&'b str, JSEnvError> {
-        match self.underlying_value.downcast_ref::<&str>() {
+    // fn to_string<'b>(&self) -> Result<&'b str, JSEnvError> {
+    //     match self.underlying_value.downcast_ref::<&str>() {
+    //         Some(str_val) => Ok(str_val),
+    //         None => Ok("dummy string value"),
+    //     }
+    // }
+}
+
+impl TryFrom<DummyJSValue> for &str {
+    type Error = JSConversionError;
+    fn try_from(value: DummyJSValue) -> Result<Self, Self::Error> {
+        match value.underlying_value.downcast_ref::<&str>() {
             Some(str_val) => Ok(str_val),
             None => Ok("dummy string value"),
         }

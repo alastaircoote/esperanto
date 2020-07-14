@@ -14,5 +14,5 @@ tokio = {version = "0.2", features = ["rt-threaded", "sync", "macros", "io-util"
 [dev-dependencies]
 simple_logger = "1.6.0"
 
-[profile.release]
-lto = true
+# [profile.release]
+# lto = true
