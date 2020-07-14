@@ -1,4 +1,4 @@
-use esperanto_traits::JSRuntime;
+use esperanto_traits::JSContext;
 use esperanto_traits::errors::{JSEnvError, JSConversionError};
 use crate::worker_state::{StateStore, WorkerState};
 use log::info;
@@ -22,7 +22,7 @@ pub enum WorkerError {
     ConversionError(JSConversionError)
 }
 
-pub struct Worker<Runtime: JSRuntime + 'static> {
+pub struct Worker<Runtime: JSContext + 'static> {
     sender: mpsc::UnboundedSender<RunloopOperation<Runtime>>,
     pub state: StateStore,
     #[allow(dead_code)] // It's used in tests!
@@ -30,7 +30,7 @@ pub struct Worker<Runtime: JSRuntime + 'static> {
     shutdown_complete: Arc<Mutex<Option<WorkerError>>>
 }
 
-impl<Runtime: JSRuntime + 'static> Worker<Runtime> {
+impl<Runtime: JSContext + 'static> Worker<Runtime> {
     pub async fn new() -> Result<Self, WorkerError> {
         let (sender, mut receiver) = mpsc::unbounded_channel::<RunloopOperation<Runtime>>();
 
@@ -214,14 +214,14 @@ impl<Runtime: JSRuntime + 'static> Worker<Runtime> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::DummyJSRuntime;
+    use crate::test_util::DummyJSContext;
 
     // type EmptyRuntime = AlwaysReturnRuntime<EmptyJSValue>;
 
     #[tokio::test]
     async fn workers_run_on_the_right_thread() {
         // This is mostly a sanity check to make sure that tokio tasks work the way I think they do
-        let worker = Worker::<DummyJSRuntime>::new().await.unwrap();
+        let worker = Worker::<DummyJSContext>::new().await.unwrap();
         let result = worker
             .enqueue(|_| return std::thread::current().id())
             .await
@@ -233,7 +233,7 @@ mod tests {
 
     #[tokio::test]
     async fn cannot_enqueue_when_shutdown() {
-        let worker = Worker::<DummyJSRuntime>::new().await.unwrap();
+        let worker = Worker::<DummyJSContext>::new().await.unwrap();
         worker.request_shutdown().await.unwrap();
         let err = worker.enqueue(|_| {}).await.unwrap_err();
         assert_eq!(err, WorkerError::CannotEnqueueInThisState);
@@ -245,7 +245,7 @@ mod tests {
 
     #[tokio::test]
     async fn states_are_correct_during_lifecycle() {
-        let worker = Worker::<DummyJSRuntime>::new().await.unwrap();
+        let worker = Worker::<DummyJSContext>::new().await.unwrap();
         assert_eq!(*worker.state.read().await, WorkerState::Active);
         worker.request_shutdown().await.unwrap();
         assert_eq!(*worker.state.read().await, WorkerState::ShutdownRequested);

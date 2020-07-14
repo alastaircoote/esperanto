@@ -1,7 +1,7 @@
 use crate::jsc_globalcontext::JSCGlobalContext;
 use crate::jsc_value::JSCValue;
 use esperanto_traits::errors::JSEnvError;
-use esperanto_traits::JSRuntime;
+use esperanto_traits::JSContext;
 use javascriptcore_sys::{
     JSEvaluateScript, JSGlobalContextCreate, JSGlobalContextRetain, JSStringCreateWithUTF8CString,
 };
@@ -9,8 +9,7 @@ use slotmap::{DefaultKey, SecondaryMap, SlotMap};
 use std::ffi::CString;
 use std::rc::Rc;
 
-pub struct JSCRuntime {
-    // jsc_ref: *mut OpaqueJSContext,
+pub struct JSCContext {
     pub(crate) context: Rc<JSCGlobalContext>,
     // This is really messy but slotmap requires that values implement Copy, which we can't
     // do because JSValueRef isn't copy-safe. So instead we use a SecondaryMap which CAN
@@ -19,7 +18,7 @@ pub struct JSCRuntime {
     value_actual_store: SecondaryMap<DefaultKey, JSCValue>,
 }
 
-impl JSRuntime for JSCRuntime {
+impl JSContext for JSCContext {
     type ValueType = JSCValue;
 
     fn new() -> Self {
@@ -27,7 +26,7 @@ impl JSRuntime for JSCRuntime {
             let ctx = JSGlobalContextCreate(std::ptr::null_mut());
             let retained_ctx = JSGlobalContextRetain(ctx);
 
-            JSCRuntime {
+            JSCContext {
                 // jsc_ref: retained_ctx,
                 context: Rc::new(JSCGlobalContext {
                     jsc_ref: retained_ctx,
@@ -85,7 +84,7 @@ mod test {
 
     #[test]
     fn it_works() {
-        let runtime = JSCRuntime::new();
+        let runtime = JSCContext::new();
         let val: JSCValue = runtime.evaluate("String(1+2)").unwrap();
         let str: &str = val.try_into().unwrap();
         assert_eq!(str, "3")

@@ -1,6 +1,6 @@
 use crate::errors::JSEnvError;
 use crate::JSValue;
-pub trait JSRuntime {
+pub trait JSContext {
     type ValueType: JSValue + 'static;
     type StoreKey: Sync + Send + Copy + Clone;
     fn evaluate<O: From<Self::ValueType>>(&self, script: &str) -> Result<O, JSEnvError>;

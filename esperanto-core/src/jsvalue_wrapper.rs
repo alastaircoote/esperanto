@@ -1,15 +1,15 @@
 use crate::worker::WorkerError;
 use crate::Worker;
 use esperanto_traits::errors::JSConversionError;
-use esperanto_traits::JSRuntime;
+use esperanto_traits::JSContext;
 use std::convert::TryFrom;
 use std::sync::Arc;
-pub struct JSValueWrapper<Runtime: JSRuntime + 'static> {
+pub struct JSValueWrapper<Runtime: JSContext + 'static> {
     worker: Arc<Worker<Runtime>>,
     js_value_key: Runtime::StoreKey,
 }
 
-impl<Runtime: JSRuntime + 'static> JSValueWrapper<Runtime> {
+impl<Runtime: JSContext + 'static> JSValueWrapper<Runtime> {
     pub async fn try_into<O: 'static + Send + Default + TryFrom<Runtime::ValueType>>(
         &self,
     ) -> Result<O, WorkerError> {
@@ -39,11 +39,11 @@ impl<Runtime: JSRuntime + 'static> JSValueWrapper<Runtime> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_util::{DummyJSRuntime, DummyJSValue};
+    use crate::test_util::{DummyJSContext, DummyJSValue};
 
     #[tokio::test]
     async fn it_wraps_successfully<'a>() {
-        let worker = Worker::<DummyJSRuntime>::new().await.unwrap();
+        let worker = Worker::<DummyJSContext>::new().await.unwrap();
 
         let key = worker
             .enqueue(move |r| {

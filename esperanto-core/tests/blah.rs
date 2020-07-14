@@ -1,5 +1,5 @@
 // use async_trait::async_trait;
-// use esperanto_core::js_trait::JSRuntime;
+// use esperanto_core::js_trait::JSContext;
 // use esperanto_core::jsvalue::JSValue;
 // use esperanto_core::worker::Worker;
 // use util::always_return_runtime;
@@ -12,7 +12,7 @@
 //     }
 // }
 
-// impl JSRuntime for Urrgh {
+// impl JSContext for Urrgh {
 //     fn evaluate(&self, script: String) -> UrrghJSValue {
 //         return UrrghJSValue {};
 //     }

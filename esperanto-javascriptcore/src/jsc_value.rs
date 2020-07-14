@@ -84,11 +84,11 @@ impl Drop for JSCValue {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::jsc_runtime::JSCRuntime;
-    use esperanto_traits::JSRuntime;
+    use crate::jsc_context::JSCContext;
+    use esperanto_traits::JSContext;
     #[test]
     fn converts_to_number() {
-        let runtime = JSCRuntime::new();
+        let runtime = JSCContext::new();
         let value: JSCValue = runtime.evaluate("3.5").unwrap();
         let f: f64 = value.try_into().unwrap();
         assert_eq!(f, 3.5);
@@ -96,7 +96,7 @@ mod test {
 
     #[test]
     fn converts_to_string() {
-        let runtime = JSCRuntime::new();
+        let runtime = JSCContext::new();
         let value: JSCValue = runtime.evaluate("'hello'").unwrap();
         let f: &str = value.try_into().unwrap();
         assert_eq!(f, "hello");

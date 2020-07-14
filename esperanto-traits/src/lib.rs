@@ -1,8 +1,8 @@
 pub mod errors;
-mod jsruntime;
+mod jscontext;
 mod jstype;
 mod jsvalue;
 
-pub use jsruntime::JSRuntime;
+pub use jscontext::JSContext;
 pub use jstype::JSType;
 pub use jsvalue::JSValue;

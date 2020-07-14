@@ -1,5 +1,5 @@
 use esperanto_traits::errors::{JSConversionError, JSEnvError};
-use esperanto_traits::{JSRuntime, JSValue};
+use esperanto_traits::{JSContext, JSValue};
 use std::any::Any;
 use std::convert::TryFrom;
 
@@ -34,11 +34,11 @@ impl TryFrom<DummyJSValue> for &str {
     }
 }
 
-pub struct DummyJSRuntime {
+pub struct DummyJSContext {
     value_store: Vec<DummyJSValue>,
 }
 
-impl JSRuntime for DummyJSRuntime {
+impl JSContext for DummyJSContext {
     type ValueType = DummyJSValue;
     type StoreKey = usize;
     fn evaluate<O: From<Self::ValueType>>(&self, _: &str) -> Result<O, JSEnvError> {
@@ -46,7 +46,7 @@ impl JSRuntime for DummyJSRuntime {
     }
 
     fn new() -> Self {
-        DummyJSRuntime {
+        DummyJSContext {
             value_store: Vec::new(),
         }
     }
