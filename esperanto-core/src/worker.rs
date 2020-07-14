@@ -1,4 +1,5 @@
-use esperanto_traits::js_traits::{JSRuntime,JSEnvError, JSConversionError};
+use esperanto_traits::JSRuntime;
+use esperanto_traits::errors::{JSEnvError, JSConversionError};
 use crate::worker_state::{StateStore, WorkerState};
 use log::info;
 use std::sync::Arc;

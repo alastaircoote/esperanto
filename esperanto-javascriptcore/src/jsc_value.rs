@@ -1,5 +1,6 @@
 use crate::jsc_globalcontext::JSCGlobalContext;
-use esperanto_traits::js_traits::{JSConversionError, JSValue};
+use esperanto_traits::errors::JSConversionError;
+use esperanto_traits::JSValue;
 use javascriptcore_sys::{
     JSStringGetLength, JSStringGetUTF8CString, JSValueProtect, JSValueRef, JSValueToNumber,
     JSValueToStringCopy, JSValueUnprotect,
@@ -56,8 +57,11 @@ impl TryFrom<JSCValue> for f64 {
         // As best I've been able to tell JSValueToNumber never actually creates an exception.
         // instead the returned value is NaN.
 
-        let val =
-            unsafe { JSValueToNumber(value.context.jsc_ref, value.jsc_ref, std::ptr::null_mut()) };
+        // Will leave this here in the hopes we'll be able to find something that triggers an exception
+        // in the future and test for it
+        let exception: *mut JSValueRef = std::ptr::null_mut();
+
+        let val = unsafe { JSValueToNumber(value.context.jsc_ref, value.jsc_ref, exception) };
 
         if val.is_nan() {
             Err(JSConversionError::ConversionFailed)
@@ -81,7 +85,7 @@ impl Drop for JSCValue {
 mod test {
     use super::*;
     use crate::jsc_runtime::JSCRuntime;
-    use esperanto_traits::js_traits::JSRuntime;
+    use esperanto_traits::JSRuntime;
     #[test]
     fn converts_to_number() {
         let runtime = JSCRuntime::new();

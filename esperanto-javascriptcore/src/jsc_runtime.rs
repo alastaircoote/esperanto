@@ -1,6 +1,7 @@
 use crate::jsc_globalcontext::JSCGlobalContext;
 use crate::jsc_value::JSCValue;
-use esperanto_traits::js_traits::{JSEnvError, JSRuntime};
+use esperanto_traits::errors::JSEnvError;
+use esperanto_traits::JSRuntime;
 use javascriptcore_sys::{
     JSEvaluateScript, JSGlobalContextCreate, JSGlobalContextRetain, JSStringCreateWithUTF8CString,
 };
@@ -10,7 +11,7 @@ use std::rc::Rc;
 
 pub struct JSCRuntime {
     // jsc_ref: *mut OpaqueJSContext,
-    context: Rc<JSCGlobalContext>,
+    pub(crate) context: Rc<JSCGlobalContext>,
     // This is really messy but slotmap requires that values implement Copy, which we can't
     // do because JSValueRef isn't copy-safe. So instead we use a SecondaryMap which CAN
     // store non-Copy items to store our actual values.

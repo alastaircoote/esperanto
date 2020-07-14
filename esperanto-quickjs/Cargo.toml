@@ -1,0 +1,9 @@
+[package]
+edition = "2018"
+name = "esperanto_quickjs"
+version = "0.1.0"
+
+[dependencies]
+esperanto_traits = {path = "../esperanto-traits"}
+qjs-sys = "0.1.2"
+slotmap = "0.4.0"

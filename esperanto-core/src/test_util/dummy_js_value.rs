@@ -1,4 +1,5 @@
-use esperanto_traits::js_traits::{JSConversionError, JSEnvError, JSRuntime, JSValue};
+use esperanto_traits::errors::{JSConversionError, JSEnvError};
+use esperanto_traits::{JSRuntime, JSValue};
 use std::any::Any;
 use std::convert::TryFrom;
 
@@ -28,7 +29,7 @@ impl TryFrom<DummyJSValue> for &str {
     fn try_from(value: DummyJSValue) -> Result<Self, Self::Error> {
         match value.underlying_value.downcast_ref::<&str>() {
             Some(str_val) => Ok(str_val),
-            None => Ok("dummy string value"),
+            None => Err(JSConversionError::ConversionFailed),
         }
     }
 }

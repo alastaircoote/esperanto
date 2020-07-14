@@ -3,5 +3,5 @@
 members = [
   "esperanto-core",
   "esperanto-javascriptcore",
-  "esperanto-javascriptcore-sys",
+  "esperanto-quickjs",
 ]
