@@ -1,7 +1,7 @@
 use crate::worker::WorkerError;
 use crate::Worker;
-use esperanto_traits::errors::JSConversionError;
-use esperanto_traits::JSContext;
+use esperanto_shared::errors::JSConversionError;
+use esperanto_shared::traits::JSContext;
 use std::convert::TryFrom;
 use std::sync::Arc;
 pub struct JSValueWrapper<Runtime: JSContext + 'static> {

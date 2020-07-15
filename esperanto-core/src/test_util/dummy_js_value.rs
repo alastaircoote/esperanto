@@ -1,5 +1,5 @@
-use esperanto_traits::errors::{JSConversionError, JSEnvError};
-use esperanto_traits::{JSContext, JSValue};
+use esperanto_shared::errors::{JSConversionError, JSEnvError};
+use esperanto_shared::traits::{JSContext, JSValue};
 use std::any::Any;
 use std::convert::TryFrom;
 

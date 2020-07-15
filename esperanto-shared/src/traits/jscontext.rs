@@ -1,5 +1,5 @@
 use crate::errors::JSEnvError;
-use crate::JSValue;
+use crate::traits::JSValue;
 use std::convert::TryFrom;
 pub trait JSContext {
     type ValueType: JSValue + 'static;

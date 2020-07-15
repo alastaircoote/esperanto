@@ -1,8 +1,8 @@
 use crate::qjs_shared_context_ref::SharedQJSContextRef;
 // use crate::ref_count::{dup_value, free_value, get_ref_count};
 use crate::ref_count::free_value;
-use esperanto_traits::errors::JSConversionError;
-use esperanto_traits::JSValue;
+use esperanto_shared::errors::JSConversionError;
+use esperanto_shared::traits::JSValue;
 use libquickjs_sys::{JSValue as QJSValueRef, JS_ToCStringLen2, JS_TAG_STRING};
 use std::convert::TryFrom;
 use std::rc::Rc;

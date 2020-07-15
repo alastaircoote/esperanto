@@ -1,7 +1,7 @@
 use crate::jsc_globalcontext::JSCGlobalContext;
 use crate::jsc_value::JSCValue;
-use esperanto_traits::errors::{JSConversionError, JSEnvError};
-use esperanto_traits::JSContext;
+use esperanto_shared::errors::{JSConversionError, JSEnvError};
+use esperanto_shared::traits::JSContext;
 use javascriptcore_sys::{
     JSEvaluateScript, JSGlobalContextCreate, JSGlobalContextRetain, JSStringCreateWithUTF8CString,
     JSValueGetType, JSValueRef,

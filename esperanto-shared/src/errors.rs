@@ -1,4 +1,4 @@
-use crate::JSType;
+use crate::enums::JSType;
 #[derive(Debug, Clone)]
 struct JSError {
     message: String,

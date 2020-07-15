@@ -1,6 +1,6 @@
 [package]
 edition = "2018"
-name = "esperanto_traits"
+name = "esperanto_shared"
 version = "0.1.0"
 
 [dependencies]

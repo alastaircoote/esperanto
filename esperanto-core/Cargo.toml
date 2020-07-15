@@ -7,7 +7,7 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-esperanto_traits = {path = "../esperanto-traits"}
+esperanto_shared = {path = "../esperanto-shared"}
 log = "0.4.8"
 tokio = {version = "0.2", features = ["rt-threaded", "sync", "macros", "io-util"]}
 

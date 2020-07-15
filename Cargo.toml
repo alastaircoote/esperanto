@@ -4,4 +4,5 @@ members = [
   "esperanto-core",
   "esperanto-javascriptcore",
   "esperanto-quickjs",
+  "esperanto-shared",
 ]

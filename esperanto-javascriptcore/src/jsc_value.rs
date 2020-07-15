@@ -1,6 +1,6 @@
 use crate::jsc_globalcontext::JSCGlobalContext;
-use esperanto_traits::errors::JSConversionError;
-use esperanto_traits::JSValue;
+use esperanto_shared::errors::JSConversionError;
+use esperanto_shared::traits::JSValue;
 use javascriptcore_sys::{
     JSStringGetLength, JSStringGetUTF8CString, JSValueProtect, JSValueRef, JSValueToNumber,
     JSValueToStringCopy, JSValueUnprotect,
@@ -85,7 +85,7 @@ impl Drop for JSCValue {
 mod test {
     use super::*;
     use crate::jsc_context::JSCContext;
-    use esperanto_traits::JSContext;
+    use esperanto_shared::traits::JSContext;
     #[test]
     fn converts_to_number() {
         let runtime = JSCContext::new();
