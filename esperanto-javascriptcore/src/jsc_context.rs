@@ -8,7 +8,6 @@ use javascriptcore_sys::{
     JSValueGetType, JSValueRef,
 };
 use slotmap::{DefaultKey, SecondaryMap, SlotMap};
-use std::ffi::CString;
 use std::rc::Rc;
 
 pub struct JSCContext {
@@ -60,12 +59,11 @@ impl JSContext for JSCContext {
         };
 
         if exception_ptr.is_null() == false {
-            let error_val = JSCObject::new(exception_ptr, self.context.clone());
-
+            let error_val = JSCObject::from_value_ref(exception_ptr, self.context.clone())?;
             return Err(JSEnvError::JSErrorEncountered(JSError::from(error_val)?));
         }
 
-        Ok(JSCValue::new(return_value, self.context.clone()))
+        Ok(JSCValue::from_value_ref(return_value, self.context.clone()))
     }
     type StoreKey = DefaultKey;
     fn store_value(&mut self, value: Self::ValueType) -> Self::StoreKey {

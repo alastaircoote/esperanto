@@ -1,5 +1,5 @@
 use esperanto_shared::errors::{JSConversionError, JSEnvError};
-use esperanto_shared::traits::{JSContext, JSValue};
+use esperanto_shared::traits::{JSContext, JSObject, JSValue};
 use std::any::Any;
 use std::convert::TryFrom;
 
@@ -12,6 +12,16 @@ impl DummyJSValue {
         DummyJSValue {
             underlying_value: Box::new(obj),
         }
+    }
+}
+
+pub struct DummyJSObject {}
+
+impl JSObject for DummyJSObject {
+    type ValueType = DummyJSValue;
+
+    fn get_property(&self, name: &str) -> Result<Self::ValueType, JSEnvError> {
+        return Ok(DummyJSValue::new(()));
     }
 }
 
@@ -43,6 +53,7 @@ pub struct DummyJSContext {
 
 impl JSContext for DummyJSContext {
     type ValueType = DummyJSValue;
+    type ObjectType = DummyJSObject;
     type StoreKey = usize;
     fn evaluate(&self, _: &str) -> Result<DummyJSValue, JSEnvError> {
         Ok(DummyJSValue::new(Box::new(())))

@@ -43,6 +43,7 @@ pub enum JSEnvError {
     IncorrectTypeForThisOperation(JSType, JSType),
     JSErrorEncountered(JSError),
     TextEncodingFailed,
+    UnknownInternalError,
 }
 
 // impl Into<JSEnvError> for JSConversionError {

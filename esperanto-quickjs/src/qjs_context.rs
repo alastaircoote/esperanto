@@ -28,6 +28,7 @@ const NAME_CSTR: *const i8 = cstr!("name");
 
 impl JSContext for QJSContext {
     type ValueType = QJSValue;
+    type ObjectType = QJSValue;
     type StoreKey = DefaultKey;
     fn new() -> Self {
         // need to add support for shared runtimes

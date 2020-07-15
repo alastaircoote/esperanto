@@ -11,15 +11,15 @@ use std::ffi::CStr;
 use std::rc::Rc;
 
 pub struct JSCValue {
-    jsc_ref: JSValueRef,
-    context: Rc<JSCGlobalContext>,
+    pub(crate) jsc_ref: JSValueRef,
+    pub(crate) context: Rc<JSCGlobalContext>,
 }
 
 impl JSCValue {
-    pub fn new(value_ref: JSValueRef, in_context: Rc<JSCGlobalContext>) -> Self {
-        unsafe { JSValueProtect(in_context.jsc_ref, value_ref) };
+    pub fn from_value_ref(v_ref: JSValueRef, in_context: Rc<JSCGlobalContext>) -> Self {
+        unsafe { JSValueProtect(in_context.jsc_ref, v_ref) };
         JSCValue {
-            jsc_ref: value_ref,
+            jsc_ref: v_ref,
             context: in_context,
         }
     }

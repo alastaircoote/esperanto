@@ -2,7 +2,7 @@ use crate::qjs_shared_context_ref::SharedQJSContextRef;
 // use crate::ref_count::{dup_value, free_value, get_ref_count};
 use crate::ref_count::free_value;
 use esperanto_shared::errors::{JSConversionError, JSEnvError};
-use esperanto_shared::traits::JSValue;
+use esperanto_shared::traits::{JSObject, JSValue};
 use libquickjs_sys::{
     JSValue as QJSValueRef, JS_GetPropertyStr, JS_ToCStringLen2, JS_ToFloat64, JS_TAG_FLOAT64,
     JS_TAG_STRING,
@@ -16,7 +16,12 @@ pub struct QJSValue {
     context_ref: Rc<SharedQJSContextRef>,
 }
 
-impl JSValue for QJSValue {
+impl JSValue for QJSValue {}
+
+// QuickJS doesn't really make a distinction between values and objects like JSC does
+// so we just do it all on the same struct
+impl JSObject for QJSValue {
+    type ValueType = Self;
     fn get_property(&self, name: &str) -> Result<Self, JSEnvError> {
         let name_cstring = CString::new(name).map_err(|_| JSEnvError::TextEncodingFailed)?;
         let property_ref = unsafe {
@@ -27,7 +32,7 @@ impl JSValue for QJSValue {
             )
         };
 
-        Ok(Self::new(property_ref, self.context_ref))
+        Ok(Self::new(property_ref, self.context_ref.clone()))
     }
 }
 
