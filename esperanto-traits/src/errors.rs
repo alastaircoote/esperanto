@@ -1,16 +1,22 @@
 use crate::JSType;
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, Clone)]
+struct JSError {
+    message: String,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum JSConversionError {
     CouldNotConvertStringToSuitableFormat,
     StringWasTooLong,
     ConversionFailed,
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum JSEnvError {
     UsingWrongThread,
     CouldNotParseScript,
     ConversionError(JSConversionError),
     ValueNoLongerExists,
     IncorrectTypeForThisOperation(JSType, JSType),
+    JSErrorEncountered(String),
 }

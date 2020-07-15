@@ -1,15 +1,18 @@
 use crate::qjs_runtime::QJSRuntime;
 use crate::qjs_value::QJSValue;
-use esperanto_traits::errors::JSEnvError;
+// use crate::qjs_value::QJSValue;
+use crate::qjs_shared_context_ref::SharedQJSContextRef;
+use esperanto_traits::errors::{JSConversionError, JSEnvError};
 use esperanto_traits::JSContext;
-use qjs_sys::{JSContext as QJSContextRef, JS_Eval, JS_FreeContext, JS_NewContextRaw};
+use libquickjs_sys::{JS_Eval, JS_GetException, JS_NewContext, JS_EVAL_TYPE_GLOBAL};
 use slotmap::{DefaultKey, SecondaryMap, SlotMap};
+use std::convert::TryFrom;
 use std::ffi::CString;
 use std::rc::Rc;
-
-struct QJSContext {
-    runtime: Rc<QJSRuntime>,
-    qjs_ref: *mut QJSContextRef,
+pub struct QJSContext {
+    // runtime: Rc<QJSRuntime>,
+    context_ref: Rc<SharedQJSContextRef>,
+    // pub(crate) qjs_ref: *mut QJSContextRef,
     // This is really messy but slotmap requires that values implement Copy, which we can't
     // do because JSValueRef isn't copy-safe. So instead we use a SecondaryMap which CAN
     // store non-Copy items to store our actual values.
@@ -23,28 +26,46 @@ impl JSContext for QJSContext {
     fn new() -> Self {
         // need to add support for shared runtimes
         let runtime = Rc::new(QJSRuntime::new());
-        let qjs_ref = unsafe { JS_NewContextRaw(runtime.qjs_ref) };
+        let qjs_ref = unsafe { JS_NewContext(runtime.qjs_ref) };
+        if qjs_ref.is_null() {
+            println!("seems bad.")
+        }
         QJSContext {
-            runtime,
-            qjs_ref,
+            // runtime,
+            context_ref: Rc::new(SharedQJSContextRef::new(qjs_ref, runtime)),
             value_initial_store: SlotMap::new(),
             value_actual_store: SecondaryMap::new(),
         }
     }
 
-    fn evaluate<O: From<QJSValue>>(&self, script: &str) -> Result<O, JSEnvError> {
+    fn evaluate<O: TryFrom<QJSValue>>(&self, script: &str) -> Result<O, JSEnvError> {
         let script_as_c_string =
             CString::new(script).map_err(|_| JSEnvError::CouldNotParseScript)?;
 
+        let fin = CString::new("file.js").unwrap();
+
         let result = unsafe {
             JS_Eval(
-                self.qjs_ref,
+                self.context_ref.qjs_ref,
                 script_as_c_string.as_ptr(),
-                script_as_c_string.as_bytes().len(),
-                std::ptr::null_mut(),
-                0,
+                script.len() as _,
+                fin.as_ptr(),
+                JS_EVAL_TYPE_GLOBAL as i32,
             )
         };
+        unsafe {
+            let exc = JS_GetException(self.context_ref.qjs_ref);
+
+            // let exc_str = JS_ToString(self.context_ref.qjs_ref, exc);
+
+            // let str = JS_ToCStringLen2(self.context_ref.qjs_ref, std::ptr::null_mut(), exc_str, 0);
+
+            // let wat = std::ffi::CStr::from_ptr(str);
+
+            let js_value = QJSValue::new(result, self.context_ref.clone());
+            O::try_from(js_value)
+                .map_err(|_| JSEnvError::ConversionError(JSConversionError::ConversionFailed))
+        }
     }
 
     fn store_value(&mut self, value: Self::ValueType) -> Self::StoreKey {
@@ -66,5 +87,16 @@ impl JSContext for QJSContext {
             .ok_or(JSEnvError::ValueNoLongerExists)?;
         self.value_initial_store.remove(key);
         Ok(value)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn it_works() {
+        let ctx = QJSContext::new();
+        let result: QJSValue = ctx.evaluate("'hello'").unwrap();
     }
 }

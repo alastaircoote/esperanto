@@ -1,4 +1,4 @@
-use qjs_sys::{JSRuntime as QJSRuntimeRef, JS_FreeRuntime, JS_NewRuntime};
+use libquickjs_sys::{JSRuntime as QJSRuntimeRef, JS_FreeRuntime, JS_NewRuntime};
 
 pub struct QJSRuntime {
     pub(crate) qjs_ref: *mut QJSRuntimeRef,

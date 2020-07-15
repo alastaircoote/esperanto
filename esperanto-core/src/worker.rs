@@ -10,7 +10,7 @@ use tokio::sync::Mutex;
 
 type RunloopOperation<Runtime> = Box<dyn Send + FnOnce(&mut Runtime) -> ()>;
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum WorkerError {
     CouldNotCreateWorker,
     OperationEnqueueFailed,
@@ -201,12 +201,12 @@ impl<Runtime: JSContext + 'static> Worker<Runtime> {
     }
 
     pub async fn wait_for_shutdown(&self) -> Result<(), WorkerError> {
-        match *self.shutdown_complete.lock().await {
+        match self.shutdown_complete.lock().await.as_ref() {
             None => {
                 // Worker shut down successfully, great!
                 Ok(())
             }
-            Some(err) => Err(err)
+            Some(err) => Err(err.clone())
         }
     }
 }

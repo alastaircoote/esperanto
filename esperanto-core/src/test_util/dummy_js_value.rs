@@ -41,8 +41,9 @@ pub struct DummyJSContext {
 impl JSContext for DummyJSContext {
     type ValueType = DummyJSValue;
     type StoreKey = usize;
-    fn evaluate<O: From<Self::ValueType>>(&self, _: &str) -> Result<O, JSEnvError> {
-        Ok(DummyJSValue::new(Box::new(())).into())
+    fn evaluate<O: TryFrom<Self::ValueType>>(&self, _: &str) -> Result<O, JSEnvError> {
+        O::try_from(DummyJSValue::new(Box::new(())))
+            .map_err(|_| JSEnvError::ConversionError(JSConversionError::ConversionFailed))
     }
 
     fn new() -> Self {
