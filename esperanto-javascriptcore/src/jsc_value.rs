@@ -1,9 +1,9 @@
-use crate::jsc_globalcontext::JSCGlobalContext;
+use crate::{jsc_globalcontext::JSCGlobalContext, jsc_string::JSCString};
 use esperanto_shared::errors::JSConversionError;
 use esperanto_shared::traits::JSValue;
 use javascriptcore_sys::{
-    JSStringGetLength, JSStringGetUTF8CString, JSValueProtect, JSValueRef, JSValueToNumber,
-    JSValueToStringCopy, JSValueUnprotect,
+    JSObjectGetProperty, JSStringGetLength, JSStringGetUTF8CString, JSValueProtect, JSValueRef,
+    JSValueToNumber, JSValueToObject, JSValueToStringCopy, JSValueUnprotect,
 };
 use std::convert::TryFrom;
 use std::convert::TryInto;
@@ -21,6 +21,14 @@ impl JSCValue {
         JSCValue {
             jsc_ref: value_ref,
             context: in_context,
+        }
+    }
+}
+
+impl Drop for JSCValue {
+    fn drop(&mut self) {
+        unsafe {
+            JSValueUnprotect(self.context.jsc_ref, self.jsc_ref);
         }
     }
 }
@@ -51,6 +59,14 @@ impl TryFrom<JSCValue> for &str {
     }
 }
 
+impl TryFrom<JSCValue> for String {
+    type Error = JSConversionError;
+    fn try_from(value: JSCValue) -> Result<Self, Self::Error> {
+        let str: &str = value.try_into()?;
+        Ok(str.to_string())
+    }
+}
+
 impl TryFrom<JSCValue> for f64 {
     type Error = JSConversionError;
     fn try_from(value: JSCValue) -> Result<Self, Self::Error> {
@@ -71,14 +87,23 @@ impl TryFrom<JSCValue> for f64 {
     }
 }
 
-impl JSValue for JSCValue {}
+impl JSValue for JSCValue {
+    // fn get_property(&self, name: &str) -> Result<Self, esperanto_shared::errors::JSEnvError> {
+    //     let name_jscstring = JSCString::from_string(name)?;
 
-impl Drop for JSCValue {
-    fn drop(&mut self) {
-        unsafe {
-            JSValueUnprotect(self.context.jsc_ref, self.jsc_ref);
-        }
-    }
+    //     let mut exception_ptr: JSValueRef = std::ptr::null_mut();
+
+    //     let self_obj = JSValueToObject(self.context.jsc_ref, self.jsc_ref, std::ptr::null_mut());
+
+    //     let prop_val = unsafe {
+    //         JSObjectGetProperty(
+    //             self.context.jsc_ref,
+    //             self_obj,
+    //             name_jscstring.jsc_ref,
+    //             &mut exception_ptr,
+    //         )
+    //     };
+    // }
 }
 
 #[cfg(test)]

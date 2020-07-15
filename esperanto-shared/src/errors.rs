@@ -1,7 +1,30 @@
 use crate::enums::JSType;
-#[derive(Debug, Clone)]
-struct JSError {
-    message: String,
+use crate::traits::JSObject;
+use std::convert::{TryFrom, TryInto};
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct JSError {
+    pub name: String,
+    pub message: String,
+}
+
+impl JSError {
+    pub fn from<Object: JSObject>(val: Object) -> Result<Self, JSEnvError>
+    where
+        Object::ValueType: TryInto<String>,
+    {
+        let message: String = val
+            .get_property("message")?
+            .try_into()
+            .map_err(|_| JSConversionError::ConversionFailed)?;
+
+        let name: String = val
+            .get_property("name")?
+            .try_into()
+            .map_err(|_| JSConversionError::ConversionFailed)?;
+
+        return Ok(JSError { message, name });
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -18,5 +41,18 @@ pub enum JSEnvError {
     ConversionError(JSConversionError),
     ValueNoLongerExists,
     IncorrectTypeForThisOperation(JSType, JSType),
-    JSErrorEncountered(String),
+    JSErrorEncountered(JSError),
+    TextEncodingFailed,
+}
+
+// impl Into<JSEnvError> for JSConversionError {
+//     fn into(self) -> JSEnvError {
+//         return JSEnvError::ConversionError(self);
+//     }
+// }
+
+impl From<JSConversionError> for JSEnvError {
+    fn from(val: JSConversionError) -> Self {
+        return JSEnvError::ConversionError(val);
+    }
 }

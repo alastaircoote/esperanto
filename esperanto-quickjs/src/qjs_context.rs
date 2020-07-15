@@ -2,13 +2,16 @@ use crate::qjs_runtime::QJSRuntime;
 use crate::qjs_value::QJSValue;
 // use crate::qjs_value::QJSValue;
 use crate::qjs_shared_context_ref::SharedQJSContextRef;
-use esperanto_shared::errors::{JSConversionError, JSEnvError};
+use esperanto_shared::cstr;
+use esperanto_shared::errors::{JSEnvError, JSError};
 use esperanto_shared::traits::JSContext;
-use libquickjs_sys::{JS_Eval, JS_GetException, JS_NewContext, JS_EVAL_TYPE_GLOBAL};
+use libquickjs_sys::{
+    JS_Eval, JS_GetException, JS_NewContext, JS_EVAL_TYPE_GLOBAL, JS_TAG_EXCEPTION,
+};
 use slotmap::{DefaultKey, SecondaryMap, SlotMap};
-use std::convert::TryFrom;
 use std::ffi::CString;
 use std::rc::Rc;
+
 pub struct QJSContext {
     // runtime: Rc<QJSRuntime>,
     context_ref: Rc<SharedQJSContextRef>,
@@ -19,6 +22,9 @@ pub struct QJSContext {
     value_initial_store: SlotMap<DefaultKey, ()>,
     value_actual_store: SecondaryMap<DefaultKey, QJSValue>,
 }
+
+const MESSAGE_CSTR: *const i8 = cstr!("message");
+const NAME_CSTR: *const i8 = cstr!("name");
 
 impl JSContext for QJSContext {
     type ValueType = QJSValue;
@@ -38,7 +44,7 @@ impl JSContext for QJSContext {
         }
     }
 
-    fn evaluate<O: TryFrom<QJSValue>>(&self, script: &str) -> Result<O, JSEnvError> {
+    fn evaluate(&self, script: &str) -> Result<QJSValue, JSEnvError> {
         let script_as_c_string =
             CString::new(script).map_err(|_| JSEnvError::CouldNotParseScript)?;
 
@@ -53,19 +59,20 @@ impl JSContext for QJSContext {
                 JS_EVAL_TYPE_GLOBAL as i32,
             )
         };
-        unsafe {
-            let exc = JS_GetException(self.context_ref.qjs_ref);
 
-            // let exc_str = JS_ToString(self.context_ref.qjs_ref, exc);
-
-            // let str = JS_ToCStringLen2(self.context_ref.qjs_ref, std::ptr::null_mut(), exc_str, 0);
-
-            // let wat = std::ffi::CStr::from_ptr(str);
-
-            let js_value = QJSValue::new(result, self.context_ref.clone());
-            O::try_from(js_value)
-                .map_err(|_| JSEnvError::ConversionError(JSConversionError::ConversionFailed))
+        if result.tag != JS_TAG_EXCEPTION as i64 {
+            return Ok(QJSValue::new(result, self.context_ref.clone()));
         }
+
+        let exception = unsafe {
+            QJSValue::new(
+                JS_GetException(self.context_ref.qjs_ref),
+                self.context_ref.clone(),
+            )
+        };
+
+        let error = JSError::from(exception)?;
+        Err(JSEnvError::JSErrorEncountered(error))
     }
 
     fn store_value(&mut self, value: Self::ValueType) -> Self::StoreKey {
@@ -93,10 +100,15 @@ impl JSContext for QJSContext {
 #[cfg(test)]
 mod test {
     use super::*;
+    use esperanto_shared::trait_tests::jscontext_tests;
 
     #[test]
-    fn it_works() {
-        let ctx = QJSContext::new();
-        let result: QJSValue = ctx.evaluate("'hello'").unwrap();
+    fn it_evaluates_correct_code() {
+        jscontext_tests::it_evaluates_correct_code::<QJSContext>();
+    }
+
+    #[test]
+    fn it_throws_exceptions_on_invalid_code() {
+        jscontext_tests::it_throws_exceptions_on_invalid_code::<QJSContext>();
     }
 }

@@ -16,6 +16,9 @@ impl DummyJSValue {
 }
 
 impl JSValue for DummyJSValue {
+    // fn get_property(&self, name: &str) -> Result<Self, JSEnvError> {
+    //     return Ok(DummyJSValue::new(()));
+    // }
     // fn to_string<'b>(&self) -> Result<&'b str, JSEnvError> {
     //     match self.underlying_value.downcast_ref::<&str>() {
     //         Some(str_val) => Ok(str_val),
@@ -41,9 +44,8 @@ pub struct DummyJSContext {
 impl JSContext for DummyJSContext {
     type ValueType = DummyJSValue;
     type StoreKey = usize;
-    fn evaluate<O: TryFrom<Self::ValueType>>(&self, _: &str) -> Result<O, JSEnvError> {
-        O::try_from(DummyJSValue::new(Box::new(())))
-            .map_err(|_| JSEnvError::ConversionError(JSConversionError::ConversionFailed))
+    fn evaluate(&self, _: &str) -> Result<DummyJSValue, JSEnvError> {
+        Ok(DummyJSValue::new(Box::new(())))
     }
 
     fn new() -> Self {

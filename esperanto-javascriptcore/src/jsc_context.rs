@@ -1,14 +1,13 @@
 use crate::jsc_globalcontext::JSCGlobalContext;
-use crate::jsc_value::JSCValue;
-use esperanto_shared::errors::{JSConversionError, JSEnvError};
+use crate::jsc_string::JSCString;
+use crate::{jsc_object::JSCObject, jsc_value::JSCValue};
+use esperanto_shared::errors::{JSConversionError, JSEnvError, JSError};
 use esperanto_shared::traits::JSContext;
 use javascriptcore_sys::{
     JSEvaluateScript, JSGlobalContextCreate, JSGlobalContextRetain, JSStringCreateWithUTF8CString,
     JSValueGetType, JSValueRef,
 };
 use slotmap::{DefaultKey, SecondaryMap, SlotMap};
-use std::convert::TryFrom;
-use std::convert::TryInto;
 use std::ffi::CString;
 use std::rc::Rc;
 
@@ -23,6 +22,7 @@ pub struct JSCContext {
 
 impl JSContext for JSCContext {
     type ValueType = JSCValue;
+    type ObjectType = JSCObject;
 
     fn new() -> Self {
         unsafe {
@@ -40,43 +40,32 @@ impl JSContext for JSCContext {
         }
     }
 
-    fn evaluate<O: TryFrom<JSCValue>>(&self, script: &str) -> Result<O, JSEnvError> {
-        let script_c_string = CString::new(script).map_err(|_| JSEnvError::CouldNotParseScript)?;
-        unsafe {
-            let script_js_string = JSStringCreateWithUTF8CString(script_c_string.as_ptr());
+    fn evaluate(&self, script: &str) -> Result<JSCValue, JSEnvError> {
+        let script_jsstring = JSCString::from_string(script)?;
+        // let script_c_string = CString::new(script).map_err(|_| JSEnvError::CouldNotParseScript)?;
 
-            let mut exception_ptr: JSValueRef = std::ptr::null_mut();
+        // let script_js_string = unsafe { JSStringCreateWithUTF8CString(script_c_string.as_ptr()) };
 
-            let return_value = JSEvaluateScript(
+        let mut exception_ptr: JSValueRef = std::ptr::null_mut();
+
+        let return_value = unsafe {
+            JSEvaluateScript(
                 self.context.jsc_ref,
-                script_js_string,
+                script_jsstring.jsc_ref,
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
                 0,
                 &mut exception_ptr,
-            );
+            )
+        };
 
-            if exception_ptr.is_null() == false {
-                let error_val = JSCValue::new(exception_ptr, self.context.clone());
+        if exception_ptr.is_null() == false {
+            let error_val = JSCObject::new(exception_ptr, self.context.clone());
 
-                match error_val.try_into() {
-                    Ok(error_str) => {
-                        let _: &str = error_str; // need this so compiler knows the type
-                        return Err(JSEnvError::JSErrorEncountered(error_str.to_string()));
-                    }
-                    Err(_) => {
-                        return Err(JSEnvError::JSErrorEncountered(
-                            "(could not read error message)".to_string(),
-                        ))
-                    }
-                }
-            }
-
-            let jsvalue = JSCValue::new(return_value, self.context.clone());
-
-            O::try_from(jsvalue)
-                .map_err(|_| JSEnvError::ConversionError(JSConversionError::ConversionFailed))
+            return Err(JSEnvError::JSErrorEncountered(JSError::from(error_val)?));
         }
+
+        Ok(JSCValue::new(return_value, self.context.clone()))
     }
     type StoreKey = DefaultKey;
     fn store_value(&mut self, value: Self::ValueType) -> Self::StoreKey {
@@ -103,29 +92,16 @@ impl JSContext for JSCContext {
 
 #[cfg(test)]
 mod test {
-
     use super::*;
-    use std::convert::TryInto;
+    use esperanto_shared::trait_tests::jscontext_tests;
 
     #[test]
     fn it_evaluates_correct_code() {
-        let runtime = JSCContext::new();
-        let val: JSCValue = runtime.evaluate("1+2").unwrap();
-        let str: f64 = val.try_into().unwrap();
-        assert_eq!(str, 3.0)
+        jscontext_tests::it_evaluates_correct_code::<JSCContext>();
     }
 
     #[test]
     fn it_throws_exceptions_on_invalid_code() {
-        let runtime = JSCContext::new();
-        match runtime.evaluate::<JSCValue>("]") {
-            Ok(_) => panic!("This call should not succeed"),
-            Err(err) => {
-                assert_eq!(
-                    err,
-                    JSEnvError::JSErrorEncountered("SyntaxError: Unexpected token ']'".to_string())
-                );
-            }
-        }
+        jscontext_tests::it_throws_exceptions_on_invalid_code::<JSCContext>();
     }
 }
