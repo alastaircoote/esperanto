@@ -1,9 +1,6 @@
 use super::JSObject;
 use crate::errors::{JSContextError, JSConversionError};
-pub trait JSValue
-where
-    Self: Sized,
-{
+pub trait JSValue {
     // type ContextType: JSContext + 'static;
     type ObjectType: JSObject + 'static;
     fn to_string(&self) -> Result<String, JSConversionError>;

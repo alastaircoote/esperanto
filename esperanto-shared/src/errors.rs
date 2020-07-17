@@ -1,11 +1,5 @@
 use crate::enums::JSType;
-use crate::traits::{JSObject, JSValue};
-use std::{
-    convert::{TryFrom, TryInto},
-    error::Error,
-    ffi::NulError,
-    fmt::Display,
-};
+use std::fmt::Display;
 use thiserror::*;
 /// JSError is a representation of an Error within JavaScript. It's also kind of a method of last resort:
 /// it could be implemented with the various JSValue and JSObject methods needed, but those methods can

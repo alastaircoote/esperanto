@@ -12,6 +12,7 @@ use std::convert::TryInto;
 use std::ffi::CStr;
 use std::rc::Rc;
 
+#[derive(Debug)]
 pub struct JSCValue {
     pub(crate) jsc_ref: JSValueRef,
     pub(crate) context: Rc<JSCSharedContextRef>,

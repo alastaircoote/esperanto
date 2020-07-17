@@ -9,6 +9,7 @@ use javascriptcore_sys::{
 // use slotmap::{DefaultKey, SecondaryMap, SlotMap};
 use std::rc::Rc;
 
+#[derive(Debug)]
 pub struct JSCContext {
     pub(crate) context: Rc<JSCSharedContextRef>,
     // This is really messy but slotmap requires that values implement Copy, which we can't
