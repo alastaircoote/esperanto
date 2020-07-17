@@ -1,9 +1,11 @@
-use crate::{jsc_globalcontext::JSCGlobalContext, jsc_string::JSCString};
-use esperanto_shared::errors::JSConversionError;
+use crate::{
+    jsc_object::JSCObject, jsc_sharedcontextref::JSCSharedContextRef, jsc_string::JSCString,
+};
+use esperanto_shared::errors::{JSContextError, JSConversionError};
 use esperanto_shared::traits::JSValue;
 use javascriptcore_sys::{
-    JSObjectGetProperty, JSStringGetLength, JSStringGetUTF8CString, JSValueProtect, JSValueRef,
-    JSValueToNumber, JSValueToObject, JSValueToStringCopy, JSValueUnprotect,
+    JSStringGetLength, JSStringGetUTF8CString, JSValueProtect, JSValueRef, JSValueToNumber,
+    JSValueToStringCopy, JSValueUnprotect,
 };
 use std::convert::TryFrom;
 use std::convert::TryInto;
@@ -12,15 +14,15 @@ use std::rc::Rc;
 
 pub struct JSCValue {
     pub(crate) jsc_ref: JSValueRef,
-    pub(crate) context: Rc<JSCGlobalContext>,
+    pub(crate) context: Rc<JSCSharedContextRef>,
 }
 
 impl JSCValue {
-    pub fn from_value_ref(v_ref: JSValueRef, in_context: Rc<JSCGlobalContext>) -> Self {
+    pub fn from_value_ref(v_ref: JSValueRef, in_context: &Rc<JSCSharedContextRef>) -> Self {
         unsafe { JSValueProtect(in_context.jsc_ref, v_ref) };
         JSCValue {
             jsc_ref: v_ref,
-            context: in_context,
+            context: in_context.clone(),
         }
     }
 }
@@ -88,22 +90,19 @@ impl TryFrom<JSCValue> for f64 {
 }
 
 impl JSValue for JSCValue {
-    // fn get_property(&self, name: &str) -> Result<Self, esperanto_shared::errors::JSEnvError> {
-    //     let name_jscstring = JSCString::from_string(name)?;
+    type ObjectType = JSCObject;
+    fn to_string(&self) -> Result<String, JSConversionError> {
+        let mut exception_ptr: JSValueRef = std::ptr::null_mut();
+        let str_ptr =
+            unsafe { JSValueToStringCopy(self.context.jsc_ref, self.jsc_ref, &mut exception_ptr) };
 
-    //     let mut exception_ptr: JSValueRef = std::ptr::null_mut();
+        let jsc_string = JSCString::from_ptr(str_ptr);
+        jsc_string.to_string()
+    }
 
-    //     let self_obj = JSValueToObject(self.context.jsc_ref, self.jsc_ref, std::ptr::null_mut());
-
-    //     let prop_val = unsafe {
-    //         JSObjectGetProperty(
-    //             self.context.jsc_ref,
-    //             self_obj,
-    //             name_jscstring.jsc_ref,
-    //             &mut exception_ptr,
-    //         )
-    //     };
-    // }
+    fn to_object(&self) -> Result<Self::ObjectType, JSContextError> {
+        JSCObject::from_value_ref(self.jsc_ref, &self.context)
+    }
 }
 
 #[cfg(test)]
@@ -113,7 +112,7 @@ mod test {
     use esperanto_shared::traits::JSContext;
     #[test]
     fn converts_to_number() {
-        let runtime = JSCContext::new();
+        let runtime = JSCContext::new().unwrap();
         let value: JSCValue = runtime.evaluate("3.5").unwrap();
         let f: f64 = value.try_into().unwrap();
         assert_eq!(f, 3.5);
@@ -121,7 +120,7 @@ mod test {
 
     #[test]
     fn converts_to_string() {
-        let runtime = JSCContext::new();
+        let runtime = JSCContext::new().unwrap();
         let value: JSCValue = runtime.evaluate("'hello'").unwrap();
         let f: &str = value.try_into().unwrap();
         assert_eq!(f, "hello");
