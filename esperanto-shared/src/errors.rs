@@ -1,5 +1,5 @@
 use crate::enums::JSType;
-use std::fmt::Display;
+use std::{ffi::NulError, fmt::Display, str::Utf8Error};
 use thiserror::*;
 /// JSError is a representation of an Error within JavaScript. It's also kind of a method of last resort:
 /// it could be implemented with the various JSValue and JSObject methods needed, but those methods can
@@ -62,8 +62,10 @@ pub enum JSConversionError {
     StringWasTooLong,
     #[error("Could not convert between types")]
     ConversionFailed,
-    #[error("String conversion failed")]
-    StringConversionFailed(Box<dyn std::error::Error>),
+    #[error("Converting the provided string to a C-compatible string failed.")]
+    ConversionToCStringFailed(#[from] NulError),
+    #[error("Converting the C string to a native string failed due to a UTF8 encoding error")]
+    ConversionFromCStringFailed(#[from] Utf8Error),
 }
 
 #[derive(Error, Debug, PartialEq, Clone)]
@@ -96,4 +98,16 @@ pub enum JSContextError {
     ConversionError(#[from] JSConversionError),
     #[error("Creation of the JS context failed")]
     CouldNotCreateContext,
+}
+
+impl From<NulError> for JSContextError {
+    fn from(e: NulError) -> Self {
+        return JSConversionError::ConversionToCStringFailed(e).into();
+    }
+}
+
+impl From<Utf8Error> for JSContextError {
+    fn from(e: Utf8Error) -> Self {
+        return JSConversionError::ConversionFromCStringFailed(e).into();
+    }
 }

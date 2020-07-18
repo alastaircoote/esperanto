@@ -1,5 +1,6 @@
 use libquickjs_sys::{JSRuntime as QJSRuntimeRef, JS_FreeRuntime, JS_NewRuntime};
 
+#[derive(Debug)]
 pub struct QJSRuntime {
     pub(crate) qjs_ref: *mut QJSRuntimeRef,
 }

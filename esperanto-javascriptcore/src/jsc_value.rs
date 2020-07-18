@@ -92,7 +92,7 @@ impl TryFrom<JSCValue> for f64 {
 
 impl JSValue for JSCValue {
     type ObjectType = JSCObject;
-    fn to_string(&self) -> Result<String, JSConversionError> {
+    fn as_string(&self) -> Result<String, JSConversionError> {
         let mut exception_ptr: JSValueRef = std::ptr::null_mut();
         let str_ptr =
             unsafe { JSValueToStringCopy(self.context.jsc_ref, self.jsc_ref, &mut exception_ptr) };
@@ -101,7 +101,7 @@ impl JSValue for JSCValue {
         jsc_string.to_string()
     }
 
-    fn to_object(&self) -> Result<Self::ObjectType, JSContextError> {
+    fn to_object(self) -> Result<Self::ObjectType, JSContextError> {
         JSCObject::from_value_ref(self.jsc_ref, &self.context)
     }
 }

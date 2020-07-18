@@ -13,8 +13,8 @@ pub struct JSCString {
 
 impl JSCString {
     pub fn from_string(string: &str) -> Result<Self, JSConversionError> {
-        let script_c_string = CString::new(string)
-            .map_err(|e| JSConversionError::StringConversionFailed(Box::new(e)))?;
+        let script_c_string =
+            CString::new(string).map_err(|e| JSConversionError::ConversionToCStringFailed(e))?;
 
         let string_ptr = unsafe { JSStringCreateWithUTF8CString(script_c_string.as_ptr()) };
 
@@ -36,7 +36,7 @@ impl JSCString {
         let str = unsafe { CStr::from_ptr(buffer.as_ptr()) };
         Ok(str
             .to_str()
-            .map_err(|e| JSConversionError::StringConversionFailed(Box::new(e)))?
+            .map_err(|e| JSConversionError::ConversionFromCStringFailed(e))?
             .to_string())
     }
 }
