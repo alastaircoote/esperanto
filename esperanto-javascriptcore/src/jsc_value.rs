@@ -4,12 +4,8 @@ use crate::{
 use esperanto_shared::errors::{JSContextError, JSConversionError};
 use esperanto_shared::traits::JSValue;
 use javascriptcore_sys::{
-    JSStringGetLength, JSStringGetUTF8CString, JSValueProtect, JSValueRef, JSValueToNumber,
-    JSValueToStringCopy, JSValueUnprotect,
+    JSValueProtect, JSValueRef, JSValueToNumber, JSValueToStringCopy, JSValueUnprotect,
 };
-use std::convert::TryFrom;
-use std::convert::TryInto;
-use std::ffi::CStr;
 use std::rc::Rc;
 
 #[derive(Debug)]
@@ -36,59 +32,46 @@ impl Drop for JSCValue {
     }
 }
 
-impl TryFrom<JSCValue> for &str {
-    type Error = JSConversionError;
-    fn try_from(value: JSCValue) -> Result<Self, Self::Error> {
-        unsafe {
-            let string_ref =
-                JSValueToStringCopy(value.context.jsc_ref, value.jsc_ref, std::ptr::null_mut());
-            let string_length = JSStringGetLength(string_ref);
+// impl TryFrom<JSCValue> for &str {
+//     type Error = JSConversionError;
+//     fn try_from(value: JSCValue) -> Result<Self, Self::Error> {
+//         unsafe {
+//             let string_ref =
+//                 JSValueToStringCopy(value.context.jsc_ref, value.jsc_ref, std::ptr::null_mut());
+//             let string_length = JSStringGetLength(string_ref);
 
-            // If we're on a 32 bit archiecture this could theoretically get too big. It really,
-            // really shouldn't ever happen though.
+//             // If we're on a 32 bit archiecture this could theoretically get too big. It really,
+//             // really shouldn't ever happen though.
 
-            let string_length_usize: usize = string_length
-                .try_into()
-                .map_err(|_| JSConversionError::StringWasTooLong)?;
+//             let string_length_usize: usize = string_length
+//                 .try_into()
+//                 .map_err(|_| JSConversionError::StringWasTooLong)?;
 
-            let mut bytes: Vec<i8> = vec![0; string_length_usize];
+//             let mut bytes: Vec<i8> = vec![0; string_length_usize];
 
-            JSStringGetUTF8CString(string_ref, bytes.as_mut_ptr(), string_length);
+//             JSStringGetUTF8CString(string_ref, bytes.as_mut_ptr(), string_length);
 
-            let cstr = CStr::from_ptr(bytes.as_ptr());
-            cstr.to_str()
-                .map_err(|_| JSConversionError::CouldNotConvertStringToSuitableFormat)
-        }
-    }
-}
+//             let cstr = CStr::from_ptr(bytes.as_ptr());
+//             cstr.to_str()
+//                 .map_err(|_| JSConversionError::CouldNotConvertStringToSuitableFormat)
+//         }
+//     }
+// }
 
-impl TryFrom<JSCValue> for String {
-    type Error = JSConversionError;
-    fn try_from(value: JSCValue) -> Result<Self, Self::Error> {
-        let str: &str = value.try_into()?;
-        Ok(str.to_string())
-    }
-}
+// impl TryFrom<JSCValue> for String {
+//     type Error = JSConversionError;
+//     fn try_from(value: JSCValue) -> Result<Self, Self::Error> {
+//         let str: &str = value.try_into()?;
+//         Ok(str.to_string())
+//     }
+// }
 
-impl TryFrom<JSCValue> for f64 {
-    type Error = JSConversionError;
-    fn try_from(value: JSCValue) -> Result<Self, Self::Error> {
-        // As best I've been able to tell JSValueToNumber never actually creates an exception.
-        // instead the returned value is NaN.
-
-        // Will leave this here in the hopes we'll be able to find something that triggers an exception
-        // in the future and test for it
-        let exception: *mut JSValueRef = std::ptr::null_mut();
-
-        let val = unsafe { JSValueToNumber(value.context.jsc_ref, value.jsc_ref, exception) };
-
-        if val.is_nan() {
-            Err(JSConversionError::ConversionFailed)
-        } else {
-            Ok(val)
-        }
-    }
-}
+// impl TryFrom<JSCValue> for f64 {
+//     type Error = JSConversionError;
+//     fn try_from(value: JSCValue) -> Result<Self, Self::Error> {
+//         value.as_number()
+//     }
+// }
 
 impl JSValue for JSCValue {
     type ObjectType = JSCObject;
@@ -104,26 +87,35 @@ impl JSValue for JSCValue {
     fn to_object(self) -> Result<Self::ObjectType, JSContextError> {
         JSCObject::from_value_ref(self.jsc_ref, &self.context)
     }
+    fn as_number(&self) -> Result<f64, JSConversionError> {
+        // As best I've been able to tell JSValueToNumber never actually creates an exception.
+        // instead the returned value is NaN.
+
+        // Will leave this here in the hopes we'll be able to find something that triggers an exception
+        // in the future and test for it
+        let exception: *mut JSValueRef = std::ptr::null_mut();
+
+        let val = unsafe { JSValueToNumber(self.context.jsc_ref, self.jsc_ref, exception) };
+
+        if val.is_nan() {
+            Err(JSConversionError::ResultIsNotANumber)
+        } else {
+            Ok(val)
+        }
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::jsc_context::JSCContext;
-    use esperanto_shared::traits::JSContext;
+    use crate::jsc_globalcontext::JSCGlobalContext;
+    use esperanto_shared::trait_tests::jsvalue_tests;
     #[test]
     fn converts_to_number() {
-        let runtime = JSCContext::new().unwrap();
-        let value: JSCValue = runtime.evaluate("3.5").unwrap();
-        let f: f64 = value.try_into().unwrap();
-        assert_eq!(f, 3.5);
+        jsvalue_tests::converts_to_number::<JSCGlobalContext>()
     }
 
     #[test]
     fn converts_to_string() {
-        let runtime = JSCContext::new().unwrap();
-        let value: JSCValue = runtime.evaluate("'hello'").unwrap();
-        let f: &str = value.try_into().unwrap();
-        assert_eq!(f, "hello");
+        jsvalue_tests::converts_to_string::<JSCGlobalContext>()
     }
 }

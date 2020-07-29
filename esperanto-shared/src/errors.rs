@@ -66,6 +66,10 @@ pub enum JSConversionError {
     ConversionToCStringFailed(#[from] NulError),
     #[error("Converting the C string to a native string failed due to a UTF8 encoding error")]
     ConversionFromCStringFailed(#[from] Utf8Error),
+    #[error("The result of this conversion was not a number")]
+    ResultIsNotANumber,
+    #[error("An unknown error ocurred")]
+    UnknownError,
 }
 
 #[derive(Error, Debug, PartialEq, Clone)]
@@ -109,5 +113,14 @@ impl From<NulError> for JSContextError {
 impl From<Utf8Error> for JSContextError {
     fn from(e: Utf8Error) -> Self {
         return JSConversionError::ConversionFromCStringFailed(e).into();
+    }
+}
+
+impl From<JSConversionError> for JSError {
+    fn from(err: JSConversionError) -> Self {
+        JSError {
+            name: "ConversionError".to_string(),
+            message: "Could not convert value".to_string(),
+        }
     }
 }

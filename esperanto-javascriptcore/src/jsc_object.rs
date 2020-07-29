@@ -12,18 +12,18 @@ use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct JSCObject {
-    jsc_ref: JSObjectRef,
+    pub(crate) jsc_ref: JSObjectRef,
     context: Rc<JSCSharedContextRef>,
 }
 
 impl JSCObject {
-    pub fn from_obj_ref(value_ref: JSObjectRef, in_context: Rc<JSCSharedContextRef>) -> Self {
-        unsafe { JSValueProtect(in_context.jsc_ref, value_ref) };
-        JSCObject {
-            jsc_ref: value_ref,
-            context: in_context,
-        }
-    }
+    // pub fn from_obj_ref(value_ref: JSObjectRef, in_context: Rc<JSCSharedContextRef>) -> Self {
+    //     unsafe { JSValueProtect(in_context.jsc_ref, value_ref) };
+    //     JSCObject {
+    //         jsc_ref: value_ref,
+    //         context: in_context,
+    //     }
+    // }
 
     pub fn from_value_ref(
         value_ref: JSValueRef,
@@ -82,20 +82,20 @@ impl JSObject for JSCObject {
 mod test {
 
     use super::*;
-    use crate::jsc_context::JSCContext;
+    use crate::jsc_globalcontext::JSCGlobalContext;
     use esperanto_shared::traits::{JSContext, JSValue};
     use std::convert::TryInto;
 
     #[test]
     fn can_create_from_object() {
-        let ctx = JSCContext::new().unwrap();
+        let ctx = JSCGlobalContext::new().unwrap();
         let result = ctx.evaluate("({})").unwrap();
         let _: JSCObject = result.try_into().unwrap();
     }
 
     #[test]
     fn throws_when_not_given_object() {
-        let ctx = JSCContext::new().unwrap();
+        let ctx = JSCGlobalContext::new().unwrap();
         let result = ctx.evaluate("undefined").unwrap();
         let conversion_result = result.to_object().unwrap_err();
 

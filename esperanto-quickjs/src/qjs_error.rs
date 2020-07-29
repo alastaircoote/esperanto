@@ -1,4 +1,4 @@
-use crate::qjs_shared_context_ref::SharedQJSContextRef;
+use crate::{qjs_shared_context_ref::SharedQJSContextRef, qjs_value::QJSValue};
 use esperanto_shared::errors::JSError;
 use libquickjs_sys::{
     JSValue as QJSValueRef, JS_GetException, JS_GetPropertyStr, JS_ToCStringLen2, JS_TAG_EXCEPTION,
@@ -17,8 +17,8 @@ pub(crate) trait QJSError {
 }
 
 fn best_effort_get_error(context_ref: &Rc<SharedQJSContextRef>) -> Option<JSError> {
-    let exception = unsafe { JS_GetException(context_ref.qjs_ref) };
-    if exception.tag == JS_TAG_UNDEFINED as i64 {
+    let exception = unsafe { QJSValue::new(JS_GetException(context_ref.qjs_ref), context_ref) };
+    if exception.qjs_ref.tag == JS_TAG_UNDEFINED as i64 {
         return None;
     }
 
@@ -33,9 +33,10 @@ fn best_effort_get_error(context_ref: &Rc<SharedQJSContextRef>) -> Option<JSErro
         _ => return None,
     }
 
-    let name_ref = unsafe { JS_GetPropertyStr(context_ref.qjs_ref, exception, name_str.as_ptr()) };
+    let name_ref =
+        unsafe { JS_GetPropertyStr(context_ref.qjs_ref, exception.qjs_ref, name_str.as_ptr()) };
     let message_ref =
-        unsafe { JS_GetPropertyStr(context_ref.qjs_ref, exception, message_str.as_ptr()) };
+        unsafe { JS_GetPropertyStr(context_ref.qjs_ref, exception.qjs_ref, message_str.as_ptr()) };
 
     if name_ref.tag != JS_TAG_STRING as i64 || message_ref.tag != JS_TAG_STRING as i64 {
         return None;

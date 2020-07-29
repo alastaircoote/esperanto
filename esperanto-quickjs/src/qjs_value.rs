@@ -1,18 +1,23 @@
 use crate::qjs_shared_context_ref::SharedQJSContextRef;
 // use crate::ref_count::{dup_value, free_value, get_ref_count};
-use crate::ref_count::free_value;
-use esperanto_shared::errors::{JSContextError, JSConversionError};
-use esperanto_shared::traits::{JSObject, JSValue};
-use libquickjs_sys::{
-    JSValue as QJSValueRef, JS_GetPropertyStr, JS_ToCStringLen2, JS_ToFloat64, JS_TAG_FLOAT64,
-    JS_TAG_STRING,
+use crate::{
+    qjs_context::QJSContext,
+    qjs_function::{
+        create_function_one_argument, wrap_one_argument_closure, wrap_two_argument_closure,
+    },
+    ref_count::{dup_value, free_value},
 };
-use std::convert::{TryFrom, TryInto};
+use esperanto_shared::errors::{JSContextError, JSConversionError};
+use esperanto_shared::traits::{FromJSValue, JSContext, JSObject, JSValue, ToJSValue};
+use libquickjs_sys::{
+    JSValue as QJSValueRef, JSValueUnion, JS_Call, JS_FreeCString, JS_GetPropertyStr,
+    JS_ToCStringLen2, JS_ToFloat64, JS_ToString, JS_TAG_BOOL, JS_TAG_EXCEPTION, JS_TAG_FLOAT64,
+};
 use std::ffi::{CStr, CString};
 use std::rc::Rc;
 
 pub struct QJSValue {
-    qjs_ref: QJSValueRef,
+    pub(crate) qjs_ref: QJSValueRef,
     context_ref: Rc<SharedQJSContextRef>,
 }
 
@@ -28,15 +33,90 @@ impl std::fmt::Debug for QJSValue {
 }
 
 impl JSValue for QJSValue {
-    type ObjectType = QJSValue;
+    type ContextType = QJSContext;
     fn as_string(&self) -> Result<String, JSConversionError> {
+        // let qjs_string = JS_ToString(self.context_ref.qjs_ref, self.qjs_ref);
         let c_str_ptr =
             unsafe { JS_ToCStringLen2(self.context_ref.qjs_ref, &mut 0, self.qjs_ref, 0) };
         let c_str = unsafe { CStr::from_ptr(c_str_ptr) };
-        Ok(c_str.to_str()?.to_string())
+        let string = c_str.to_str()?.to_string();
+        unsafe { JS_FreeCString(self.context_ref.qjs_ref, c_str_ptr) };
+        Ok(string)
     }
-    fn to_object(self) -> Result<Self::ObjectType, esperanto_shared::errors::JSContextError> {
+    fn to_object(
+        self,
+    ) -> Result<
+        <Self::ContextType as JSContext>::ObjectType,
+        esperanto_shared::errors::JSContextError,
+    > {
         Ok(self)
+    }
+    fn as_number(&self) -> Result<f64, JSConversionError> {
+        let mut result = f64::NAN;
+        let return_code =
+            unsafe { JS_ToFloat64(self.context_ref.qjs_ref, &mut result, self.qjs_ref) };
+        if return_code != 0 {
+            // I've never seen it return anything other than 0, so if it does that seems notable.
+            return Err(JSConversionError::UnknownError);
+        }
+        Ok(result)
+    }
+
+    fn from_number(number: &f64, in_context: &Rc<SharedQJSContextRef>) -> Self {
+        let val = QJSValueRef {
+            tag: JS_TAG_FLOAT64 as i64,
+            u: JSValueUnion { float64: *number },
+        };
+        Self::new(val, in_context)
+    }
+
+    fn from_one_arg_closure<
+        I: FromJSValue<Self> + 'static,
+        O: ToJSValue<Self> + 'static,
+        F: Fn(I) -> O + 'static,
+    >(
+        closure: F,
+        in_context: &<Self::ContextType as JSContext>::SharedRef,
+    ) -> Self {
+        let internal_val = wrap_one_argument_closure(closure, in_context);
+        Self::new(internal_val, in_context)
+    }
+
+    fn from_two_arg_closure<
+        I1: FromJSValue<Self> + 'static,
+        I2: FromJSValue<Self> + 'static,
+        O: ToJSValue<Self> + 'static,
+        F: Fn(I1, I2) -> O + 'static,
+    >(
+        closure: F,
+        in_context: &<Self::ContextType as JSContext>::SharedRef,
+    ) -> Self {
+        let internal_val = wrap_two_argument_closure(closure, in_context);
+        Self::new(internal_val, in_context)
+    }
+
+    fn call(&self) -> Self {
+        self.call_bound(Vec::new(), self)
+    }
+    fn call_with_arguments(&self, arguments: Vec<&Self>) -> Self {
+        self.call_bound(arguments, self)
+    }
+    fn call_bound(&self, arguments: Vec<&Self>, bound_to: &Self) -> Self {
+        let return_val = unsafe {
+            JS_Call(
+                self.context_ref.qjs_ref,
+                self.qjs_ref,
+                bound_to.qjs_ref,
+                arguments.len() as i32,
+                arguments
+                    .iter()
+                    .map(|a| a.qjs_ref)
+                    .collect::<Vec<QJSValueRef>>()
+                    .as_mut_ptr(),
+            )
+        };
+
+        QJSValue::new(return_val, &self.context_ref)
     }
 }
 
@@ -71,53 +151,61 @@ impl QJSValue {
             context_ref: in_context.clone(),
         }
     }
-}
 
-impl TryFrom<QJSValue> for &str {
-    type Error = JSConversionError;
-    fn try_from(value: QJSValue) -> Result<Self, Self::Error> {
-        if value.qjs_ref.tag != JS_TAG_STRING as i64 {
-            return Err(JSConversionError::ConversionFailed);
-        }
-
-        let c_string_ptr = unsafe {
-            JS_ToCStringLen2(
-                value.context_ref.qjs_ref,
-                std::ptr::null_mut(),
-                value.qjs_ref,
-                0,
-            )
+    fn from_bool(bool_val: bool, in_context: &Rc<SharedQJSContextRef>) -> Self {
+        let val = QJSValueRef {
+            tag: JS_TAG_BOOL as i64,
+            u: JSValueUnion {
+                int32: if bool_val { 1 } else { 0 },
+            },
         };
+        unsafe { dup_value(val) };
+        Self::new(val, &in_context)
+    }
 
-        let cstr = unsafe { std::ffi::CStr::from_ptr(c_string_ptr) };
-        cstr.to_str()
-            .map_err(|_| JSConversionError::ConversionFailed)
+    pub fn exception(in_context: &Rc<SharedQJSContextRef>) -> Self {
+        let val = EXCEPTION_RAW;
+        Self::new(val, in_context)
     }
 }
 
-impl TryFrom<QJSValue> for String {
-    type Error = JSConversionError;
-    fn try_from(value: QJSValue) -> Result<Self, Self::Error> {
-        let str: &str = value.try_into()?;
-        Ok(str.to_string())
-    }
-}
-
-impl TryFrom<QJSValue> for f64 {
-    type Error = JSConversionError;
-    fn try_from(value: QJSValue) -> Result<Self, Self::Error> {
-        if value.qjs_ref.tag != JS_TAG_FLOAT64 as i64 {
-            return Err(JSConversionError::ConversionFailed);
-        }
-
-        let mut precision = 0.0;
-        let val = unsafe { JS_ToFloat64(value.context_ref.qjs_ref, &mut precision, value.qjs_ref) };
-        Ok(val as f64 / precision)
-    }
-}
+pub(crate) const EXCEPTION_RAW: QJSValueRef = QJSValueRef {
+    tag: JS_TAG_EXCEPTION as i64,
+    u: JSValueUnion { int32: 0 },
+};
 
 impl Drop for QJSValue {
     fn drop(&mut self) {
         unsafe { free_value(self.context_ref.qjs_ref, self.qjs_ref) }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::QJSValue;
+    use esperanto_shared::trait_tests::jsvalue_tests;
+    #[test]
+    fn converts_to_number() {
+        jsvalue_tests::converts_to_number::<QJSValue>()
+    }
+
+    #[test]
+    fn converts_to_string() {
+        jsvalue_tests::converts_to_string::<QJSValue>()
+    }
+
+    #[test]
+    fn can_call_functions() {
+        jsvalue_tests::can_call_functions::<QJSValue>()
+    }
+
+    #[test]
+    fn can_wrap_rust_closure_with_one_argument() {
+        jsvalue_tests::can_wrap_rust_closure_with_one_argument::<QJSValue>();
+    }
+
+    #[test]
+    fn can_wrap_rust_closure_with_two_arguments() {
+        jsvalue_tests::can_wrap_rust_closure_with_two_arguments::<QJSValue>();
     }
 }

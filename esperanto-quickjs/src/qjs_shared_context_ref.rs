@@ -3,7 +3,7 @@ use libquickjs_sys::{JSContext as QJSContextRef, JS_FreeContext};
 use std::rc::Rc;
 
 #[derive(Debug)]
-pub(crate) struct SharedQJSContextRef {
+pub struct SharedQJSContextRef {
     pub(crate) qjs_ref: *mut QJSContextRef,
     pub(crate) runtime_ref: Rc<QJSRuntime>,
 }

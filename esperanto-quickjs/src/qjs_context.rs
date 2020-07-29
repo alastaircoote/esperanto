@@ -8,12 +8,13 @@ use std::ffi::CString;
 use std::rc::Rc;
 
 pub struct QJSContext {
-    context_ref: Rc<SharedQJSContextRef>,
+    pub(crate) context_ref: Rc<SharedQJSContextRef>,
 }
 
 impl JSContext for QJSContext {
     type ValueType = QJSValue;
     type ObjectType = QJSValue;
+    type SharedRef = Rc<SharedQJSContextRef>;
     fn new() -> Result<Self, JSContextError> {
         // need to add support for shared runtimes
         let runtime = Rc::new(QJSRuntime::new());
@@ -45,6 +46,10 @@ impl JSContext for QJSContext {
         JSError::check_for_exception(result, &self.context_ref)?;
 
         Ok(QJSValue::new(result, &self.context_ref))
+    }
+
+    fn get_shared_ref(&self) -> &Self::SharedRef {
+        &self.context_ref
     }
 }
 
