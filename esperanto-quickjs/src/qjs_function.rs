@@ -106,7 +106,7 @@ unsafe fn ensure_closure_context_class_registered(runtime: &QJSRuntime) -> JSCla
 }
 
 type ClosureWrapper =
-    dyn Fn(&mut Vec<QJSValue>, &Rc<SharedQJSContextRef>) -> Result<QJSValue, JSError>;
+    dyn Fn(&[libquickjs_sys::JSValue], &Rc<SharedQJSContextRef>) -> Result<QJSValue, JSError>;
 
 pub fn wrap_one_argument_closure<Input, Output, ClosureType>(
     closure: ClosureType,
@@ -126,7 +126,7 @@ where
             });
         }
 
-        let argument_converted = Input::from_js_value(arguments.remove(0))?;
+        let argument_converted = Input::from_js_value(QJSValue::new(arguments[0], in_context))?;
         let output_value = closure(argument_converted);
         Ok(output_value.to_js_value(&in_context)?)
     });
@@ -146,15 +146,17 @@ where
 {
     let wrapper: Box<ClosureWrapper> = Box::new(move |arguments, in_context| {
         if arguments.len() < 2 {
-            // more than 1 is OK by the standard JS operates: we just ignore the extras.
             return Err(JSError {
                 name: "ArgumentError".to_string(),
                 message: format!("Expected 2 arguments, got {}", arguments.len()),
             });
         }
 
-        let argument_one_converted = Input1::from_js_value(arguments.remove(0))?;
-        let argument_two_converted = Input2::from_js_value(arguments.remove(0))?;
+        let argument_one_converted =
+            Input1::from_js_value(QJSValue::new(arguments[0], in_context))?;
+        let argument_two_converted =
+            Input2::from_js_value(QJSValue::new(arguments[1], in_context))?;
+
         let output_value = closure(argument_one_converted, argument_two_converted);
         Ok(output_value.to_js_value(&in_context)?)
     });
@@ -180,7 +182,7 @@ fn create_function_for_wrapper(
     // SO. First of all we grab our class ID (and also ensure it's been registered correctly)
     let class_id = unsafe { ensure_closure_context_class_registered(&in_context.runtime_ref) };
 
-    // We use a weak reference here, because if we don't we'll have a loop: the JSContext internals will
+    // We use a weak reference here because if we don't we'll have a loop: the JSContext internals will
     // hold onto the closure wrapper, and the closure wrapper will hold onto the externals of the JSContext.
     let context_weak = Rc::downgrade(in_context);
 
@@ -190,7 +192,8 @@ fn create_function_for_wrapper(
             None => {
                 // This shouldn't really happen since it shouldn't be possible to to execute
                 // a function after the runtime has been destroyed. But all the same, we need to
-                // unwrap the weak reference and should handle this error
+                // unwrap the weak reference. Since we can't get the context we can't properly throw
+                // an error, but we can at least return the QuickJS exception constant.
                 return EXCEPTION_RAW;
                 // return Err(JSError {
                 //     name: "LifetimeError".to_string(),
@@ -218,12 +221,7 @@ fn create_function_for_wrapper(
                 )
             };
 
-            let mut arguments_as_values = arguments_slice
-                .iter()
-                .map(|raw_val| QJSValue::new(*raw_val, &context))
-                .collect::<Vec<QJSValue>>();
-
-            Ok(wrapper(&mut arguments_as_values, &context)?)
+            Ok(wrapper(arguments_slice, &context)?)
         };
 
         match result() {
