@@ -1,6 +1,7 @@
 use esperanto_shared::errors::JSConversionError;
 use javascriptcore_sys::{
-    JSStringCreateWithUTF8CString, JSStringGetLength, JSStringGetUTF8CString, OpaqueJSString,
+    JSStringCreateWithUTF8CString, JSStringGetLength, JSStringGetUTF8CString, JSStringRelease,
+    OpaqueJSString,
 };
 use std::{
     ffi::{CStr, CString},
@@ -8,7 +9,13 @@ use std::{
 };
 
 pub struct JSCString {
-    pub(crate) jsc_ref: *mut OpaqueJSString,
+    pub(crate) raw_ref: *mut OpaqueJSString,
+}
+
+impl Drop for JSCString {
+    fn drop(&mut self) {
+        unsafe { JSStringRelease(self.raw_ref) }
+    }
 }
 
 impl JSCString {
@@ -19,19 +26,19 @@ impl JSCString {
         let string_ptr = unsafe { JSStringCreateWithUTF8CString(script_c_string.as_ptr()) };
 
         Ok(JSCString {
-            jsc_ref: string_ptr,
+            raw_ref: string_ptr,
         })
     }
 
     pub fn from_ptr(ptr: *mut OpaqueJSString) -> Self {
-        JSCString { jsc_ref: ptr }
+        JSCString { raw_ref: ptr }
     }
 
     pub fn to_string(&self) -> Result<String, JSConversionError> {
-        let len = unsafe { JSStringGetLength(self.jsc_ref) };
+        let len = unsafe { JSStringGetLength(self.raw_ref) };
         // len + 1 because JSStringGetLength doesn't include a terminating null byte
         let mut buffer: Vec<c_char> = vec![0; len + 1];
-        unsafe { JSStringGetUTF8CString(self.jsc_ref, buffer.as_mut_ptr(), len) };
+        unsafe { JSStringGetUTF8CString(self.raw_ref, buffer.as_mut_ptr(), len) };
 
         let str = unsafe { CStr::from_ptr(buffer.as_ptr()) };
         Ok(str

@@ -1,5 +1,5 @@
 use crate::{
-    jsc_error::JSErrorFromJSC, jsc_sharedcontextref::JSCSharedContextRef, jsc_string::JSCString,
+    jsc_error::JSErrorFromJSC, jsc_globalcontext::JSCGlobalContext, jsc_string::JSCString,
     jsc_value::JSCValue,
 };
 use esperanto_shared::errors::{JSContextError, JSError};
@@ -7,13 +7,12 @@ use esperanto_shared::traits::JSObject;
 use javascriptcore_sys::{
     JSObjectGetProperty, JSObjectRef, JSValueProtect, JSValueRef, JSValueToObject, JSValueUnprotect,
 };
-use std::convert::TryFrom;
 use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct JSCObject {
     pub(crate) jsc_ref: JSObjectRef,
-    context: Rc<JSCSharedContextRef>,
+    context: Rc<JSCGlobalContext>,
 }
 
 impl JSCObject {
@@ -27,14 +26,14 @@ impl JSCObject {
 
     pub fn from_value_ref(
         value_ref: JSValueRef,
-        in_context: &Rc<JSCSharedContextRef>,
+        in_context: &Rc<JSCGlobalContext>,
     ) -> Result<Self, JSContextError> {
         let mut exception_ptr: JSValueRef = std::ptr::null_mut();
-        let obj_ref = unsafe { JSValueToObject(in_context.jsc_ref, value_ref, &mut exception_ptr) };
+        let obj_ref = unsafe { JSValueToObject(in_context.raw_ref, value_ref, &mut exception_ptr) };
 
         JSError::check_jsc_value_ref(exception_ptr, &in_context)?;
 
-        unsafe { JSValueProtect(in_context.jsc_ref, value_ref) };
+        unsafe { JSValueProtect(in_context.raw_ref, value_ref) };
 
         Ok(JSCObject {
             jsc_ref: obj_ref,
@@ -43,16 +42,9 @@ impl JSCObject {
     }
 }
 
-impl TryFrom<JSCValue> for JSCObject {
-    type Error = JSContextError;
-    fn try_from(value: JSCValue) -> Result<JSCObject, Self::Error> {
-        JSCObject::from_value_ref(value.jsc_ref, &value.context)
-    }
-}
-
 impl Drop for JSCObject {
     fn drop(&mut self) {
-        unsafe { JSValueUnprotect(self.context.jsc_ref, self.jsc_ref) }
+        unsafe { JSValueUnprotect(self.context.raw_ref, self.jsc_ref) }
     }
 }
 
@@ -65,9 +57,9 @@ impl JSObject for JSCObject {
 
         let prop_val = unsafe {
             JSObjectGetProperty(
-                self.context.jsc_ref,
+                self.context.raw_ref,
                 self.jsc_ref,
-                name_jscstring.jsc_ref,
+                name_jscstring.raw_ref,
                 &mut exception_ptr,
             )
         };
@@ -84,13 +76,12 @@ mod test {
     use super::*;
     use crate::jsc_globalcontext::JSCGlobalContext;
     use esperanto_shared::traits::{JSContext, JSValue};
-    use std::convert::TryInto;
 
     #[test]
     fn can_create_from_object() {
         let ctx = JSCGlobalContext::new().unwrap();
         let result = ctx.evaluate("({})").unwrap();
-        let _: JSCObject = result.try_into().unwrap();
+        let _: JSCObject = result.to_object().unwrap();
     }
 
     #[test]

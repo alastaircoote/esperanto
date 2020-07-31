@@ -1,20 +1,18 @@
 use super::jsc_string::JSCString;
-use crate::jsc_sharedcontextref::JSCSharedContextRef;
+use crate::jsc_globalcontext::JSCGlobalContext;
 use esperanto_shared::errors::JSError;
 use javascriptcore_sys::{JSObjectGetProperty, JSValueRef, JSValueToObject, JSValueToStringCopy};
 use std::rc::Rc;
 
 pub trait JSErrorFromJSC {
-    fn check_jsc_value_ref(
-        v: JSValueRef,
-        in_context: &Rc<JSCSharedContextRef>,
-    ) -> Result<(), JSError>;
+    fn check_jsc_value_ref(v: JSValueRef, in_context: &Rc<JSCGlobalContext>)
+        -> Result<(), JSError>;
 }
 
 impl JSErrorFromJSC for JSError {
     fn check_jsc_value_ref(
         v: JSValueRef,
-        in_context: &Rc<JSCSharedContextRef>,
+        in_context: &Rc<JSCGlobalContext>,
     ) -> Result<(), JSError> {
         if v.is_null() {
             return Ok(());
@@ -23,7 +21,7 @@ impl JSErrorFromJSC for JSError {
         let maybe = || unsafe {
             let mut exception: JSValueRef = std::ptr::null_mut();
 
-            let obj_ref = JSValueToObject(in_context.jsc_ref, v, &mut exception);
+            let obj_ref = JSValueToObject(in_context.raw_ref, v, &mut exception);
             if exception.is_null() == false {
                 return None;
             }
@@ -35,9 +33,9 @@ impl JSErrorFromJSC for JSError {
             match (name_property, message_property) {
                 (Some(name_exists), Some(message_exists)) => {
                     let name_ref = JSObjectGetProperty(
-                        in_context.jsc_ref,
+                        in_context.raw_ref,
                         obj_ref,
-                        name_exists.jsc_ref,
+                        name_exists.raw_ref,
                         &mut exception,
                     );
                     if exception.is_null() == false {
@@ -45,9 +43,9 @@ impl JSErrorFromJSC for JSError {
                     }
 
                     let message_ref = JSObjectGetProperty(
-                        in_context.jsc_ref,
+                        in_context.raw_ref,
                         obj_ref,
-                        message_exists.jsc_ref,
+                        message_exists.raw_ref,
                         &mut exception,
                     );
                     if exception.is_null() == false {
@@ -55,13 +53,13 @@ impl JSErrorFromJSC for JSError {
                     }
 
                     let name_string =
-                        JSValueToStringCopy(in_context.jsc_ref, name_ref, &mut exception);
+                        JSValueToStringCopy(in_context.raw_ref, name_ref, &mut exception);
                     if exception.is_null() == false {
                         return None;
                     }
 
                     let msg_string =
-                        JSValueToStringCopy(in_context.jsc_ref, message_ref, &mut exception);
+                        JSValueToStringCopy(in_context.raw_ref, message_ref, &mut exception);
                     if exception.is_null() == false {
                         return None;
                     }
