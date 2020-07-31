@@ -6,7 +6,7 @@ use crate::{
     qjs_value::{QJSValue, EXCEPTION_RAW},
 };
 use esperanto_shared::{
-    errors::JSError,
+    errors::{JSContextError, JSError},
     traits::{FromJSValue, ToJSValue},
 };
 use libquickjs_sys::{
@@ -104,7 +104,7 @@ unsafe fn ensure_closure_context_class_registered(runtime: &QJSRuntime) -> JSCla
 }
 
 type ClosureWrapper =
-    dyn Fn(&[libquickjs_sys::JSValue], &Rc<QJSContext>) -> Result<QJSValue, JSError>;
+    dyn Fn(&[libquickjs_sys::JSValue], &Rc<QJSContext>) -> Result<QJSValue, JSContextError>;
 
 pub fn wrap_one_argument_closure<Input, Output, ClosureType>(
     closure: ClosureType,
@@ -121,7 +121,8 @@ where
             return Err(JSError {
                 name: "ArgumentError".to_string(),
                 message: format!("Expected 1 argument, got {}", arguments.len()),
-            });
+            }
+            .into());
         }
 
         let argument_converted =
@@ -148,7 +149,8 @@ where
             return Err(JSError {
                 name: "ArgumentError".to_string(),
                 message: format!("Expected 2 arguments, got {}", arguments.len()),
-            });
+            }
+            .into());
         }
 
         let argument_one_converted =
@@ -201,7 +203,7 @@ fn create_function_for_wrapper(
             }
         };
 
-        let result = || {
+        let result = || -> Result<QJSValue, JSContextError> {
             if closure_context.number_of_arguments < 1 {
                 // more than 1 is OK by the standard JS operates: we just ignore the extras.
                 return Err(JSError {
@@ -210,7 +212,8 @@ fn create_function_for_wrapper(
                         "Expected 1 argument, got {}",
                         closure_context.number_of_arguments
                     ),
-                });
+                }
+                .into());
             }
 
             let arguments_slice = unsafe {

@@ -2,16 +2,16 @@ use super::{
     jsconvertible::{FromJSValue, ToJSValue},
     JSContext,
 };
-use crate::errors::{JSContextError, JSConversionError};
+use crate::errors::JSContextError;
 use std::rc::Rc;
 pub trait JSValue
 where
     Self: Sized + 'static,
 {
     type ContextType: JSContext<ValueType = Self> + 'static;
-    fn as_string(&self) -> Result<String, JSConversionError>;
+    fn as_string(&self) -> Result<String, JSContextError>;
     fn to_object(self) -> Result<<Self::ContextType as JSContext>::ObjectType, JSContextError>;
-    fn as_number(&self) -> Result<f64, JSConversionError>;
+    fn as_number(&self) -> Result<f64, JSContextError>;
     fn from_number(number: f64, in_context: &Rc<Self::ContextType>) -> Self;
     fn from_one_arg_closure<
         I: FromJSValue<Self> + 'static,

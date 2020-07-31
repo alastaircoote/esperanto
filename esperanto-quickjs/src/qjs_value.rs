@@ -30,7 +30,7 @@ impl std::fmt::Debug for QJSValue {
 
 impl JSValue for QJSValue {
     type ContextType = QJSContext;
-    fn as_string(&self) -> Result<String, JSConversionError> {
+    fn as_string(&self) -> Result<String, JSContextError> {
         // let qjs_string = JS_ToString(self.context_ref.qjs_ref, self.qjs_ref);
         let c_str_ptr = unsafe { JS_ToCStringLen2(self.context.raw, &mut 0, self.raw, 0) };
         let c_str = unsafe { CStr::from_ptr(c_str_ptr) };
@@ -46,14 +46,18 @@ impl JSValue for QJSValue {
     > {
         Ok(self)
     }
-    fn as_number(&self) -> Result<f64, JSConversionError> {
+    fn as_number(&self) -> Result<f64, JSContextError> {
         let mut result = f64::NAN;
         let return_code = unsafe { JS_ToFloat64(self.context.raw, &mut result, self.raw) };
         if return_code != 0 {
             // I've never seen it return anything other than 0, so if it does that seems notable.
-            return Err(JSConversionError::UnknownError);
+            return Err(JSConversionError::UnknownError.into());
         }
-        Ok(result)
+        if result == f64::NAN {
+            Err(JSConversionError::ResultIsNotANumber.into())
+        } else {
+            Ok(result)
+        }
     }
 
     fn from_number(number: f64, in_context: &Rc<Self::ContextType>) -> Self {

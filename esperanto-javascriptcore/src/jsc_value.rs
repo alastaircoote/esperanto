@@ -2,8 +2,7 @@ use crate::{jsc_globalcontext::JSCGlobalContext, jsc_object::JSCObject, jsc_stri
 use esperanto_shared::errors::{JSContextError, JSConversionError};
 use esperanto_shared::traits::{JSContext, JSValue};
 use javascriptcore_sys::{
-    JSValueMakeNumber, JSValueProtect, JSValueRef, JSValueToNumber, JSValueToStringCopy,
-    JSValueUnprotect,
+    JSValueMakeNumber, JSValueProtect, JSValueRef, JSValueToNumber, JSValueUnprotect,
 };
 use std::rc::Rc;
 
@@ -33,19 +32,15 @@ impl Drop for JSCValue {
 
 impl JSValue for JSCValue {
     type ContextType = JSCGlobalContext;
-    fn as_string(&self) -> Result<String, JSConversionError> {
-        let mut exception_ptr: JSValueRef = std::ptr::null_mut();
-        let str_ptr =
-            unsafe { JSValueToStringCopy(self.context.raw_ref, self.jsc_ref, &mut exception_ptr) };
-
-        let jsc_string = JSCString::from_ptr(str_ptr);
-        jsc_string.to_string()
+    fn as_string(&self) -> Result<String, JSContextError> {
+        let jsc = JSCString::from_js_value(self)?;
+        Ok(jsc.to_string()?)
     }
 
     fn to_object(self) -> Result<<Self::ContextType as JSContext>::ObjectType, JSContextError> {
         JSCObject::from_value_ref(self.jsc_ref, &self.context)
     }
-    fn as_number(&self) -> Result<f64, JSConversionError> {
+    fn as_number(&self) -> Result<f64, JSContextError> {
         // As best I've been able to tell JSValueToNumber never actually creates an exception.
         // instead the returned value is NaN.
 
@@ -56,7 +51,7 @@ impl JSValue for JSCValue {
         let val = unsafe { JSValueToNumber(self.context.raw_ref, self.jsc_ref, exception) };
 
         if val.is_nan() {
-            Err(JSConversionError::ResultIsNotANumber)
+            Err(JSConversionError::ResultIsNotANumber.into())
         } else {
             Ok(val)
         }
