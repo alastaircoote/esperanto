@@ -2,7 +2,8 @@ use crate::{jsc_globalcontext::JSCGlobalContext, jsc_object::JSCObject, jsc_stri
 use esperanto_shared::errors::{JSContextError, JSConversionError};
 use esperanto_shared::traits::{JSContext, JSValue};
 use javascriptcore_sys::{
-    JSValueProtect, JSValueRef, JSValueToNumber, JSValueToStringCopy, JSValueUnprotect,
+    JSValueMakeNumber, JSValueProtect, JSValueRef, JSValueToNumber, JSValueToStringCopy,
+    JSValueUnprotect,
 };
 use std::rc::Rc;
 
@@ -60,8 +61,9 @@ impl JSValue for JSCValue {
             Ok(val)
         }
     }
-    fn from_number(number: &f64, in_context: &Rc<Self::ContextType>) -> Self {
-        todo!()
+    fn from_number(number: f64, in_context: &Rc<Self::ContextType>) -> Self {
+        let raw = unsafe { JSValueMakeNumber(in_context.raw_ref, number) };
+        JSCValue::from_value_ref(raw, in_context)
     }
     fn from_one_arg_closure<
         I: esperanto_shared::traits::FromJSValue<Self> + 'static,
@@ -107,5 +109,10 @@ mod test {
     #[test]
     fn converts_to_string() {
         jsvalue_tests::converts_to_string::<JSCValue>()
+    }
+
+    #[test]
+    fn converts_from_number() {
+        jsvalue_tests::converts_from_number::<JSCValue>()
     }
 }

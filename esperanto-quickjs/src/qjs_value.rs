@@ -56,10 +56,10 @@ impl JSValue for QJSValue {
         Ok(result)
     }
 
-    fn from_number(number: &f64, in_context: &Rc<Self::ContextType>) -> Self {
+    fn from_number(number: f64, in_context: &Rc<Self::ContextType>) -> Self {
         let val = QJSRawValue {
             tag: JS_TAG_FLOAT64 as i64,
-            u: JSValueUnion { float64: *number },
+            u: JSValueUnion { float64: number },
         };
         Self::from_raw(val, in_context)
     }
@@ -180,6 +180,11 @@ mod test {
     #[test]
     fn converts_to_string() {
         jsvalue_tests::converts_to_string::<QJSValue>()
+    }
+
+    #[test]
+    fn converts_from_number() {
+        jsvalue_tests::converts_from_number::<QJSValue>()
     }
 
     #[test]

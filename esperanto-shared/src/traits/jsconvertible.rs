@@ -15,7 +15,7 @@ where
 
 impl<ValueType: JSValue> ToJSValue<ValueType> for f64 {
     fn to_js_value(&self, in_context: &Rc<ValueType::ContextType>) -> Result<ValueType, JSError> {
-        Ok(ValueType::from_number(self, in_context))
+        Ok(ValueType::from_number(*self, in_context))
     }
 }
 

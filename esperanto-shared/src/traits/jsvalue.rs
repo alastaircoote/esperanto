@@ -12,7 +12,7 @@ where
     fn as_string(&self) -> Result<String, JSConversionError>;
     fn to_object(self) -> Result<<Self::ContextType as JSContext>::ObjectType, JSContextError>;
     fn as_number(&self) -> Result<f64, JSConversionError>;
-    fn from_number(number: &f64, in_context: &Rc<Self::ContextType>) -> Self;
+    fn from_number(number: f64, in_context: &Rc<Self::ContextType>) -> Self;
     fn from_one_arg_closure<
         I: FromJSValue<Self> + 'static,
         O: ToJSValue<Self> + 'static,
