@@ -1,15 +1,10 @@
 use crate::errors::JSContextError;
 use crate::traits::JSObject;
 use crate::traits::JSValue;
+use std::rc::Rc;
 pub trait JSContext: Sized + 'static {
     type ValueType: JSValue<ContextType = Self> + 'static;
     type ObjectType: JSObject + 'static;
-    type SharedRef: 'static;
-    // type StoreKey: Sync + Send + Copy + Clone;
-    fn evaluate(&self, script: &str) -> Result<Self::ValueType, JSContextError>;
-    fn new() -> Result<Self, JSContextError>;
-    fn get_shared_ref(&self) -> &Self::SharedRef;
-    // fn store_value(&mut self, value: Self::ValueType) -> Self::StoreKey;
-    // fn get_value_ref(&self, key: Self::StoreKey) -> Result<&Self::ValueType, JSEnvError>;
-    // fn pull_value(&mut self, key: Self::StoreKey) -> Result<Self::ValueType, JSEnvError>;
+    fn evaluate(self: &Rc<Self>, script: &str) -> Result<Self::ValueType, JSContextError>;
+    fn new() -> Result<Rc<Self>, JSContextError>;
 }

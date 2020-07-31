@@ -3,7 +3,6 @@ use crate::{
     qjs_classids::{get_class_id, QJSClassType},
     qjs_context::QJSContext,
     qjs_runtime::QJSRuntime,
-    qjs_shared_context_ref::SharedQJSContextRef,
     qjs_value::{QJSValue, EXCEPTION_RAW},
 };
 use esperanto_shared::{
@@ -11,11 +10,10 @@ use esperanto_shared::{
     traits::{FromJSValue, ToJSValue},
 };
 use libquickjs_sys::{
-    JSClassDef, JSClassID, JSContext, JSValue, JS_DefinePropertyValue, JS_GetOpaque,
-    JS_GetPropertyUint32, JS_IsRegisteredClass, JS_NewCFunctionData, JS_NewClass,
-    JS_NewObjectClass, JS_SetOpaque,
+    JSClassDef, JSClassID, JSContext, JSValue, JS_GetOpaque, JS_IsRegisteredClass,
+    JS_NewCFunctionData, JS_NewClass, JS_NewObjectClass, JS_SetOpaque,
 };
-use std::{ffi::CString, rc::Rc};
+use std::rc::Rc;
 
 struct FunctionInvocationContext {
     this_val: JSValue,
@@ -86,11 +84,11 @@ const CLOSURE_CONTEXT_CLASS_NAME: &'static [u8] = b"ClosureContext\0";
 // that has happened:
 unsafe fn ensure_closure_context_class_registered(runtime: &QJSRuntime) -> JSClassID {
     let class_id = get_class_id(QJSClassType::ClosureContext);
-    if JS_IsRegisteredClass(runtime.qjs_ref, class_id) > 0 {
+    if JS_IsRegisteredClass(runtime.raw, class_id) > 0 {
         return class_id;
     }
     JS_NewClass(
-        runtime.qjs_ref,
+        runtime.raw,
         class_id,
         &JSClassDef {
             class_name: CLOSURE_CONTEXT_CLASS_NAME.as_ptr() as *const i8,
@@ -106,11 +104,11 @@ unsafe fn ensure_closure_context_class_registered(runtime: &QJSRuntime) -> JSCla
 }
 
 type ClosureWrapper =
-    dyn Fn(&[libquickjs_sys::JSValue], &Rc<SharedQJSContextRef>) -> Result<QJSValue, JSError>;
+    dyn Fn(&[libquickjs_sys::JSValue], &Rc<QJSContext>) -> Result<QJSValue, JSError>;
 
 pub fn wrap_one_argument_closure<Input, Output, ClosureType>(
     closure: ClosureType,
-    in_context: &Rc<SharedQJSContextRef>,
+    in_context: &Rc<QJSContext>,
 ) -> JSValue
 where
     Input: FromJSValue<QJSValue> + 'static,
@@ -126,7 +124,8 @@ where
             });
         }
 
-        let argument_converted = Input::from_js_value(QJSValue::new(arguments[0], in_context))?;
+        let argument_converted =
+            Input::from_js_value(QJSValue::from_raw(arguments[0], in_context))?;
         let output_value = closure(argument_converted);
         Ok(output_value.to_js_value(&in_context)?)
     });
@@ -136,7 +135,7 @@ where
 
 pub fn wrap_two_argument_closure<Input1, Input2, Output, ClosureType>(
     closure: ClosureType,
-    in_context: &Rc<SharedQJSContextRef>,
+    in_context: &Rc<QJSContext>,
 ) -> JSValue
 where
     Input1: FromJSValue<QJSValue> + 'static,
@@ -153,9 +152,9 @@ where
         }
 
         let argument_one_converted =
-            Input1::from_js_value(QJSValue::new(arguments[0], in_context))?;
+            Input1::from_js_value(QJSValue::from_raw(arguments[0], in_context))?;
         let argument_two_converted =
-            Input2::from_js_value(QJSValue::new(arguments[1], in_context))?;
+            Input2::from_js_value(QJSValue::from_raw(arguments[1], in_context))?;
 
         let output_value = closure(argument_one_converted, argument_two_converted);
         Ok(output_value.to_js_value(&in_context)?)
@@ -166,7 +165,7 @@ where
 
 fn create_function_for_wrapper(
     wrapper: Box<ClosureWrapper>,
-    in_context: &Rc<SharedQJSContextRef>,
+    in_context: &Rc<QJSContext>,
 ) -> JSValue {
     // The way QuickJS allows this is quite confusing at first. It lets you create a function that wraps
     // a C function and attach "data" to it, which is essential for us because the C function has to be
@@ -180,7 +179,7 @@ fn create_function_for_wrapper(
     // Phew.
 
     // SO. First of all we grab our class ID (and also ensure it's been registered correctly)
-    let class_id = unsafe { ensure_closure_context_class_registered(&in_context.runtime_ref) };
+    let class_id = unsafe { ensure_closure_context_class_registered(&in_context.runtime) };
 
     // We use a weak reference here because if we don't we'll have a loop: the JSContext internals will
     // hold onto the closure wrapper, and the closure wrapper will hold onto the externals of the JSContext.
@@ -225,21 +224,21 @@ fn create_function_for_wrapper(
         };
 
         match result() {
-            Err(js_error) => QJSValue::exception(&context).qjs_ref,
-            Ok(jsvalue) => jsvalue.qjs_ref,
+            Err(js_error) => QJSValue::exception(&context).raw,
+            Ok(jsvalue) => jsvalue.raw,
         }
     };
 
     let boxed: Box<FunctionInvokeReceiver> = Box::new(closure_wrapper);
     let raw_pointer = Box::into_raw(Box::new(boxed));
 
-    let mut data_container = unsafe { JS_NewObjectClass(in_context.qjs_ref, class_id as i32) };
+    let mut data_container = unsafe { JS_NewObjectClass(in_context.raw, class_id as i32) };
 
     unsafe { JS_SetOpaque(data_container, raw_pointer as *mut std::ffi::c_void) };
 
     let result = unsafe {
         JS_NewCFunctionData(
-            in_context.qjs_ref,
+            in_context.raw,
             Some(run_native_closure),
             1,
             0,
@@ -247,13 +246,13 @@ fn create_function_for_wrapper(
             &mut data_container,
         )
     };
-    unsafe { free_value(in_context.qjs_ref, data_container) };
+    unsafe { free_value(in_context.raw, data_container) };
     result
 }
 
 pub fn create_function_one_argument<I, O, F: (Fn(I) -> O) + 'static>(
     closure: F,
-    in_context: &Rc<SharedQJSContextRef>,
+    in_context: &Rc<QJSContext>,
 ) -> JSValue
 where
     I: FromJSValue<QJSValue> + 'static,
@@ -271,7 +270,7 @@ where
     // Phew.
 
     // SO. First of all we grab our class ID (and also ensure it's been registered correctly)
-    let class_id = unsafe { ensure_closure_context_class_registered(&in_context.runtime_ref) };
+    let class_id = unsafe { ensure_closure_context_class_registered(&in_context.runtime) };
 
     // We use a weak reference here, because if we don't we'll have a loop: the JSContext internals will
     // hold onto the closure wrapper, and the closure wrapper will hold onto the externals of the JSContext.
@@ -316,7 +315,7 @@ where
 
             let mut arguments_as_values = arguments_slice
                 .iter()
-                .map(|raw_val| QJSValue::new(*raw_val, &context))
+                .map(|raw_val| QJSValue::from_raw(*raw_val, &context))
                 .collect::<Vec<QJSValue>>();
 
             // let argument_value =
@@ -331,21 +330,21 @@ where
         };
 
         match result() {
-            Err(js_error) => QJSValue::exception(&context).qjs_ref,
-            Ok(jsvalue) => jsvalue.qjs_ref,
+            Err(js_error) => QJSValue::exception(&context).raw,
+            Ok(jsvalue) => jsvalue.raw,
         }
     };
 
     let boxed: Box<FunctionInvokeReceiver> = Box::new(closure_wrapper);
     let raw_pointer = Box::into_raw(Box::new(boxed));
 
-    let mut data_container = unsafe { JS_NewObjectClass(in_context.qjs_ref, class_id as i32) };
+    let mut data_container = unsafe { JS_NewObjectClass(in_context.raw, class_id as i32) };
 
     unsafe { JS_SetOpaque(data_container, raw_pointer as *mut std::ffi::c_void) };
 
     let result = unsafe {
         JS_NewCFunctionData(
-            in_context.qjs_ref,
+            in_context.raw,
             Some(run_native_closure),
             1,
             0,
@@ -353,7 +352,7 @@ where
             &mut data_container,
         )
     };
-    unsafe { free_value(in_context.qjs_ref, data_container) };
+    unsafe { free_value(in_context.raw, data_container) };
     result
 }
 

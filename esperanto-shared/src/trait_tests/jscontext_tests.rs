@@ -13,6 +13,7 @@ where
     Context::ValueType: Debug,
 {
     let runtime = Context::new().unwrap();
+
     let result = runtime.evaluate("]").unwrap_err();
     match result {
         JSContextError::JavaScriptErrorOccurred(js_error) => {
