@@ -32,6 +32,7 @@ impl Drop for JSCValue {
 
 impl JSValue for JSCValue {
     type ContextType = JSCGlobalContext;
+    type RawType = JSValueRef;
     fn as_string(&self) -> Result<String, JSContextError> {
         let jsc = JSCString::from_js_value(self)?;
         Ok(jsc.to_string()?)
@@ -60,16 +61,7 @@ impl JSValue for JSCValue {
         let raw = unsafe { JSValueMakeNumber(in_context.raw_ref, number) };
         JSCValue::from_value_ref(raw, in_context)
     }
-    fn from_one_arg_closure<
-        I: esperanto_shared::traits::FromJSValue<Self> + 'static,
-        O: esperanto_shared::traits::ToJSValue<Self> + 'static,
-        F: Fn(I) -> O + 'static,
-    >(
-        closure: F,
-        in_context: &Rc<Self::ContextType>,
-    ) -> Self {
-        todo!()
-    }
+
     fn from_two_arg_closure<
         I1: esperanto_shared::traits::FromJSValue<Self> + 'static,
         I2: esperanto_shared::traits::FromJSValue<Self> + 'static,
@@ -89,6 +81,23 @@ impl JSValue for JSCValue {
     }
     fn call_bound(&self, arguments: Vec<&Self>, bound_to: &Self) -> Self {
         todo!()
+    }
+    fn from_one_arg_closure<
+        I: esperanto_shared::traits::FromJSValue<Self> + 'static,
+        O: esperanto_shared::traits::ToJSValue<Self> + 'static,
+        F: Fn(I) -> Result<O, JSContextError> + 'static,
+    >(
+        closure: F,
+        in_context: &Rc<Self::ContextType>,
+    ) -> Self {
+        todo!()
+    }
+    fn from_raw(raw: Self::RawType, in_context: &Rc<Self::ContextType>) -> Self {
+        unsafe { JSValueProtect(in_context.raw_ref, raw) };
+        JSCValue {
+            jsc_ref: raw,
+            context: in_context.clone(),
+        }
     }
 }
 

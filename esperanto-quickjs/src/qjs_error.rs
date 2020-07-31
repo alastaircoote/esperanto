@@ -1,5 +1,5 @@
 use crate::{qjs_context::QJSContext, qjs_value::QJSValue, ref_count::free_value};
-use esperanto_shared::errors::JSError;
+use esperanto_shared::{errors::JSError, traits::JSValue};
 use libquickjs_sys::{
     JSValue as QJSValueRef, JS_FreeCString, JS_GetException, JS_GetPropertyStr, JS_ToCStringLen2,
     JS_TAG_EXCEPTION, JS_TAG_STRING, JS_TAG_UNDEFINED,

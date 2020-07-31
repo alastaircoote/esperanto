@@ -2,7 +2,7 @@ use crate::qjs_error::QJSError;
 use crate::qjs_runtime::QJSRuntime;
 use crate::qjs_value::QJSValue;
 use esperanto_shared::errors::{JSContextError, JSConversionError, JSError};
-use esperanto_shared::traits::JSContext;
+use esperanto_shared::traits::{JSContext, JSValue};
 use libquickjs_sys::{
     JSContext as QJSRawContext, JS_Eval, JS_FreeContext, JS_NewContext, JS_EVAL_TYPE_GLOBAL,
 };

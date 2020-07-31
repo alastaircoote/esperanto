@@ -93,6 +93,11 @@ pub enum JSEnvError {
     #[error("An unknown error occurred")]
     UnknownInternalError,
 }
+#[derive(Error, Debug)]
+pub enum JSEvaluationError {
+    #[error("Expected {} arguments, received {}", .expected, .actual)]
+    NotEnoughArguments { expected: usize, actual: usize },
+}
 
 #[derive(Error, Debug)]
 pub enum JSContextError {
@@ -102,6 +107,10 @@ pub enum JSContextError {
     ConversionError(#[from] JSConversionError),
     #[error("Creation of the JS context failed")]
     CouldNotCreateContext,
+    #[error("The JS context has already been destroyed")]
+    ContextAlreadyDestroyed,
+    #[error("An evaluation error occurred")]
+    EvaluationError(#[from] JSEvaluationError),
 }
 
 impl From<NulError> for JSContextError {

@@ -8,3 +8,7 @@ pub trait JSContext: Sized + 'static {
     fn evaluate(self: &Rc<Self>, script: &str) -> Result<Self::ValueType, JSContextError>;
     fn new() -> Result<Rc<Self>, JSContextError>;
 }
+
+pub trait RawBackedJSContext : JSContext {
+    type RawValueType;
+}

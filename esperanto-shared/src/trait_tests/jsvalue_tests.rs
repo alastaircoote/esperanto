@@ -39,7 +39,7 @@ pub fn can_call_functions<Value: JSValue>() {
 
 pub fn can_wrap_rust_closure_with_one_argument<Value: JSValue>() {
     let ctx = Value::ContextType::new().unwrap();
-    let func = Value::from_one_arg_closure(|num: f64| num * 2.0, &ctx);
+    let func = Value::from_one_arg_closure(|num: f64| Ok(num * 2.0), &ctx);
     let arg = Value::from_number(3.0, &ctx);
     let result = func.call_with_arguments(vec![&arg]);
     let number = result.as_number().unwrap();
@@ -48,7 +48,7 @@ pub fn can_wrap_rust_closure_with_one_argument<Value: JSValue>() {
 
 pub fn can_wrap_rust_closure_with_two_arguments<Value: JSValue>() {
     let ctx = Value::ContextType::new().unwrap();
-    let func = Value::from_two_arg_closure(|num1: f64, num2: f64| num1 * num2, &ctx);
+    let func = Value::from_two_arg_closure(|num1: f64, num2: f64| Ok(num1 * num2), &ctx);
     let arg1 = Value::from_number(3.0, &ctx);
     let arg2 = Value::from_number(4.0, &ctx);
     let result = func.call_with_arguments(vec![&arg1, &arg2]);

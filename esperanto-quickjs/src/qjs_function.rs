@@ -3,43 +3,30 @@ use crate::{
     qjs_classids::{get_class_id, QJSClassType},
     qjs_context::QJSContext,
     qjs_runtime::QJSRuntime,
-    qjs_value::{QJSValue, EXCEPTION_RAW},
 };
-use esperanto_shared::{
-    errors::{JSContextError, JSError},
-    traits::{FromJSValue, ToJSValue},
-};
+use esperanto_shared::util::closures::{FunctionInvocation, FunctionInvocationContext};
 use libquickjs_sys::{
-    JSClassDef, JSClassID, JSContext, JSValue, JS_GetOpaque, JS_IsRegisteredClass,
+    JSClassDef, JSClassID, JSContext, JSValue as QJSRawValue, JS_GetOpaque, JS_IsRegisteredClass,
     JS_NewCFunctionData, JS_NewClass, JS_NewObjectClass, JS_SetOpaque,
 };
 use std::rc::Rc;
 
-struct FunctionInvocationContext {
-    _this_val: JSValue,
-    number_of_arguments: i32,
-    arguments: *mut JSValue,
-    _context: *mut JSContext,
-}
-
-type FunctionInvokeReceiver = dyn Fn(FunctionInvocationContext) -> JSValue;
-
 unsafe extern "C" fn run_native_closure(
-    ctx: *mut JSContext,
-    this_val: JSValue,
+    _ctx: *mut JSContext,
+    this_val: QJSRawValue,
     argc: i32,
-    argv: *mut JSValue,
+    argv: *mut QJSRawValue,
     // Magic is for getters and setters (and maybe constructors?), we haven't
     // had a need to use it yet
     _magic: i32,
-    data: *mut JSValue,
-) -> JSValue {
+    data: *mut QJSRawValue,
+) -> QJSRawValue {
     // QuickJS uses different "class IDs" for storing opaque data. We have specified one for
     // this closure context:
     let class_id = get_class_id(QJSClassType::ClosureContext);
 
     // Now we grab the raw pointer from the JSValue:
-    let closure_raw = JS_GetOpaque(*data, class_id) as *mut Box<FunctionInvokeReceiver>;
+    let closure_raw = JS_GetOpaque(*data, class_id) as *mut FunctionInvocation<QJSContext>;
 
     // Then we inflate that back into the box we previously stored:
     let closure = Box::from_raw(closure_raw);
@@ -47,9 +34,8 @@ unsafe extern "C" fn run_native_closure(
     // Now we actually run the closure and grab the result:
     let evaluation_result = closure(FunctionInvocationContext {
         _this_val: this_val,
-        number_of_arguments: argc,
+        number_of_arguments: argc as usize,
         arguments: argv,
-        _context: ctx,
     });
 
     // Then convert the storage back into a raw pointer. This ensures that Rust doesn't free
@@ -58,7 +44,7 @@ unsafe extern "C" fn run_native_closure(
     Box::into_raw(closure);
 
     // *finally* we return the actual result.
-    evaluation_result
+    evaluation_result.unwrap().raw
 }
 
 // This function is called when the QuickJS garbage collector cleans up the variable.
@@ -68,7 +54,7 @@ unsafe extern "C" fn finalize_closure_context(
     value: libquickjs_sys::JSValue,
 ) {
     let class_id = get_class_id(QJSClassType::ClosureContext);
-    let closure_raw = JS_GetOpaque(value, class_id) as *mut Box<FunctionInvokeReceiver>;
+    let closure_raw = JS_GetOpaque(value, class_id) as *mut FunctionInvocation<QJSContext>;
 
     // This creates the closure context then, because it isn't returned anywhere, immediately frees the memory
     // associated with it
@@ -103,143 +89,23 @@ unsafe fn ensure_closure_context_class_registered(runtime: &QJSRuntime) -> JSCla
     class_id
 }
 
-type ClosureWrapper =
-    dyn Fn(&[libquickjs_sys::JSValue], &Rc<QJSContext>) -> Result<QJSValue, JSContextError>;
-
-pub fn wrap_one_argument_closure<Input, Output, ClosureType>(
-    closure: ClosureType,
+pub fn wrap_closure(
+    closure: FunctionInvocation<QJSContext>,
     in_context: &Rc<QJSContext>,
-) -> JSValue
-where
-    Input: FromJSValue<QJSValue> + 'static,
-    Output: ToJSValue<QJSValue> + 'static,
-    ClosureType: (Fn(Input) -> Output) + 'static,
-{
-    let wrapper: Box<ClosureWrapper> = Box::new(move |arguments, in_context| {
-        if arguments.len() < 1 {
-            // more than 1 is OK by the standard JS operates: we just ignore the extras.
-            return Err(JSError {
-                name: "ArgumentError".to_string(),
-                message: format!("Expected 1 argument, got {}", arguments.len()),
-            }
-            .into());
-        }
-
-        let argument_converted =
-            Input::from_js_value(QJSValue::from_raw(arguments[0], in_context))?;
-        let output_value = closure(argument_converted);
-        Ok(output_value.to_js_value(&in_context)?)
-    });
-
-    create_function_for_wrapper(wrapper, in_context)
-}
-
-pub fn wrap_two_argument_closure<Input1, Input2, Output, ClosureType>(
-    closure: ClosureType,
-    in_context: &Rc<QJSContext>,
-) -> JSValue
-where
-    Input1: FromJSValue<QJSValue> + 'static,
-    Input2: FromJSValue<QJSValue> + 'static,
-    Output: ToJSValue<QJSValue> + 'static,
-    ClosureType: (Fn(Input1, Input2) -> Output) + 'static,
-{
-    let wrapper: Box<ClosureWrapper> = Box::new(move |arguments, in_context| {
-        if arguments.len() < 2 {
-            return Err(JSError {
-                name: "ArgumentError".to_string(),
-                message: format!("Expected 2 arguments, got {}", arguments.len()),
-            }
-            .into());
-        }
-
-        let argument_one_converted =
-            Input1::from_js_value(QJSValue::from_raw(arguments[0], in_context))?;
-        let argument_two_converted =
-            Input2::from_js_value(QJSValue::from_raw(arguments[1], in_context))?;
-
-        let output_value = closure(argument_one_converted, argument_two_converted);
-        Ok(output_value.to_js_value(&in_context)?)
-    });
-
-    create_function_for_wrapper(wrapper, in_context)
-}
-
-fn create_function_for_wrapper(
-    wrapper: Box<ClosureWrapper>,
-    in_context: &Rc<QJSContext>,
-) -> JSValue {
-    // The way QuickJS allows this is quite confusing at first. It lets you create a function that wraps
-    // a C function and attach "data" to it, which is essential for us because the C function has to be
-    // static and we want to be able to dynamically dispatch Rust closures.
-
-    // BUT we can't attach the rust closure itself as "data", the data must be a JSValue. The good news is that
-    // we can attach "opaque data" to a JSValue, so we can still do what we want, just with a layer of misdirection.
-
-    // BUT we can't just arbitrarily attach opaque data. Instead we need to create a "JSClassID", then register
-    // that class with the context, then create an instance of that class, THEN attach opaque data to the class specifically.
-    // Phew.
-
-    // SO. First of all we grab our class ID (and also ensure it's been registered correctly)
+) -> QJSRawValue {
     let class_id = unsafe { ensure_closure_context_class_registered(&in_context.runtime) };
 
-    // We use a weak reference here because if we don't we'll have a loop: the JSContext internals will
-    // hold onto the closure wrapper, and the closure wrapper will hold onto the externals of the JSContext.
-    let context_weak = Rc::downgrade(in_context);
+    // Must double box this value (it's already a box). Not entirely clear why but I think it's because into_raw breaks down the outer box we
+    // still need to be keeping one in the interior
+    let raw_pointer = Box::into_raw(Box::new(closure));
 
-    let closure_wrapper = move |closure_context: FunctionInvocationContext| -> JSValue {
-        let context = match context_weak.upgrade() {
-            Some(val) => val,
-            None => {
-                // This shouldn't really happen since it shouldn't be possible to to execute
-                // a function after the runtime has been destroyed. But all the same, we need to
-                // unwrap the weak reference. Since we can't get the context we can't properly throw
-                // an error, but we can at least return the QuickJS exception constant.
-                return EXCEPTION_RAW;
-                // return Err(JSError {
-                //     name: "LifetimeError".to_string(),
-                //     message: "This JavaScript context has been destroyed".to_string()
-                // })
-            }
-        };
+    // Create the hidden JSValue that will store our pointer
+    let mut pointer_container = unsafe { JS_NewObjectClass(in_context.raw, class_id as i32) };
 
-        let result = || -> Result<QJSValue, JSContextError> {
-            if closure_context.number_of_arguments < 1 {
-                // more than 1 is OK by the standard JS operates: we just ignore the extras.
-                return Err(JSError {
-                    name: "ArgumentError".to_string(),
-                    message: format!(
-                        "Expected 1 argument, got {}",
-                        closure_context.number_of_arguments
-                    ),
-                }
-                .into());
-            }
+    // Store the pointer in it:
+    unsafe { JS_SetOpaque(pointer_container, raw_pointer as *mut std::ffi::c_void) };
 
-            let arguments_slice = unsafe {
-                std::slice::from_raw_parts(
-                    closure_context.arguments,
-                    closure_context.number_of_arguments as usize,
-                )
-            };
-
-            Ok(wrapper(arguments_slice, &context)?)
-        };
-
-        match result() {
-            // TODO: better error handling, need to pass the actual error
-            Err(_) => QJSValue::exception(&context).raw,
-            Ok(jsvalue) => jsvalue.raw,
-        }
-    };
-
-    let boxed: Box<FunctionInvokeReceiver> = Box::new(closure_wrapper);
-    let raw_pointer = Box::into_raw(Box::new(boxed));
-
-    let mut data_container = unsafe { JS_NewObjectClass(in_context.raw, class_id as i32) };
-
-    unsafe { JS_SetOpaque(data_container, raw_pointer as *mut std::ffi::c_void) };
-
+    // Then wrap it in a JavaScript function
     let result = unsafe {
         JS_NewCFunctionData(
             in_context.raw,
@@ -247,9 +113,14 @@ fn create_function_for_wrapper(
             1,
             0,
             1,
-            &mut data_container,
+            &mut pointer_container,
         )
     };
-    unsafe { free_value(in_context.raw, data_container) };
+
+    // Since the function is now holding a reference to the hidden pointer container we want to free our reference
+    // to it, otherwise it never gets garbage collected
+    unsafe { free_value(in_context.raw, pointer_container) };
+
+    // And then return the function
     result
 }

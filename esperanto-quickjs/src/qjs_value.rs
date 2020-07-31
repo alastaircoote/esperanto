@@ -1,10 +1,7 @@
-use crate::{
-    qjs_context::QJSContext,
-    qjs_function::{wrap_one_argument_closure, wrap_two_argument_closure},
-    ref_count::free_value,
-};
+use crate::{qjs_context::QJSContext, qjs_function::wrap_closure, ref_count::free_value};
 use esperanto_shared::errors::{JSContextError, JSConversionError};
 use esperanto_shared::traits::{FromJSValue, JSContext, JSObject, JSValue, ToJSValue};
+use esperanto_shared::util::closures::{wrap_one_argument_closure, wrap_two_argument_closure};
 use libquickjs_sys::{
     JSValue as QJSRawValue, JSValueUnion, JS_Call, JS_FreeCString, JS_GetPropertyStr,
     JS_ToCStringLen2, JS_ToFloat64, JS_TAG_BOOL, JS_TAG_EXCEPTION, JS_TAG_FLOAT64,
@@ -30,6 +27,7 @@ impl std::fmt::Debug for QJSValue {
 
 impl JSValue for QJSValue {
     type ContextType = QJSContext;
+    type RawType = QJSRawValue;
     fn as_string(&self) -> Result<String, JSContextError> {
         // let qjs_string = JS_ToString(self.context_ref.qjs_ref, self.qjs_ref);
         let c_str_ptr = unsafe { JS_ToCStringLen2(self.context.raw, &mut 0, self.raw, 0) };
@@ -71,26 +69,28 @@ impl JSValue for QJSValue {
     fn from_one_arg_closure<
         I: FromJSValue<Self> + 'static,
         O: ToJSValue<Self> + 'static,
-        F: Fn(I) -> O + 'static,
+        F: Fn(I) -> Result<O, JSContextError> + 'static,
     >(
         closure: F,
         in_context: &Rc<Self::ContextType>,
     ) -> Self {
-        let internal_val = wrap_one_argument_closure(closure, in_context);
-        Self::from_raw(internal_val, in_context)
+        let closure = wrap_one_argument_closure(closure, in_context);
+        let raw = wrap_closure(closure, in_context);
+        Self::from_raw(raw, in_context)
     }
 
     fn from_two_arg_closure<
         I1: FromJSValue<Self> + 'static,
         I2: FromJSValue<Self> + 'static,
         O: ToJSValue<Self> + 'static,
-        F: Fn(I1, I2) -> O + 'static,
+        F: Fn(I1, I2) -> Result<O, JSContextError> + 'static,
     >(
         closure: F,
         in_context: &Rc<Self::ContextType>,
     ) -> Self {
-        let internal_val = wrap_two_argument_closure(closure, in_context);
-        Self::from_raw(internal_val, in_context)
+        let closure = wrap_two_argument_closure(closure, in_context);
+        let raw = wrap_closure(closure, in_context);
+        Self::from_raw(raw, in_context)
     }
 
     fn call(&self) -> Self {
@@ -116,6 +116,19 @@ impl JSValue for QJSValue {
 
         QJSValue::from_raw(return_val, &self.context)
     }
+
+    fn from_raw(raw: Self::RawType, in_context: &Rc<Self::ContextType>) -> Self {
+        // unsafe { dup_value(in_context.qjs_ref, value_ref) };
+        // let ref_c = unsafe { get_ref_count(in_context.qjs_ref, value_ref) };
+
+        // Unlike JSC QuickJS starts with this value having a refcount of 1, so we don't need to up
+        // it when we create a reference
+
+        QJSValue {
+            raw,
+            context: in_context.clone(),
+        }
+    }
 }
 
 // QuickJS doesn't really make a distinction between values and objects like JSC does
@@ -132,19 +145,6 @@ impl JSObject for QJSValue {
 }
 
 impl QJSValue {
-    pub(crate) fn from_raw(raw: QJSRawValue, in_context: &Rc<QJSContext>) -> Self {
-        // unsafe { dup_value(in_context.qjs_ref, value_ref) };
-        // let ref_c = unsafe { get_ref_count(in_context.qjs_ref, value_ref) };
-
-        // Unlike JSC QuickJS starts with this value having a refcount of 1, so we don't need to up
-        // it when we create a reference
-
-        QJSValue {
-            raw,
-            context: in_context.clone(),
-        }
-    }
-
     fn from_bool(bool_val: bool, in_context: &Rc<QJSContext>) -> Self {
         let val = QJSRawValue {
             tag: JS_TAG_BOOL as i64,
