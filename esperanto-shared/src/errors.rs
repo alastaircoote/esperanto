@@ -120,7 +120,7 @@ impl From<JSConversionError> for JSError {
     fn from(err: JSConversionError) -> Self {
         JSError {
             name: "ConversionError".to_string(),
-            message: "Could not convert value".to_string(),
+            message: format!("Could not convert value, reason: {}", err),
         }
     }
 }

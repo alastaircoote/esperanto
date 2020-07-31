@@ -1,9 +1,4 @@
 use libquickjs_sys::{JSClassID, JS_NewClassID};
-use std::collections::HashMap;
-
-pub struct QJSClassIDs {
-    closure_context: JSClassID,
-}
 
 static mut CLOSURE_CONTEXT: JSClassID = 0;
 static mut CLASSIDS_CREATED: bool = false;

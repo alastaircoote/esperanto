@@ -1,4 +1,4 @@
-use super::{JSContext, JSValue};
+use super::JSValue;
 use crate::errors::JSError;
 use std::rc::Rc;
 

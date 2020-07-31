@@ -69,11 +69,8 @@ impl Drop for JSCGlobalContext {
 #[cfg(test)]
 mod test {
     use super::*;
-    use esperanto_shared::{
-        trait_tests::jscontext_tests,
-        traits::{JSObject, JSValue},
-    };
-    use javascriptcore_sys::{JSContextRef, JSGarbageCollect, JSValueUnprotect};
+    use esperanto_shared::trait_tests::jscontext_tests;
+    // use javascriptcore_sys::{JSContextRef, JSGarbageCollect, JSValueUnprotect};
 
     #[test]
     fn it_evaluates_correct_code() {
