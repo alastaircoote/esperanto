@@ -21,12 +21,12 @@ impl<ValueType: JSValue> ToJSValue<ValueType> for f64 {
         &self,
         in_context: &Rc<ValueType::ContextType>,
     ) -> Result<ValueType, JSContextError> {
-        Ok(ValueType::from_number(*self, in_context))
+        ValueType::from_number(*self, in_context)
     }
 }
 
 impl<ValueType: JSValue> FromJSValue<ValueType> for f64 {
     fn from_js_value(val: ValueType) -> Result<Self, JSContextError> {
-        Ok(val.as_number()?)
+        val.as_number()
     }
 }

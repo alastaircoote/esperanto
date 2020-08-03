@@ -3,7 +3,7 @@ use esperanto_shared::errors::{JSContextError, JSConversionError};
 use esperanto_shared::traits::{FromJSValue, JSContext, JSObject, JSValue, ToJSValue};
 use esperanto_shared::util::closures::{wrap_one_argument_closure, wrap_two_argument_closure};
 use libquickjs_sys::{
-    JSValue as QJSRawValue, JSValueUnion, JS_Call, JS_FreeCString, JS_GetPropertyStr,
+    JSValue as QJSRawValue, JSValueUnion, JS_Call, JS_FreeCString, JS_GetPropertyStr, JS_ToBool,
     JS_ToCStringLen2, JS_ToFloat64, JS_TAG_BOOL, JS_TAG_EXCEPTION, JS_TAG_FLOAT64,
 };
 use std::ffi::{CStr, CString};
@@ -58,7 +58,10 @@ impl JSValue for QJSValue {
         }
     }
 
-    fn from_number(number: f64, in_context: &Rc<Self::ContextType>) -> Self {
+    fn from_number(
+        number: f64,
+        in_context: &Rc<Self::ContextType>,
+    ) -> Result<Self, JSContextError> {
         let val = QJSRawValue {
             tag: JS_TAG_FLOAT64 as i64,
             u: JSValueUnion { float64: number },
@@ -73,7 +76,7 @@ impl JSValue for QJSValue {
     >(
         closure: F,
         in_context: &Rc<Self::ContextType>,
-    ) -> Self {
+    ) -> Result<Self, JSContextError> {
         let closure = wrap_one_argument_closure(closure, in_context);
         let raw = wrap_closure(closure, in_context);
         Self::from_raw(raw, in_context)
@@ -87,19 +90,13 @@ impl JSValue for QJSValue {
     >(
         closure: F,
         in_context: &Rc<Self::ContextType>,
-    ) -> Self {
+    ) -> Result<Self, JSContextError> {
         let closure = wrap_two_argument_closure(closure, in_context);
         let raw = wrap_closure(closure, in_context);
         Self::from_raw(raw, in_context)
     }
 
-    fn call(&self) -> Self {
-        self.call_bound(Vec::new(), self)
-    }
-    fn call_with_arguments(&self, arguments: Vec<&Self>) -> Self {
-        self.call_bound(arguments, self)
-    }
-    fn call_bound(&self, arguments: Vec<&Self>, bound_to: &Self) -> Self {
+    fn call_bound(&self, arguments: Vec<&Self>, bound_to: &Self) -> Result<Self, JSContextError> {
         let return_val = unsafe {
             JS_Call(
                 self.context.raw,
@@ -117,17 +114,34 @@ impl JSValue for QJSValue {
         QJSValue::from_raw(return_val, &self.context)
     }
 
-    fn from_raw(raw: Self::RawType, in_context: &Rc<Self::ContextType>) -> Self {
+    fn from_raw(
+        raw: Self::RawType,
+        in_context: &Rc<Self::ContextType>,
+    ) -> Result<Self, JSContextError> {
         // unsafe { dup_value(in_context.qjs_ref, value_ref) };
         // let ref_c = unsafe { get_ref_count(in_context.qjs_ref, value_ref) };
 
         // Unlike JSC QuickJS starts with this value having a refcount of 1, so we don't need to up
         // it when we create a reference
 
-        QJSValue {
+        Ok(QJSValue {
             raw,
             context: in_context.clone(),
-        }
+        })
+    }
+
+    fn from_bool(bool_val: bool, in_context: &Rc<QJSContext>) -> Result<Self, JSContextError> {
+        let val = QJSRawValue {
+            tag: JS_TAG_BOOL as i64,
+            u: JSValueUnion {
+                int32: if bool_val { 1 } else { 0 },
+            },
+        };
+        Self::from_raw(val, &in_context)
+    }
+    fn as_bool(&self) -> Result<bool, JSContextError> {
+        let val = unsafe { JS_ToBool(self.context.raw, self.raw) };
+        Ok(val == 1)
     }
 }
 
@@ -140,22 +154,12 @@ impl JSObject for QJSValue {
         let property_ref =
             unsafe { JS_GetPropertyStr(self.context.raw, self.raw, name_cstring.as_ptr()) };
 
-        Ok(Self::from_raw(property_ref, &self.context))
+        Self::from_raw(property_ref, &self.context)
     }
 }
 
 impl QJSValue {
-    fn from_bool(bool_val: bool, in_context: &Rc<QJSContext>) -> Self {
-        let val = QJSRawValue {
-            tag: JS_TAG_BOOL as i64,
-            u: JSValueUnion {
-                int32: if bool_val { 1 } else { 0 },
-            },
-        };
-        Self::from_raw(val, &in_context)
-    }
-
-    pub fn exception(in_context: &Rc<QJSContext>) -> Self {
+    pub fn exception(in_context: &Rc<QJSContext>) -> Result<Self, JSContextError> {
         let val = EXCEPTION_RAW;
         Self::from_raw(val, in_context)
     }
@@ -189,6 +193,16 @@ mod test {
     #[test]
     fn converts_from_number() {
         jsvalue_tests::converts_from_number::<QJSValue>()
+    }
+
+    #[test]
+    fn converts_from_boolean() {
+        jsvalue_tests::converts_from_boolean::<QJSValue>()
+    }
+
+    #[test]
+    fn converts_to_boolean() {
+        jsvalue_tests::converts_to_boolean::<QJSValue>()
     }
 
     #[test]

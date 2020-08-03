@@ -97,6 +97,8 @@ pub enum JSEnvError {
 pub enum JSEvaluationError {
     #[error("Expected {} arguments, received {}", .expected, .actual)]
     NotEnoughArguments { expected: usize, actual: usize },
+    #[error("This is not a function")]
+    IsNotAFunction,
 }
 
 #[derive(Error, Debug)]

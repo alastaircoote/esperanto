@@ -39,7 +39,7 @@ unsafe extern "C" fn run_native_closure(
     });
 
     // Then convert the storage back into a raw pointer. This ensures that Rust doesn't free
-    // the memory for the closure (since we might want to run it again). The memory is finally
+    // the memory for the closure (since we might want to run it again). The memory is eventually
     // freed in the finalizer.
     Box::into_raw(closure);
 

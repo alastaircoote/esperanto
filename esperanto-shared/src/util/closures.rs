@@ -59,7 +59,8 @@ where
     Box::new(move |closure_context| {
         let context = upgrade_context(&weak_context)?;
         let arguments = convert_arguments(closure_context, 1)?;
-        let input = Input::from_js_value(ContextType::ValueType::from_raw(arguments[0], &context))?;
+        let input =
+            Input::from_js_value(ContextType::ValueType::from_raw(arguments[0], &context)?)?;
         let output = closure(input)?;
         Ok(output.to_js_value(&context)?)
     })
@@ -82,9 +83,9 @@ where
         let context = upgrade_context(&weak_context)?;
         let arguments = convert_arguments(closure_context, 2)?;
         let input1 =
-            Input1::from_js_value(ContextType::ValueType::from_raw(arguments[0], &context))?;
+            Input1::from_js_value(ContextType::ValueType::from_raw(arguments[0], &context)?)?;
         let input2 =
-            Input2::from_js_value(ContextType::ValueType::from_raw(arguments[1], &context))?;
+            Input2::from_js_value(ContextType::ValueType::from_raw(arguments[1], &context)?)?;
         let output = closure(input1, input2)?;
         Ok(output.to_js_value(&context)?)
     })

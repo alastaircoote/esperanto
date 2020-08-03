@@ -13,7 +13,10 @@ where
     fn as_string(&self) -> Result<String, JSContextError>;
     fn to_object(self) -> Result<<Self::ContextType as JSContext>::ObjectType, JSContextError>;
     fn as_number(&self) -> Result<f64, JSContextError>;
-    fn from_number(number: f64, in_context: &Rc<Self::ContextType>) -> Self;
+    fn as_bool(&self) -> Result<bool, JSContextError>;
+    fn from_number(number: f64, in_context: &Rc<Self::ContextType>)
+        -> Result<Self, JSContextError>;
+    fn from_bool(bool: bool, in_context: &Rc<Self::ContextType>) -> Result<Self, JSContextError>;
     fn from_one_arg_closure<
         I: FromJSValue<Self> + 'static,
         O: ToJSValue<Self> + 'static,
@@ -21,7 +24,7 @@ where
     >(
         closure: F,
         in_context: &Rc<Self::ContextType>,
-    ) -> Self;
+    ) -> Result<Self, JSContextError>;
 
     fn from_two_arg_closure<
         I1: FromJSValue<Self> + 'static,
@@ -31,12 +34,19 @@ where
     >(
         closure: F,
         in_context: &Rc<Self::ContextType>,
-    ) -> Self;
-    fn call(&self) -> Self;
-    fn call_with_arguments(&self, arguments: Vec<&Self>) -> Self;
-    fn call_bound(&self, arguments: Vec<&Self>, bound_to: &Self) -> Self;
-    // fn from_bool(bool: bool, in_context: &Self::ContextType) -> Self;
+    ) -> Result<Self, JSContextError>;
+    fn call(&self) -> Result<Self, JSContextError> {
+        self.call_bound(Vec::new(), self)
+    }
+    fn call_with_arguments(&self, arguments: Vec<&Self>) -> Result<Self, JSContextError> {
+        self.call_bound(arguments, self)
+    }
+    fn call_bound(&self, arguments: Vec<&Self>, bound_to: &Self) -> Result<Self, JSContextError>;
+
     // fn get_property(&self, name: &str) -> Result<Self, JSEnvError>;
 
-    fn from_raw(raw: Self::RawType, in_context: &Rc<Self::ContextType>) -> Self;
+    fn from_raw(
+        raw: Self::RawType,
+        in_context: &Rc<Self::ContextType>,
+    ) -> Result<Self, JSContextError>;
 }

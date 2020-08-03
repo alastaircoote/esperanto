@@ -1,31 +1,27 @@
-use crate::{jsc_globalcontext::JSCGlobalContext, jsc_object::JSCObject, jsc_string::JSCString};
-use esperanto_shared::errors::{JSContextError, JSConversionError};
+use crate::{
+    jsc_error::JSErrorFromJSC, jsc_globalcontext::JSCGlobalContext, jsc_object::JSCObject,
+    jsc_string::JSCString,
+};
+use esperanto_shared::errors::{JSContextError, JSConversionError, JSError, JSEvaluationError};
 use esperanto_shared::traits::{JSContext, JSValue};
 use javascriptcore_sys::{
-    JSValueMakeNumber, JSValueProtect, JSValueRef, JSValueToNumber, JSValueUnprotect,
+    JSObjectCallAsFunction, JSObjectIsFunction, JSObjectRef, JSValueIsObject, JSValueMakeBoolean,
+    JSValueMakeNumber, JSValueProtect, JSValueRef, JSValueToBoolean, JSValueToNumber,
+    JSValueToObject, JSValueUnprotect, OpaqueJSValue,
 };
 use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct JSCValue {
-    pub(crate) jsc_ref: JSValueRef,
+    pub(crate) raw_ref: JSValueRef,
+    pub(crate) object_raw_ref: Option<JSObjectRef>,
     pub(crate) context: Rc<JSCGlobalContext>,
-}
-
-impl JSCValue {
-    pub fn from_value_ref(v_ref: JSValueRef, in_context: &Rc<JSCGlobalContext>) -> Self {
-        unsafe { JSValueProtect(in_context.raw_ref, v_ref) };
-        JSCValue {
-            jsc_ref: v_ref,
-            context: in_context.clone(),
-        }
-    }
 }
 
 impl Drop for JSCValue {
     fn drop(&mut self) {
         unsafe {
-            JSValueUnprotect(self.context.raw_ref, self.jsc_ref);
+            JSValueUnprotect(self.context.raw_ref, self.raw_ref);
         }
     }
 }
@@ -39,7 +35,7 @@ impl JSValue for JSCValue {
     }
 
     fn to_object(self) -> Result<<Self::ContextType as JSContext>::ObjectType, JSContextError> {
-        JSCObject::from_value_ref(self.jsc_ref, &self.context)
+        JSCObject::from_value_ref(self.raw_ref, &self.context)
     }
     fn as_number(&self) -> Result<f64, JSContextError> {
         // As best I've been able to tell JSValueToNumber never actually creates an exception.
@@ -49,7 +45,7 @@ impl JSValue for JSCValue {
         // in the future and test for it
         let exception: *mut JSValueRef = std::ptr::null_mut();
 
-        let val = unsafe { JSValueToNumber(self.context.raw_ref, self.jsc_ref, exception) };
+        let val = unsafe { JSValueToNumber(self.context.raw_ref, self.raw_ref, exception) };
 
         if val.is_nan() {
             Err(JSConversionError::ResultIsNotANumber.into())
@@ -57,31 +53,18 @@ impl JSValue for JSCValue {
             Ok(val)
         }
     }
-    fn from_number(number: f64, in_context: &Rc<Self::ContextType>) -> Self {
+    fn from_number(
+        number: f64,
+        in_context: &Rc<Self::ContextType>,
+    ) -> Result<Self, JSContextError> {
         let raw = unsafe { JSValueMakeNumber(in_context.raw_ref, number) };
-        JSCValue::from_value_ref(raw, in_context)
+        Ok(JSCValue {
+            raw_ref: raw,
+            object_raw_ref: None,
+            context: in_context.clone(),
+        })
     }
 
-    fn from_two_arg_closure<
-        I1: esperanto_shared::traits::FromJSValue<Self> + 'static,
-        I2: esperanto_shared::traits::FromJSValue<Self> + 'static,
-        O: esperanto_shared::traits::ToJSValue<Self> + 'static,
-        F: Fn(I1, I2) -> O + 'static,
-    >(
-        closure: F,
-        in_context: &Rc<Self::ContextType>,
-    ) -> Self {
-        todo!()
-    }
-    fn call(&self) -> Self {
-        todo!()
-    }
-    fn call_with_arguments(&self, arguments: Vec<&Self>) -> Self {
-        todo!()
-    }
-    fn call_bound(&self, arguments: Vec<&Self>, bound_to: &Self) -> Self {
-        todo!()
-    }
     fn from_one_arg_closure<
         I: esperanto_shared::traits::FromJSValue<Self> + 'static,
         O: esperanto_shared::traits::ToJSValue<Self> + 'static,
@@ -89,15 +72,86 @@ impl JSValue for JSCValue {
     >(
         closure: F,
         in_context: &Rc<Self::ContextType>,
-    ) -> Self {
+    ) -> Result<Self, JSContextError> {
         todo!()
     }
-    fn from_raw(raw: Self::RawType, in_context: &Rc<Self::ContextType>) -> Self {
+
+    fn from_two_arg_closure<
+        I1: esperanto_shared::traits::FromJSValue<Self> + 'static,
+        I2: esperanto_shared::traits::FromJSValue<Self> + 'static,
+        O: esperanto_shared::traits::ToJSValue<Self> + 'static,
+        F: Fn(I1, I2) -> Result<O, JSContextError> + 'static,
+    >(
+        closure: F,
+        in_context: &Rc<Self::ContextType>,
+    ) -> Result<Self, JSContextError> {
+        todo!()
+    }
+    fn call(&self) -> Result<Self, JSContextError> {
+        self.call_bound(Vec::new(), self)
+    }
+    fn call_with_arguments(&self, arguments: Vec<&Self>) -> Result<Self, JSContextError> {
+        self.call_bound(arguments, self)
+    }
+    fn call_bound(&self, arguments: Vec<&Self>, bound_to: &Self) -> Result<Self, JSContextError> {
+        let obj_ref = self
+            .object_raw_ref
+            .ok_or(JSEvaluationError::IsNotAFunction)?;
+
+        let arguments_raw = arguments
+            .iter()
+            .map(|a| a.raw_ref)
+            .collect::<Vec<Self::RawType>>();
+
+        let mut exception_ptr: JSValueRef = std::ptr::null_mut();
+
+        let result = unsafe {
+            JSObjectCallAsFunction(
+                self.context.raw_ref,
+                obj_ref,
+                bound_to.raw_ref as *mut OpaqueJSValue,
+                arguments.len(),
+                arguments_raw.as_ptr(),
+                &mut exception_ptr,
+            )
+        };
+        JSError::check_jsc_value_ref(exception_ptr, &self.context)?;
+        Self::from_raw(result, &self.context)
+    }
+
+    fn from_raw(
+        raw: Self::RawType,
+        in_context: &Rc<Self::ContextType>,
+    ) -> Result<Self, JSContextError> {
         unsafe { JSValueProtect(in_context.raw_ref, raw) };
-        JSCValue {
-            jsc_ref: raw,
+
+        // JavaScriptCore has two different "value" types: JSValueRef and JSObjectRef. It half makes sense: JSValueRef is
+        // a const because it represents values, e.g. the number type, which can't ever be changed internally. JSObjectRef
+        // is mutable, and you can change the properties of an object. But at the same time, numbers are objects: they have
+        // methods like toFixed() that you can call. So we're wrapping both types in one here (another reason to do so is that
+        // QuickJS makes no such distincton)
+
+        let object_ref = match unsafe { JSValueIsObject(in_context.raw_ref, raw) } {
+            true => {
+                let mut exception_ptr: JSValueRef = std::ptr::null_mut();
+                let obj = unsafe { JSValueToObject(in_context.raw_ref, raw, &mut exception_ptr) };
+                JSError::check_jsc_value_ref(exception_ptr, in_context)?;
+                Some(obj)
+            }
+            false => None,
+        };
+        Ok(JSCValue {
+            raw_ref: raw,
+            object_raw_ref: object_ref,
             context: in_context.clone(),
-        }
+        })
+    }
+    fn as_bool(&self) -> Result<bool, JSContextError> {
+        unsafe { Ok(JSValueToBoolean(self.context.raw_ref, self.raw_ref)) }
+    }
+    fn from_bool(bool: bool, in_context: &Rc<Self::ContextType>) -> Result<Self, JSContextError> {
+        let raw = unsafe { JSValueMakeBoolean(in_context.raw_ref, bool) };
+        Self::from_raw(raw, in_context)
     }
 }
 
@@ -118,5 +172,20 @@ mod test {
     #[test]
     fn converts_from_number() {
         jsvalue_tests::converts_from_number::<JSCValue>()
+    }
+
+    #[test]
+    fn can_call_functions() {
+        jsvalue_tests::can_call_functions::<JSCValue>()
+    }
+
+    #[test]
+    fn converts_from_boolean() {
+        jsvalue_tests::converts_from_boolean::<JSCValue>()
+    }
+
+    #[test]
+    fn converts_to_boolean() {
+        jsvalue_tests::converts_to_boolean::<JSCValue>()
     }
 }

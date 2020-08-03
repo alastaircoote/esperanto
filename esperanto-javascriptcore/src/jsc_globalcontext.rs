@@ -1,7 +1,7 @@
 use crate::jsc_string::JSCString;
 use crate::{jsc_error::JSErrorFromJSC, jsc_object::JSCObject, jsc_value::JSCValue};
 use esperanto_shared::errors::{JSContextError, JSError};
-use esperanto_shared::traits::JSContext;
+use esperanto_shared::traits::{JSContext, JSValue};
 use javascriptcore_sys::{
     JSContextGroupCreate, JSEvaluateScript, JSGlobalContextCreateInGroup, JSGlobalContextRelease,
     JSGlobalContextRetain, JSValueRef, OpaqueJSContext, OpaqueJSContextGroup,
@@ -56,7 +56,7 @@ impl JSContext for JSCGlobalContext {
 
         JSError::check_jsc_value_ref(exception_ptr, &self)?;
 
-        Ok(JSCValue::from_value_ref(return_value, self))
+        JSCValue::from_raw(return_value, self)
     }
 }
 

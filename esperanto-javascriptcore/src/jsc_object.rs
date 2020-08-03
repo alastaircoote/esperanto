@@ -3,7 +3,7 @@ use crate::{
     jsc_value::JSCValue,
 };
 use esperanto_shared::errors::{JSContextError, JSError};
-use esperanto_shared::traits::JSObject;
+use esperanto_shared::traits::{JSObject, JSValue};
 use javascriptcore_sys::{
     JSObjectGetProperty, JSObjectRef, JSValueProtect, JSValueRef, JSValueToObject, JSValueUnprotect,
 };
@@ -66,7 +66,7 @@ impl JSObject for JSCObject {
 
         JSError::check_jsc_value_ref(exception_ptr, &self.context)?;
 
-        Ok(JSCValue::from_value_ref(prop_val, &self.context))
+        JSCValue::from_raw(prop_val, &self.context)
     }
 }
 

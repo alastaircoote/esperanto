@@ -54,7 +54,7 @@ impl JSContext for QJSContext {
 
         JSError::check_for_exception(result, &self)?;
 
-        Ok(QJSValue::from_raw(result, &self))
+        QJSValue::from_raw(result, &self)
     }
 }
 

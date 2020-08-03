@@ -34,7 +34,7 @@ impl JSCString {
     pub fn from_js_value(val: &JSCValue) -> Result<Self, JSError> {
         let mut exception_ptr: JSValueRef = std::ptr::null_mut();
         let str_ptr =
-            unsafe { JSValueToStringCopy(val.context.raw_ref, val.jsc_ref, &mut exception_ptr) };
+            unsafe { JSValueToStringCopy(val.context.raw_ref, val.raw_ref, &mut exception_ptr) };
 
         JSError::check_jsc_value_ref(exception_ptr, &val.context)?;
 
