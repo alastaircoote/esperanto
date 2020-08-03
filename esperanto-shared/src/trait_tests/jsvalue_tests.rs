@@ -70,3 +70,10 @@ pub fn can_wrap_rust_closure_with_two_arguments<Value: JSValue>() {
     let number = result.as_number().unwrap();
     assert_eq!(number, 12.0);
 }
+
+pub fn can_get_properties<Value: JSValue>() {
+    let ctx = Value::ContextType::new().unwrap();
+    let obj = ctx.evaluate("({a: 'bcd'})").unwrap();
+    let value = obj.get_property("a").unwrap().as_string().unwrap();
+    assert_eq!(value, "bcd");
+}

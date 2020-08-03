@@ -1,5 +1,5 @@
 use crate::jsc_string::JSCString;
-use crate::{jsc_error::JSErrorFromJSC, jsc_object::JSCObject, jsc_value::JSCValue};
+use crate::{jsc_error::JSErrorFromJSC, jsc_value::JSCValue};
 use esperanto_shared::errors::{JSContextError, JSError};
 use esperanto_shared::traits::{JSContext, JSValue};
 use javascriptcore_sys::{
@@ -17,7 +17,6 @@ pub struct JSCGlobalContext {
 
 impl JSContext for JSCGlobalContext {
     type ValueType = JSCValue;
-    type ObjectType = JSCObject;
 
     fn new() -> Result<Rc<Self>, JSContextError> {
         let group = unsafe { JSContextGroupCreate() };

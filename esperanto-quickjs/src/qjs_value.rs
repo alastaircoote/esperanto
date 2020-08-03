@@ -1,6 +1,6 @@
 use crate::{qjs_context::QJSContext, qjs_function::wrap_closure, ref_count::free_value};
 use esperanto_shared::errors::{JSContextError, JSConversionError};
-use esperanto_shared::traits::{FromJSValue, JSContext, JSObject, JSValue, ToJSValue};
+use esperanto_shared::traits::{FromJSValue, JSValue, ToJSValue};
 use esperanto_shared::util::closures::{wrap_one_argument_closure, wrap_two_argument_closure};
 use libquickjs_sys::{
     JSValue as QJSRawValue, JSValueUnion, JS_Call, JS_FreeCString, JS_GetPropertyStr, JS_ToBool,
@@ -36,14 +36,7 @@ impl JSValue for QJSValue {
         unsafe { JS_FreeCString(self.context.raw, c_str_ptr) };
         Ok(string)
     }
-    fn to_object(
-        self,
-    ) -> Result<
-        <Self::ContextType as JSContext>::ObjectType,
-        esperanto_shared::errors::JSContextError,
-    > {
-        Ok(self)
-    }
+
     fn as_number(&self) -> Result<f64, JSContextError> {
         let mut result = f64::NAN;
         let return_code = unsafe { JS_ToFloat64(self.context.raw, &mut result, self.raw) };
@@ -139,16 +132,12 @@ impl JSValue for QJSValue {
         };
         Self::from_raw(val, &in_context)
     }
+
     fn as_bool(&self) -> Result<bool, JSContextError> {
         let val = unsafe { JS_ToBool(self.context.raw, self.raw) };
         Ok(val == 1)
     }
-}
 
-// QuickJS doesn't really make a distinction between values and objects like JSC does
-// so we just do it all on the same struct
-impl JSObject for QJSValue {
-    type ValueType = Self;
     fn get_property(&self, name: &str) -> Result<Self, JSContextError> {
         let name_cstring = CString::new(name)?;
         let property_ref =
@@ -218,5 +207,10 @@ mod test {
     #[test]
     fn can_wrap_rust_closure_with_two_arguments() {
         jsvalue_tests::can_wrap_rust_closure_with_two_arguments::<QJSValue>();
+    }
+
+    #[test]
+    fn can_get_properties() {
+        jsvalue_tests::can_get_properties::<QJSValue>()
     }
 }

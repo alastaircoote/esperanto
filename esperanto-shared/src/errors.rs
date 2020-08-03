@@ -99,6 +99,8 @@ pub enum JSEvaluationError {
     NotEnoughArguments { expected: usize, actual: usize },
     #[error("This is not a function")]
     IsNotAFunction,
+    #[error("This is not an object")]
+    IsNotAnObject,
 }
 
 #[derive(Error, Debug)]

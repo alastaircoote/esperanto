@@ -1,13 +1,12 @@
 use crate::{
-    jsc_error::JSErrorFromJSC, jsc_globalcontext::JSCGlobalContext, jsc_object::JSCObject,
-    jsc_string::JSCString,
+    jsc_error::JSErrorFromJSC, jsc_globalcontext::JSCGlobalContext, jsc_string::JSCString,
 };
 use esperanto_shared::errors::{JSContextError, JSConversionError, JSError, JSEvaluationError};
 use esperanto_shared::traits::{JSContext, JSValue};
 use javascriptcore_sys::{
-    JSObjectCallAsFunction, JSObjectIsFunction, JSObjectRef, JSValueIsObject, JSValueMakeBoolean,
-    JSValueMakeNumber, JSValueProtect, JSValueRef, JSValueToBoolean, JSValueToNumber,
-    JSValueToObject, JSValueUnprotect, OpaqueJSValue,
+    JSObjectCallAsFunction, JSObjectGetProperty, JSObjectIsFunction, JSObjectRef, JSValueIsObject,
+    JSValueMakeBoolean, JSValueMakeNumber, JSValueProtect, JSValueRef, JSValueToBoolean,
+    JSValueToNumber, JSValueToObject, JSValueUnprotect, OpaqueJSValue,
 };
 use std::rc::Rc;
 
@@ -34,9 +33,6 @@ impl JSValue for JSCValue {
         Ok(jsc.to_string()?)
     }
 
-    fn to_object(self) -> Result<<Self::ContextType as JSContext>::ObjectType, JSContextError> {
-        JSCObject::from_value_ref(self.raw_ref, &self.context)
-    }
     fn as_number(&self) -> Result<f64, JSContextError> {
         // As best I've been able to tell JSValueToNumber never actually creates an exception.
         // instead the returned value is NaN.
@@ -153,6 +149,27 @@ impl JSValue for JSCValue {
         let raw = unsafe { JSValueMakeBoolean(in_context.raw_ref, bool) };
         Self::from_raw(raw, in_context)
     }
+    fn get_property(&self, name: &str) -> Result<Self, JSContextError> {
+        let obj_ref = self
+            .object_raw_ref
+            .ok_or(JSEvaluationError::IsNotAnObject)?;
+        let name_jscstring = JSCString::from_string(name)?;
+
+        let mut exception_ptr: JSValueRef = std::ptr::null_mut();
+
+        let prop_val = unsafe {
+            JSObjectGetProperty(
+                self.context.raw_ref,
+                obj_ref,
+                name_jscstring.raw_ref,
+                &mut exception_ptr,
+            )
+        };
+
+        JSError::check_jsc_value_ref(exception_ptr, &self.context)?;
+
+        JSCValue::from_raw(prop_val, &self.context)
+    }
 }
 
 #[cfg(test)]
@@ -187,5 +204,10 @@ mod test {
     #[test]
     fn converts_to_boolean() {
         jsvalue_tests::converts_to_boolean::<JSCValue>()
+    }
+
+    #[test]
+    fn can_get_properties() {
+        jsvalue_tests::can_get_properties::<JSCValue>()
     }
 }

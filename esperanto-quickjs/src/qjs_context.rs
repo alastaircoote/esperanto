@@ -22,7 +22,6 @@ impl Drop for QJSContext {
 
 impl JSContext for QJSContext {
     type ValueType = QJSValue;
-    type ObjectType = QJSValue;
     fn new() -> Result<Rc<Self>, JSContextError> {
         // need to add support for shared runtimes
         let runtime = Rc::new(QJSRuntime::new());

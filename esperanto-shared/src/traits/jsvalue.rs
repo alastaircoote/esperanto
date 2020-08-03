@@ -11,7 +11,6 @@ where
     type ContextType: JSContext<ValueType = Self> + 'static;
     type RawType: Copy;
     fn as_string(&self) -> Result<String, JSContextError>;
-    fn to_object(self) -> Result<<Self::ContextType as JSContext>::ObjectType, JSContextError>;
     fn as_number(&self) -> Result<f64, JSContextError>;
     fn as_bool(&self) -> Result<bool, JSContextError>;
     fn from_number(number: f64, in_context: &Rc<Self::ContextType>)
@@ -43,7 +42,7 @@ where
     }
     fn call_bound(&self, arguments: Vec<&Self>, bound_to: &Self) -> Result<Self, JSContextError>;
 
-    // fn get_property(&self, name: &str) -> Result<Self, JSEnvError>;
+    fn get_property(&self, name: &str) -> Result<Self, JSContextError>;
 
     fn from_raw(
         raw: Self::RawType,
