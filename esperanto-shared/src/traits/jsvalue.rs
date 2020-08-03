@@ -48,4 +48,10 @@ where
         raw: Self::RawType,
         in_context: &Rc<Self::ContextType>,
     ) -> Result<Self, JSContextError>;
+
+    fn create_function(
+        in_context: &Rc<Self::ContextType>,
+        arg_names: Vec<&str>,
+        body: &str,
+    ) -> Result<Self, JSContextError>;
 }

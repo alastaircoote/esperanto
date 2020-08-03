@@ -3,8 +3,8 @@ use esperanto_shared::errors::{JSContextError, JSConversionError};
 use esperanto_shared::traits::{FromJSValue, JSValue, ToJSValue};
 use esperanto_shared::util::closures::{wrap_one_argument_closure, wrap_two_argument_closure};
 use libquickjs_sys::{
-    JSValue as QJSRawValue, JSValueUnion, JS_Call, JS_FreeCString, JS_GetPropertyStr, JS_ToBool,
-    JS_ToCStringLen2, JS_ToFloat64, JS_TAG_BOOL, JS_TAG_EXCEPTION, JS_TAG_FLOAT64,
+    JSValue as QJSRawValue, JSValueUnion, JS_Call, JS_Eval, JS_FreeCString, JS_GetPropertyStr,
+    JS_ToBool, JS_ToCStringLen2, JS_ToFloat64, JS_TAG_BOOL, JS_TAG_EXCEPTION, JS_TAG_FLOAT64,
 };
 use std::ffi::{CStr, CString};
 use std::rc::Rc;
@@ -145,6 +145,33 @@ impl JSValue for QJSValue {
 
         Self::from_raw(property_ref, &self.context)
     }
+
+    fn create_function(
+        in_context: &Rc<Self::ContextType>,
+        arg_names: Vec<&str>,
+        body: &str,
+    ) -> Result<Self, JSContextError> {
+        // I might be wrong but I can't find a way to define a function from a string in QuickJS,
+        // so we just use JS_Eval to do it. This is not good, as it might allow someone the ability
+        // to immediately execute code if they're creative with {}s. Going to leave for now but
+        // should revisit in the future. Maybe look at the struct that gets created to try to
+        // manually construct one ourselves?
+
+        let combined_arg_names = arg_names.join(",");
+        let function_complete = format!("(function({}) {{ {} }})", combined_arg_names, body);
+        let function_length = function_complete.len();
+        let function_c_string = CString::new(function_complete)?;
+        let result = unsafe {
+            JS_Eval(
+                in_context.raw,
+                function_c_string.as_ptr(),
+                function_length as u64,
+                CString::new("script.js")?.as_ptr(),
+                0,
+            )
+        };
+        Self::from_raw(result, in_context)
+    }
 }
 
 impl QJSValue {
@@ -212,5 +239,10 @@ mod test {
     #[test]
     fn can_get_properties() {
         jsvalue_tests::can_get_properties::<QJSValue>()
+    }
+
+    #[test]
+    fn can_create_function() {
+        jsvalue_tests::can_create_function::<QJSValue>();
     }
 }

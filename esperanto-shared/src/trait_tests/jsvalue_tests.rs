@@ -77,3 +77,16 @@ pub fn can_get_properties<Value: JSValue>() {
     let value = obj.get_property("a").unwrap().as_string().unwrap();
     assert_eq!(value, "bcd");
 }
+
+pub fn can_create_function<Value: JSValue>() {
+    let ctx = Value::ContextType::new().unwrap();
+    let func = Value::create_function(&ctx, vec!["one", "two"], "return one * two;").unwrap();
+    let arg1 = Value::from_number(3.0, &ctx).unwrap();
+    let arg2 = Value::from_number(4.0, &ctx).unwrap();
+    let result = func
+        .call_with_arguments(vec![&arg1, &arg2])
+        .unwrap()
+        .as_number()
+        .unwrap();
+    assert_eq!(result, 12.0);
+}

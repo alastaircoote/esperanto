@@ -4,13 +4,14 @@ use crate::{
 };
 use esperanto_shared::errors::{JSContextError, JSConversionError, JSError, JSEvaluationError};
 use esperanto_shared::{
-    traits::{JSContext, JSValue},
+    traits::JSValue,
     util::closures::{wrap_one_argument_closure, wrap_two_argument_closure},
 };
 use javascriptcore_sys::{
-    JSObjectCallAsFunction, JSObjectGetProperty, JSObjectIsFunction, JSObjectRef, JSValueIsObject,
-    JSValueMakeBoolean, JSValueMakeNumber, JSValueProtect, JSValueRef, JSValueToBoolean,
-    JSValueToNumber, JSValueToObject, JSValueUnprotect, OpaqueJSValue,
+    JSObjectCallAsFunction, JSObjectGetProperty, JSObjectMakeFunction, JSObjectRef,
+    JSValueIsObject, JSValueMakeBoolean, JSValueMakeNumber, JSValueProtect, JSValueRef,
+    JSValueToBoolean, JSValueToNumber, JSValueToObject, JSValueUnprotect, OpaqueJSString,
+    OpaqueJSValue,
 };
 use std::rc::Rc;
 
@@ -173,6 +174,44 @@ impl JSValue for JSCValue {
 
         JSCValue::from_raw(prop_val, &self.context)
     }
+    fn create_function(
+        in_context: &Rc<Self::ContextType>,
+        arg_names: Vec<&str>,
+        body: &str,
+    ) -> Result<Self, JSContextError> {
+        // Originally I had this creating the JSCString and immediately grabbing the
+        // raw reference, but when I did that JSCString::drop was called before
+        // the function was created. So we're doing it separately to keep the reference
+        // to the JSC strings.
+
+        let args_as_jsc_strings = arg_names
+            .iter()
+            .map(|n| JSCString::from_string(n))
+            .collect::<Result<Vec<JSCString>, _>>()?;
+
+        let args_raw = args_as_jsc_strings
+            .iter()
+            .map(|s| s.raw_ref)
+            .collect::<Vec<*mut OpaqueJSString>>();
+
+        let mut exception_ptr: JSValueRef = std::ptr::null_mut();
+        let raw = unsafe {
+            JSObjectMakeFunction(
+                in_context.raw_ref,
+                std::ptr::null_mut(),
+                args_as_jsc_strings.len() as u32,
+                args_raw.as_ptr(),
+                JSCString::from_string(body)?.raw_ref,
+                std::ptr::null_mut(),
+                0,
+                &mut exception_ptr,
+            )
+        };
+
+        JSError::check_jsc_value_ref(exception_ptr, in_context)?;
+
+        Self::from_raw(raw, in_context)
+    }
 }
 
 #[cfg(test)]
@@ -222,5 +261,10 @@ mod test {
     #[test]
     fn can_wrap_rust_closure_with_two_arguments() {
         jsvalue_tests::can_wrap_rust_closure_with_two_arguments::<JSCValue>();
+    }
+
+    #[test]
+    fn can_create_function() {
+        jsvalue_tests::can_create_function::<JSCValue>();
     }
 }

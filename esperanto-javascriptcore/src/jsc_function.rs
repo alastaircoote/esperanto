@@ -1,7 +1,7 @@
-use crate::{jsc_globalcontext::JSCGlobalContext, jsc_value::JSCValue};
+use crate::jsc_globalcontext::JSCGlobalContext;
 use esperanto_shared::util::closures::{FunctionInvocationContext, FunctionToInvoke};
 use javascriptcore_sys::{
-    JSClassCreate, JSClassDefinition, JSClassRef, JSClassRetain, JSObjectGetPrivate, JSObjectMake,
+    JSClassCreate, JSClassDefinition, JSClassRef, JSObjectGetPrivate, JSObjectMake,
     JSValueIsObjectOfClass, JSValueRef, OpaqueJSContext, OpaqueJSValue,
 };
 use std::{ffi::c_void, rc::Rc};
@@ -10,11 +10,11 @@ const NATIVE_FUNCTION_CLASS_NAME: &'static [u8] = b"NativeFunction\0";
 
 unsafe extern "C" fn invoke_function(
     ctx: *const OpaqueJSContext,
-    function: *mut OpaqueJSValue,
+    _function: *mut OpaqueJSValue,
     this_object: *mut OpaqueJSValue,
     argument_count: usize,
     arguments: *const *const OpaqueJSValue,
-    exception: *mut *const OpaqueJSValue,
+    _exception: *mut *const OpaqueJSValue,
 ) -> *const OpaqueJSValue {
     let class_ref = NATIVE_FUNCTION_CLASS.unwrap();
 
@@ -42,7 +42,7 @@ unsafe extern "C" fn invoke_function(
 
 unsafe extern "C" fn finalize_native_function(val: *mut OpaqueJSValue) {
     let pointer = JSObjectGetPrivate(val) as *mut FunctionToInvoke<JSCGlobalContext>;
-    Box::from_raw(pointer);
+    let _ = Box::from_raw(pointer);
 }
 
 const NATIVE_FUNCTION_CLASS_DEFINITION: JSClassDefinition = JSClassDefinition {
@@ -77,7 +77,6 @@ pub fn wrap_closure(
             None => {
                 let created_definition = JSClassCreate(&NATIVE_FUNCTION_CLASS_DEFINITION);
                 NATIVE_FUNCTION_CLASS = Some(created_definition);
-                JSClassRetain(created_definition);
                 created_definition
             }
         }
