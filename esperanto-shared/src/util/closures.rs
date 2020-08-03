@@ -7,10 +7,10 @@ use std::rc::{Rc, Weak};
 pub struct FunctionInvocationContext<ContextType: JSContext> {
     pub _this_val: <ContextType::ValueType as JSValue>::RawType,
     pub number_of_arguments: usize,
-    pub arguments: *mut <ContextType::ValueType as JSValue>::RawType,
+    pub arguments: *const <ContextType::ValueType as JSValue>::RawType,
 }
 
-pub type FunctionInvocation<ContextType> = Box<
+pub type FunctionToInvoke<ContextType> = Box<
     dyn Fn(
         FunctionInvocationContext<ContextType>,
     ) -> Result<<ContextType as JSContext>::ValueType, JSContextError>,
@@ -47,7 +47,7 @@ fn upgrade_context<ContextType: JSContext>(
 pub fn wrap_one_argument_closure<Input, Output, ClosureType, ContextType>(
     closure: ClosureType,
     in_context: &Rc<ContextType>,
-) -> FunctionInvocation<ContextType>
+) -> FunctionToInvoke<ContextType>
 where
     Input: FromJSValue<ContextType::ValueType> + 'static,
     Output: ToJSValue<ContextType::ValueType> + 'static,
@@ -69,7 +69,7 @@ where
 pub fn wrap_two_argument_closure<Input1, Input2, Output, ClosureType, ContextType>(
     closure: ClosureType,
     in_context: &Rc<ContextType>,
-) -> FunctionInvocation<ContextType>
+) -> FunctionToInvoke<ContextType>
 where
     Input1: FromJSValue<ContextType::ValueType> + 'static,
     Input2: FromJSValue<ContextType::ValueType> + 'static,

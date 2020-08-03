@@ -4,7 +4,7 @@ use crate::{
     qjs_context::QJSContext,
     qjs_runtime::QJSRuntime,
 };
-use esperanto_shared::util::closures::{FunctionInvocation, FunctionInvocationContext};
+use esperanto_shared::util::closures::{FunctionInvocationContext, FunctionToInvoke};
 use libquickjs_sys::{
     JSClassDef, JSClassID, JSContext, JSValue as QJSRawValue, JS_GetOpaque, JS_IsRegisteredClass,
     JS_NewCFunctionData, JS_NewClass, JS_NewObjectClass, JS_SetOpaque,
@@ -26,7 +26,7 @@ unsafe extern "C" fn run_native_closure(
     let class_id = get_class_id(QJSClassType::ClosureContext);
 
     // Now we grab the raw pointer from the JSValue:
-    let closure_raw = JS_GetOpaque(*data, class_id) as *mut FunctionInvocation<QJSContext>;
+    let closure_raw = JS_GetOpaque(*data, class_id) as *mut FunctionToInvoke<QJSContext>;
 
     // Then we inflate that back into the box we previously stored:
     let closure = Box::from_raw(closure_raw);
@@ -54,7 +54,7 @@ unsafe extern "C" fn finalize_closure_context(
     value: libquickjs_sys::JSValue,
 ) {
     let class_id = get_class_id(QJSClassType::ClosureContext);
-    let closure_raw = JS_GetOpaque(value, class_id) as *mut FunctionInvocation<QJSContext>;
+    let closure_raw = JS_GetOpaque(value, class_id) as *mut FunctionToInvoke<QJSContext>;
 
     // This creates the closure context then, because it isn't returned anywhere, immediately frees the memory
     // associated with it
@@ -90,7 +90,7 @@ unsafe fn ensure_closure_context_class_registered(runtime: &QJSRuntime) -> JSCla
 }
 
 pub fn wrap_closure(
-    closure: FunctionInvocation<QJSContext>,
+    closure: FunctionToInvoke<QJSContext>,
     in_context: &Rc<QJSContext>,
 ) -> QJSRawValue {
     let class_id = unsafe { ensure_closure_context_class_registered(&in_context.runtime) };

@@ -1,8 +1,12 @@
 use crate::{
-    jsc_error::JSErrorFromJSC, jsc_globalcontext::JSCGlobalContext, jsc_string::JSCString,
+    jsc_error::JSErrorFromJSC, jsc_function::wrap_closure, jsc_globalcontext::JSCGlobalContext,
+    jsc_string::JSCString,
 };
 use esperanto_shared::errors::{JSContextError, JSConversionError, JSError, JSEvaluationError};
-use esperanto_shared::traits::{JSContext, JSValue};
+use esperanto_shared::{
+    traits::{JSContext, JSValue},
+    util::closures::{wrap_one_argument_closure, wrap_two_argument_closure},
+};
 use javascriptcore_sys::{
     JSObjectCallAsFunction, JSObjectGetProperty, JSObjectIsFunction, JSObjectRef, JSValueIsObject,
     JSValueMakeBoolean, JSValueMakeNumber, JSValueProtect, JSValueRef, JSValueToBoolean,
@@ -69,7 +73,9 @@ impl JSValue for JSCValue {
         closure: F,
         in_context: &Rc<Self::ContextType>,
     ) -> Result<Self, JSContextError> {
-        todo!()
+        let closure = wrap_one_argument_closure(closure, in_context);
+        let raw = wrap_closure(closure, in_context);
+        Self::from_raw(raw, in_context)
     }
 
     fn from_two_arg_closure<
@@ -81,14 +87,11 @@ impl JSValue for JSCValue {
         closure: F,
         in_context: &Rc<Self::ContextType>,
     ) -> Result<Self, JSContextError> {
-        todo!()
+        let closure = wrap_two_argument_closure(closure, in_context);
+        let raw = wrap_closure(closure, in_context);
+        Self::from_raw(raw, in_context)
     }
-    fn call(&self) -> Result<Self, JSContextError> {
-        self.call_bound(Vec::new(), self)
-    }
-    fn call_with_arguments(&self, arguments: Vec<&Self>) -> Result<Self, JSContextError> {
-        self.call_bound(arguments, self)
-    }
+
     fn call_bound(&self, arguments: Vec<&Self>, bound_to: &Self) -> Result<Self, JSContextError> {
         let obj_ref = self
             .object_raw_ref
@@ -209,5 +212,15 @@ mod test {
     #[test]
     fn can_get_properties() {
         jsvalue_tests::can_get_properties::<JSCValue>()
+    }
+
+    #[test]
+    fn can_wrap_rust_closure_with_one_argument() {
+        jsvalue_tests::can_wrap_rust_closure_with_one_argument::<JSCValue>();
+    }
+
+    #[test]
+    fn can_wrap_rust_closure_with_two_arguments() {
+        jsvalue_tests::can_wrap_rust_closure_with_two_arguments::<JSCValue>();
     }
 }
