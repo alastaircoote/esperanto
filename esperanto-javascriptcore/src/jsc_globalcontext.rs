@@ -3,8 +3,9 @@ use crate::{jsc_error::JSErrorFromJSC, jsc_value::JSCValue};
 use esperanto_shared::errors::{JSContextError, JSError};
 use esperanto_shared::traits::{JSContext, JSValue};
 use javascriptcore_sys::{
-    JSContextGroupCreate, JSEvaluateScript, JSGlobalContextCreateInGroup, JSGlobalContextRelease,
-    JSGlobalContextRetain, JSValueRef, OpaqueJSContext, OpaqueJSContextGroup,
+    JSContextGroupCreate, JSContextGroupRelease, JSEvaluateScript, JSGlobalContextCreateInGroup,
+    JSGlobalContextRelease, JSGlobalContextRetain, JSValueRef, OpaqueJSContext,
+    OpaqueJSContextGroup,
 };
 // use slotmap::{DefaultKey, SecondaryMap, SlotMap};
 use std::rc::Rc;
@@ -32,7 +33,7 @@ impl JSContext for JSCGlobalContext {
         assert_eq!(retained_ctx, ctx);
 
         Ok(Rc::new(JSCGlobalContext {
-            raw_ref: retained_ctx,
+            raw_ref: ctx,
             group_raw_ref: group,
         }))
     }
@@ -61,7 +62,9 @@ impl JSContext for JSCGlobalContext {
 
 impl Drop for JSCGlobalContext {
     fn drop(&mut self) {
+        println!("Dropping");
         unsafe { JSGlobalContextRelease(self.raw_ref) }
+        unsafe { JSContextGroupRelease(self.group_raw_ref) }
     }
 }
 
