@@ -24,7 +24,7 @@ fn main() {
         },
         parse: cbindgen::ParseConfig {
             // parse_deps: true,
-            // include: Some(vec!["esperanto_javascriptcore".to_string()]),
+            include: Some(vec!["esperanto_javascriptcore".to_string()]),
             ..Default::default()
         },
         function: cbindgen::FunctionConfig {

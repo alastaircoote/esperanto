@@ -8,12 +8,33 @@ use javascriptcore_sys::{
     OpaqueJSContextGroup,
 };
 // use slotmap::{DefaultKey, SecondaryMap, SlotMap};
-use std::rc::Rc;
+use std::{os::raw::c_char, rc::Rc};
 
 #[derive(Debug)]
 pub struct JSCGlobalContext {
     pub(crate) raw_ref: *mut OpaqueJSContext,
     group_raw_ref: *const OpaqueJSContextGroup,
+}
+
+impl JSCGlobalContext {
+    fn evaluate_jscstring(self: &Rc<Self>, script: JSCString) -> Result<JSCValue, JSContextError> {
+        let mut exception_ptr: JSValueRef = std::ptr::null_mut();
+
+        let return_value = unsafe {
+            JSEvaluateScript(
+                self.raw_ref,
+                script.raw_ref,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                0,
+                &mut exception_ptr,
+            )
+        };
+
+        JSError::check_jsc_value_ref(exception_ptr, &self)?;
+
+        JSCValue::from_raw(return_value, self)
+    }
 }
 
 impl JSContext for JSCGlobalContext {
@@ -40,23 +61,15 @@ impl JSContext for JSCGlobalContext {
 
     fn evaluate(self: &Rc<Self>, script: &str) -> Result<JSCValue, JSContextError> {
         let script_jsstring = JSCString::from_string(script)?;
+        self.evaluate_jscstring(script_jsstring)
+    }
 
-        let mut exception_ptr: JSValueRef = std::ptr::null_mut();
-
-        let return_value = unsafe {
-            JSEvaluateScript(
-                self.raw_ref,
-                script_jsstring.raw_ref,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                0,
-                &mut exception_ptr,
-            )
-        };
-
-        JSError::check_jsc_value_ref(exception_ptr, &self)?;
-
-        JSCValue::from_raw(return_value, self)
+    fn evaluate_cstring(
+        self: &Rc<Self>,
+        script: *const c_char,
+    ) -> Result<Self::ValueType, JSContextError> {
+        let script_jsstring = JSCString::from_c_string(script)?;
+        self.evaluate_jscstring(script_jsstring)
     }
 }
 

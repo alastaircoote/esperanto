@@ -6,7 +6,7 @@ use esperanto_shared::traits::{JSContext, JSValue};
 use libquickjs_sys::{
     JSContext as QJSRawContext, JS_Eval, JS_FreeContext, JS_NewContext, JS_EVAL_TYPE_GLOBAL,
 };
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::rc::Rc;
 #[derive(Debug)]
 pub struct QJSContext {
@@ -17,6 +17,30 @@ pub struct QJSContext {
 impl Drop for QJSContext {
     fn drop(&mut self) {
         unsafe { JS_FreeContext(self.raw) }
+    }
+}
+
+impl QJSContext {
+    fn evaluate_cstring_with_len(
+        self: &Rc<Self>,
+        script: *const std::os::raw::c_char,
+        script_len: usize,
+    ) -> Result<QJSValue, JSContextError> {
+        let fin = CString::new("file.js").unwrap();
+
+        let result = unsafe {
+            JS_Eval(
+                self.raw,
+                script,
+                script_len as _,
+                fin.as_ptr(),
+                JS_EVAL_TYPE_GLOBAL as i32,
+            )
+        };
+
+        JSError::check_for_exception(result, &self)?;
+
+        QJSValue::from_raw(result, &self)
     }
 }
 
@@ -39,21 +63,14 @@ impl JSContext for QJSContext {
         let script_as_c_string =
             CString::new(script).map_err(|e| JSConversionError::ConversionToCStringFailed(e))?;
 
-        let fin = CString::new("file.js").unwrap();
-
-        let result = unsafe {
-            JS_Eval(
-                self.raw,
-                script_as_c_string.as_ptr(),
-                script.len() as _,
-                fin.as_ptr(),
-                JS_EVAL_TYPE_GLOBAL as i32,
-            )
-        };
-
-        JSError::check_for_exception(result, &self)?;
-
-        QJSValue::from_raw(result, &self)
+        self.evaluate_cstring_with_len(script_as_c_string.as_ptr(), script.len())
+    }
+    fn evaluate_cstring(
+        self: &Rc<Self>,
+        script: *const std::os::raw::c_char,
+    ) -> Result<Self::ValueType, JSContextError> {
+        let cstr_len = unsafe { CStr::from_ptr(script).to_str()?.len() };
+        self.evaluate_cstring_with_len(script, cstr_len)
     }
 }
 

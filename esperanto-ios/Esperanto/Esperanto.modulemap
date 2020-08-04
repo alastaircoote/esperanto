@@ -1,0 +1,11 @@
+framework module Esperanto {
+    umbrella header "Esperanto.h"
+
+    explicit module Esperanto_Private {
+        header "esperanto_javascriptcore.h"
+        link "esperanto_javascriptcore"
+        link framework "JavaScriptCore"
+    }
+
+    export *
+}

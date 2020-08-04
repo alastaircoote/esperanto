@@ -24,7 +24,11 @@ impl JSCString {
         let script_c_string =
             CString::new(string).map_err(|e| JSConversionError::ConversionToCStringFailed(e))?;
 
-        let string_ptr = unsafe { JSStringCreateWithUTF8CString(script_c_string.as_ptr()) };
+        Self::from_c_string(script_c_string.as_ptr())
+    }
+
+    pub fn from_c_string(c_string: *const c_char) -> Result<Self, JSConversionError> {
+        let string_ptr = unsafe { JSStringCreateWithUTF8CString(c_string) };
 
         Ok(JSCString {
             raw_ref: string_ptr,

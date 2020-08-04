@@ -1,3 +1,4 @@
+use super::util::with_ptr;
 use crate::{JSCGlobalContext, JSCValue};
 use esperanto_shared::traits::JSContext;
 use std::{
@@ -7,27 +8,21 @@ use std::{
 };
 
 #[no_mangle]
-pub extern "C" fn context_new() -> *mut Box<Rc<JSCGlobalContext>> {
+pub extern "C" fn context_new() -> *mut Rc<JSCGlobalContext> {
     let ctx = JSCGlobalContext::new().unwrap();
-    Box::into_raw(Box::new(Box::new(ctx)))
+    Box::into_raw(Box::new(ctx))
 }
 
 #[no_mangle]
 pub extern "C" fn context_evaluate(
-    ctx_ptr: *mut Box<Rc<JSCGlobalContext>>,
+    ctx_ptr: *mut Rc<JSCGlobalContext>,
     script_ptr: *const c_char,
 ) -> *mut JSCValue {
-    let ctx = unsafe { Box::from_raw(ctx_ptr) };
-
-    let script = unsafe { CStr::from_ptr(script_ptr) };
-    let result = ctx.evaluate(script.to_str().unwrap()).unwrap();
-    Box::into_raw(ctx);
-    std::mem::forget(script);
+    let result = with_ptr(ctx_ptr, |ctx| ctx.evaluate_cstring(script_ptr).unwrap());
     Box::into_raw(Box::new(result))
 }
 
 #[no_mangle]
-pub extern "C" fn context_free(ctx_ptr: *mut Box<Rc<JSCGlobalContext>>) {
-    println!("Should drop?");
+pub extern "C" fn context_free(ctx_ptr: *mut Rc<JSCGlobalContext>) {
     unsafe { Box::from_raw(ctx_ptr) };
 }
