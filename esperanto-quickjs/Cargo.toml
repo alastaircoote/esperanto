@@ -5,5 +5,5 @@ version = "0.1.0"
 
 [dependencies]
 esperanto_shared = {path = "../esperanto-shared"}
-libquickjs-sys = {path = "../libquickjs-sys"}
+libquickjs-sys = {git = "https://github.com/alastaircoote/quickjs-rs.git", features = ["dump_leaks"]}
 slotmap = "0.4.0"
