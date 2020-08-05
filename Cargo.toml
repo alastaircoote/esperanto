@@ -5,6 +5,7 @@ members = [
   "esperanto-javascriptcore",
   "esperanto-quickjs",
   "esperanto-shared",
+  "esperanto-ffi",
 ]
 
 [profile.release]

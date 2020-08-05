@@ -1,0 +1,22 @@
+[package]
+authors = ["Alastair Coote <alastair.coote@nytimes.com>"]
+build = "build.rs"
+edition = "2018"
+name = "esperanto_ffi"
+version = "0.1.0"
+
+[dependencies]
+esperanto_javascriptcore = {path = "../esperanto-javascriptcore", optional = true}
+esperanto_quickjs = {path = "../esperanto-quickjs", optional = true}
+esperanto_shared = {path = "../esperanto-shared"}
+
+[lib]
+crate-type = ["staticlib"]
+
+[features]
+default = ["javascriptcore"]
+javascriptcore = ["esperanto_javascriptcore"]
+quickjs = ["esperanto_quickjs"]
+
+[build-dependencies]
+cbindgen = "0.14.3"

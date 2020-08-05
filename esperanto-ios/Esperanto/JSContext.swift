@@ -12,15 +12,15 @@ import Esperanto.Esperanto_Private
 public class JSContext {
     let ctx: OpaquePointer
     public init() {
-        self.ctx = context_new()
+        self.ctx = jscontext_new()
     }
 
     public func evaluate(script: String) -> JSValue {
-        let val_ptr = context_evaluate(self.ctx, script)
+        let val_ptr = jscontext_evaluate(self.ctx, script)
         return JSValue(ptr: val_ptr!)
     }
 
     deinit {
-        context_free(self.ctx)
+        jscontext_free(self.ctx)
     }
 }

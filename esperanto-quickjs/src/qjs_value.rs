@@ -192,6 +192,19 @@ impl Drop for QJSValue {
     }
 }
 
+// macro_rules! foo {
+//     ($v:ident) => {
+//         fn what<V>(v: V)
+//         where
+//             : JSValue,
+//         {
+//             v.asdasd
+//         }
+//     };
+// }
+
+// foo!(QJSValue);
+
 #[cfg(test)]
 mod test {
     use super::QJSValue;

@@ -212,6 +212,13 @@ impl JSValue for JSCValue {
 
         Self::from_raw(raw, in_context)
     }
+    // fn call_property_with_arguments(
+    //     &self,
+    //     name: &str,
+    //     arguments: Vec<&Self>,
+    // ) -> Result<Self, JSContextError> {
+    //     todo!()
+    // }
 }
 
 #[cfg(test)]

@@ -43,6 +43,14 @@ where
     fn call_bound(&self, arguments: Vec<&Self>, bound_to: &Self) -> Result<Self, JSContextError>;
 
     fn get_property(&self, name: &str) -> Result<Self, JSContextError>;
+    // fn call_property(&self, name: &str) -> Result<Self, JSContextError> {
+    //     self.call_property_with_arguments(name, Vec::new())
+    // }
+    // fn call_property_with_arguments(
+    //     &self,
+    //     name: &str,
+    //     arguments: Vec<&Self>,
+    // ) -> Result<Self, JSContextError>;
 
     fn from_raw(
         raw: Self::RawType,

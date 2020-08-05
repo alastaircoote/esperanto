@@ -2,8 +2,8 @@ framework module Esperanto {
     umbrella header "Esperanto.h"
 
     explicit module Esperanto_Private {
-        header "esperanto_javascriptcore.h"
-        link "esperanto_javascriptcore"
+        header "esperanto_ffi.h"
+        link "esperanto_ffi"
         link framework "JavaScriptCore"
     }
 

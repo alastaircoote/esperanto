@@ -10,11 +10,11 @@
 		D386AE3924D9D1D900619C29 /* Esperanto.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D386AE2F24D9D1D800619C29 /* Esperanto.framework */; };
 		D386AE3E24D9D1D900619C29 /* EsperantoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D386AE3D24D9D1D900619C29 /* EsperantoTests.swift */; };
 		D386AE4024D9D1D900619C29 /* Esperanto.h in Headers */ = {isa = PBXBuildFile; fileRef = D386AE3224D9D1D800619C29 /* Esperanto.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		D386AE4B24D9D1FC00619C29 /* esperanto_javascriptcore.h in Headers */ = {isa = PBXBuildFile; fileRef = D386AE4A24D9D1FC00619C29 /* esperanto_javascriptcore.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		D386AE5024D9D2B100619C29 /* JSContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = D386AE4F24D9D2B100619C29 /* JSContext.swift */; };
-		D386AE5424D9D6CE00619C29 /* libesperanto_javascriptcore.a in Frameworks */ = {isa = PBXBuildFile; fileRef = D386AE4C24D9D20100619C29 /* libesperanto_javascriptcore.a */; };
-		D386AE5524D9D70C00619C29 /* libesperanto_javascriptcore.a in Resources */ = {isa = PBXBuildFile; fileRef = D386AE4C24D9D20100619C29 /* libesperanto_javascriptcore.a */; };
 		D386AE7C24D9EB8500619C29 /* JSValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = D386AE7B24D9EB8500619C29 /* JSValue.swift */; };
+		D386AE8024DB026A00619C29 /* libesperanto_ffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = D386AE7F24DB026A00619C29 /* libesperanto_ffi.a */; };
+		D386AE8224DB027F00619C29 /* esperanto_ffi.h in Headers */ = {isa = PBXBuildFile; fileRef = D386AE8124DB027F00619C29 /* esperanto_ffi.h */; settings = {ATTRIBUTES = (Private, ); }; };
+		D386AE8424DB0FDE00619C29 /* NumberGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D386AE8324DB0FDE00619C29 /* NumberGenerator.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -34,11 +34,12 @@
 		D386AE3824D9D1D900619C29 /* EsperantoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EsperantoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D386AE3D24D9D1D900619C29 /* EsperantoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EsperantoTests.swift; sourceTree = "<group>"; };
 		D386AE3F24D9D1D900619C29 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		D386AE4A24D9D1FC00619C29 /* esperanto_javascriptcore.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = esperanto_javascriptcore.h; path = "../../../esperanto-javascriptcore/target/esperanto_javascriptcore.h"; sourceTree = "<group>"; };
-		D386AE4C24D9D20100619C29 /* libesperanto_javascriptcore.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libesperanto_javascriptcore.a; path = ../../../target/universal/debug/libesperanto_javascriptcore.a; sourceTree = "<group>"; };
 		D386AE4E24D9D26C00619C29 /* Esperanto.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = Esperanto.modulemap; sourceTree = "<group>"; };
 		D386AE4F24D9D2B100619C29 /* JSContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSContext.swift; sourceTree = "<group>"; };
 		D386AE7B24D9EB8500619C29 /* JSValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSValue.swift; sourceTree = "<group>"; };
+		D386AE7F24DB026A00619C29 /* libesperanto_ffi.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libesperanto_ffi.a; path = ../../../target/universal/debug/libesperanto_ffi.a; sourceTree = "<group>"; };
+		D386AE8124DB027F00619C29 /* esperanto_ffi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = esperanto_ffi.h; path = "../../../esperanto-ffi/target/esperanto_ffi.h"; sourceTree = "<group>"; };
+		D386AE8324DB0FDE00619C29 /* NumberGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NumberGenerator.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -46,7 +47,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D386AE5424D9D6CE00619C29 /* libesperanto_javascriptcore.a in Frameworks */,
+				D386AE8024DB026A00619C29 /* libesperanto_ffi.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -83,11 +84,12 @@
 		D386AE3124D9D1D800619C29 /* Esperanto */ = {
 			isa = PBXGroup;
 			children = (
-				D386AE4924D9D1EF00619C29 /* esperanto_javascriptcore */,
+				D386AE4924D9D1EF00619C29 /* esperanto_ffi */,
 				D386AE3224D9D1D800619C29 /* Esperanto.h */,
 				D386AE3324D9D1D800619C29 /* Info.plist */,
 				D386AE4E24D9D26C00619C29 /* Esperanto.modulemap */,
 				D386AE4F24D9D2B100619C29 /* JSContext.swift */,
+				D386AE8324DB0FDE00619C29 /* NumberGenerator.swift */,
 				D386AE7B24D9EB8500619C29 /* JSValue.swift */,
 			);
 			path = Esperanto;
@@ -102,13 +104,13 @@
 			path = EsperantoTests;
 			sourceTree = "<group>";
 		};
-		D386AE4924D9D1EF00619C29 /* esperanto_javascriptcore */ = {
+		D386AE4924D9D1EF00619C29 /* esperanto_ffi */ = {
 			isa = PBXGroup;
 			children = (
-				D386AE4A24D9D1FC00619C29 /* esperanto_javascriptcore.h */,
-				D386AE4C24D9D20100619C29 /* libesperanto_javascriptcore.a */,
+				D386AE8124DB027F00619C29 /* esperanto_ffi.h */,
+				D386AE7F24DB026A00619C29 /* libesperanto_ffi.a */,
 			);
-			path = esperanto_javascriptcore;
+			path = esperanto_ffi;
 			sourceTree = "<group>";
 		};
 		D386AE5324D9D6CE00619C29 /* Frameworks */ = {
@@ -125,7 +127,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D386AE4B24D9D1FC00619C29 /* esperanto_javascriptcore.h in Headers */,
+				D386AE8224DB027F00619C29 /* esperanto_ffi.h in Headers */,
 				D386AE4024D9D1D900619C29 /* Esperanto.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -213,7 +215,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D386AE5524D9D70C00619C29 /* libesperanto_javascriptcore.a in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -243,7 +244,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# The $PATH used by XCode likely won't contain Cargo, fix that.\n# This assumes a default `rustup` setup.\nexport PATH=\"$HOME/.cargo/bin:$PATH\"\n\n# --xcode-integ determines --release and --targets from XCode's env vars.\n# Depending your setup, specify the rustup toolchain explicitly.\ncargo lipo --xcode-integ --manifest-path ../Cargo.toml\n";
+			shellScript = "# The $PATH used by XCode likely won't contain Cargo, fix that.\n# This assumes a default `rustup` setup.\nexport PATH=\"$HOME/.cargo/bin:$PATH\"\n\n# --xcode-integ determines --release and --targets from XCode's env vars.\n# Depending your setup, specify the rustup toolchain explicitly.\ncargo lipo --xcode-integ --manifest-path ../Cargo.toml \n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -253,6 +254,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D386AE7C24D9EB8500619C29 /* JSValue.swift in Sources */,
+				D386AE8424DB0FDE00619C29 /* NumberGenerator.swift in Sources */,
 				D386AE5024D9D2B100619C29 /* JSContext.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

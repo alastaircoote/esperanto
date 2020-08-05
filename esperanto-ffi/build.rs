@@ -2,7 +2,7 @@ extern crate cbindgen;
 
 use cbindgen::Config;
 use std::env;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 fn main() {
     let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
@@ -15,15 +15,19 @@ fn main() {
 
     // println!("{}", target_dir().to_str().unwrap());
 
+    let mut renames = HashMap::new();
+    renames.insert("Rc_Context".to_string(), "Context".to_string());
+
     let config = Config {
         language: cbindgen::Language::C,
         // namespace: Some(String::from("ffi")),
         export: cbindgen::ExportConfig {
-            // include: vec!["JSCValue".to_string()],
+            include: vec!["Value".to_string()],
+            rename: renames,
             ..Default::default()
         },
         parse: cbindgen::ParseConfig {
-            // parse_deps: true,
+            parse_deps: true,
             include: Some(vec!["esperanto_javascriptcore".to_string()]),
             ..Default::default()
         },
