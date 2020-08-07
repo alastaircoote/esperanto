@@ -79,8 +79,8 @@ pub extern "system" fn Java_org_esperanto_esperanto_JSValuePrivate_call(
 ) -> jlong {
     debug!("call requested");
     // unsafe {(val_ptr as *mut Value).as_ref()}.get_property("sdf");
-    let value: &Value = to_ref(val_ptr).unwrap();
-    // let value = unsafe {Box::from_raw(val_ptr as *mut Value) };
+    // let value: &Value = to_ref(val_ptr).unwrap();
+    let value = unsafe { Box::from_raw(val_ptr as *mut Value) };
     let bound = unsafe { Box::from_raw(bound_to as *mut Value) };
     let result = value.call_bound(Vec::new(), &bound).unwrap();
     Box::into_raw(Box::new(value));
