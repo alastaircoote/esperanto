@@ -7,12 +7,17 @@ use jni::{
 use esperanto_shared::traits::JSContext;
 use crate::implementation::Context;
 use std::rc::Rc;
+use android_logger::Config;
+use log::Level;
 
 #[no_mangle]
 pub extern "system" fn Java_org_esperanto_esperanto_JSContextPrivate_new(
     _env: JNIEnv,
     _class: JClass,
 ) -> jlong {
+    android_logger::init_once(
+        Config::default().with_min_level(Level::Trace),
+    );
     let ctx = Context::new().unwrap();
     let ptr = Box::into_raw(Box::new(ctx));
     ptr as _

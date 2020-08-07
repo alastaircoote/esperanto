@@ -36,22 +36,22 @@ public class JSValue {
         self.value_ptr = ptr
     }
 
-    func toString() -> String {
+    public func toString() -> String {
         let str = jsvalue_as_string(self.value_ptr)!
         return String(cString: str)
     }
 
-    func call() -> JSValue {
+    public func call() -> JSValue {
         let new_val_ptr = jsvalue_call(self.value_ptr)
         return JSValue(ptr: new_val_ptr!)
     }
 
-    func call(boundTo: JSValue) -> JSValue {
+    public func call(boundTo: JSValue) -> JSValue {
         let new_val_ptr = jsvalue_call_bound(self.value_ptr, boundTo.value_ptr)
         return JSValue(ptr: new_val_ptr!)
     }
 
-    func toNumber() -> Double {
+    public func toNumber() -> Double {
         jsvalue_as_number(self.value_ptr)
     }
 
@@ -61,7 +61,7 @@ public class JSValue {
         return "wsdfs"
     }
 
-    func get(propertyByName: String) -> JSValue {
+    public func get(propertyByName: String) -> JSValue {
         let ptr = jsvalue_get_property(self.value_ptr, propertyByName)!
         return JSValue(ptr: ptr)
     }
