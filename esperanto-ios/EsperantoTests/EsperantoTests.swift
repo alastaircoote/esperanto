@@ -13,6 +13,10 @@ import XCTest
 
 class EsperantoTests: XCTestCase {
 
+    protocol NumberGenerator : FromJSValue {
+        func generate() -> Double
+    }
+
     func testNumberGenerator() {
         let ctx = JSContext()
         let val = ctx.evaluate(script: """
@@ -28,9 +32,11 @@ class EsperantoTests: XCTestCase {
             }
 
             new JSNumberGenerator()
-""")
-        
+        """)
+        // Cast to our native proxy
         let generator:NumberGenerator = val.cast()
+
+        // Now use it as if it's a native class
         let number = generator.generate()
         assert(number == 1)
         let number2 = generator.generate()
