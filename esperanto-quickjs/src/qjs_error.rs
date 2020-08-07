@@ -1,8 +1,8 @@
-use crate::{qjs_context::QJSContext, ref_count::free_value};
+use crate::qjs_context::QJSContext;
 use esperanto_shared::errors::JSError;
-use libquickjs_sys::{
-    JSValue as QJSValueRef, JS_FreeCString, JS_GetException, JS_GetPropertyStr, JS_ToCStringLen2,
-    JS_TAG_EXCEPTION, JS_TAG_STRING, JS_TAG_UNDEFINED,
+use quickjs_android_suitable_sys::{
+    JSValue as QJSValueRef, JS_FreeCString, JS_FreeValue__, JS_GetException, JS_GetPropertyStr,
+    JS_IsException__, JS_IsString__, JS_IsUndefined__, JS_ToCStringLen2,
 };
 use std::{
     ffi::{CStr, CString},
@@ -16,7 +16,8 @@ pub(crate) trait QJSError {
 
 fn best_effort_get_error(context_ref: &Rc<QJSContext>) -> Option<JSError> {
     let exception = unsafe { JS_GetException(context_ref.raw) };
-    if exception.tag == JS_TAG_UNDEFINED as i64 {
+
+    if unsafe { JS_IsUndefined__(exception) } == 0 {
         return None;
     }
 
@@ -35,7 +36,7 @@ fn best_effort_get_error(context_ref: &Rc<QJSContext>) -> Option<JSError> {
     let message_ref =
         unsafe { JS_GetPropertyStr(context_ref.raw, exception, message_str.as_ptr()) };
 
-    if name_ref.tag != JS_TAG_STRING as i64 || message_ref.tag != JS_TAG_STRING as i64 {
+    if unsafe { JS_IsString__(name_ref) == 0 || JS_IsString__(message_ref) == 0 } {
         return None;
     }
 
@@ -51,8 +52,8 @@ fn best_effort_get_error(context_ref: &Rc<QJSContext>) -> Option<JSError> {
             CStr::from_ptr(message_string).to_str(),
         ) {
             (Ok(final_name), Ok(final_message)) => {
-                free_value(context_ref.raw, name_ref);
-                free_value(context_ref.raw, message_ref);
+                JS_FreeValue__(context_ref.raw, name_ref);
+                JS_FreeValue__(context_ref.raw, message_ref);
                 JS_FreeCString(context_ref.raw, name_string);
                 JS_FreeCString(context_ref.raw, message_string);
 
@@ -71,7 +72,7 @@ impl QJSError for JSError {
         value_ref: QJSValueRef,
         context_ref: &Rc<QJSContext>,
     ) -> Result<(), JSError> {
-        if value_ref.tag != JS_TAG_EXCEPTION as i64 {
+        if unsafe { JS_IsException__(value_ref) } == 0 {
             return Ok(());
         }
 

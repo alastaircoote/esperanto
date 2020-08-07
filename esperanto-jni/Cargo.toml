@@ -1,0 +1,21 @@
+[package]
+authors = ["Alastair Coote <alastair.coote@nytimes.com>"]
+edition = "2018"
+name = "esperanto_jni"
+version = "0.1.0"
+
+[dependencies]
+android_logger = "0.9.0"
+esperanto_javascriptcore = {path = "../esperanto-javascriptcore", optional = true}
+esperanto_quickjs = {path = "../esperanto-quickjs", optional = true}
+esperanto_shared = {path = "../esperanto-shared"}
+jni = "0.17.0"
+log = "0.4.11"
+
+[lib]
+crate_type = ["cdylib"]
+
+[features]
+default = ["quickjs"]
+javascriptcore = ["esperanto_javascriptcore"]
+quickjs = ["esperanto_quickjs"]

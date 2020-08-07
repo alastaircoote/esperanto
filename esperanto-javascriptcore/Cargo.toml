@@ -3,13 +3,6 @@ edition = "2018"
 name = "esperanto_javascriptcore"
 version = "0.1.0"
 
-# [lib]
-# crate-type = ["staticlib"]
-
 [dependencies]
 esperanto_shared = {path = "../esperanto-shared"}
 javascriptcore-sys = "0.0.4"
-
-[build-dependencies]
-
-# cc = {version = "1.0", features = ["parallel"]}

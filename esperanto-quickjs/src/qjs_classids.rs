@@ -1,4 +1,4 @@
-use libquickjs_sys::{JSClassID, JS_NewClassID};
+use quickjs_android_suitable_sys::{JSClassID, JS_NewClassID};
 
 static mut CLOSURE_CONTEXT: JSClassID = 0;
 static mut CLASSIDS_CREATED: bool = false;

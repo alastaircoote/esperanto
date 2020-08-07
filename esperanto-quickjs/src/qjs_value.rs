@@ -1,10 +1,10 @@
-use crate::{qjs_context::QJSContext, qjs_function::wrap_closure, ref_count::free_value};
+use crate::{qjs_context::QJSContext, qjs_function::wrap_closure};
 use esperanto_shared::errors::{JSContextError, JSConversionError};
 use esperanto_shared::traits::{FromJSValue, JSValue, ToJSValue};
 use esperanto_shared::util::closures::{wrap_one_argument_closure, wrap_two_argument_closure};
-use libquickjs_sys::{
-    JSValue as QJSRawValue, JSValueUnion, JS_Call, JS_Eval, JS_FreeCString, JS_GetPropertyStr,
-    JS_ToBool, JS_ToCStringLen2, JS_ToFloat64, JS_TAG_BOOL, JS_TAG_EXCEPTION, JS_TAG_FLOAT64,
+use quickjs_android_suitable_sys::{
+    JSValue as QJSRawValue, JS_Call, JS_Eval, JS_FreeCString, JS_FreeValue__, JS_GetPropertyStr,
+    JS_NewBool__, JS_NewFloat64__, JS_ToBool, JS_ToCStringLen2, JS_ToFloat64,
 };
 use std::ffi::{CStr, CString};
 use std::rc::Rc;
@@ -20,7 +20,7 @@ impl std::fmt::Debug for QJSValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("QJSValue")
             .field("context", &self.context)
-            .field("raw", unsafe { &self.raw.u.ptr })
+            // .field("raw", unsafe { &self.raw.u.ptr })
             .finish()
     }
 }
@@ -55,10 +55,7 @@ impl JSValue for QJSValue {
         number: f64,
         in_context: &Rc<Self::ContextType>,
     ) -> Result<Self, JSContextError> {
-        let val = QJSRawValue {
-            tag: JS_TAG_FLOAT64 as i64,
-            u: JSValueUnion { float64: number },
-        };
+        let val = unsafe { JS_NewFloat64__(in_context.raw, number) };
         Self::from_raw(val, in_context)
     }
 
@@ -124,12 +121,7 @@ impl JSValue for QJSValue {
     }
 
     fn from_bool(bool_val: bool, in_context: &Rc<QJSContext>) -> Result<Self, JSContextError> {
-        let val = QJSRawValue {
-            tag: JS_TAG_BOOL as i64,
-            u: JSValueUnion {
-                int32: if bool_val { 1 } else { 0 },
-            },
-        };
+        let val = unsafe { JS_NewBool__(in_context.raw, if bool_val { 1 } else { 0 }) };
         Self::from_raw(val, &in_context)
     }
 
@@ -165,7 +157,7 @@ impl JSValue for QJSValue {
             JS_Eval(
                 in_context.raw,
                 function_c_string.as_ptr(),
-                function_length as u64,
+                function_length as _,
                 CString::new("script.js")?.as_ptr(),
                 0,
             )
@@ -175,20 +167,20 @@ impl JSValue for QJSValue {
 }
 
 impl QJSValue {
-    pub fn exception(in_context: &Rc<QJSContext>) -> Result<Self, JSContextError> {
-        let val = EXCEPTION_RAW;
-        Self::from_raw(val, in_context)
-    }
+    // pub fn exception(in_context: &Rc<QJSContext>) -> Result<Self, JSContextError> {
+    //     let val = EXCEPTION_RAW;
+    //     Self::from_raw(val, in_context)
+    // }
 }
 
-pub(crate) const EXCEPTION_RAW: QJSRawValue = QJSRawValue {
-    tag: JS_TAG_EXCEPTION as i64,
-    u: JSValueUnion { int32: 0 },
-};
+// pub(crate) const EXCEPTION_RAW: QJSRawValue = QJSRawValue {
+//     tag: JS_TAG_EXCEPTION as i64,
+//     u: JSValueUnion { int32: 0 },
+// };
 
 impl Drop for QJSValue {
     fn drop(&mut self) {
-        unsafe { free_value(self.context.raw, self.raw) }
+        unsafe { JS_FreeValue__(self.context.raw, self.raw) }
     }
 }
 

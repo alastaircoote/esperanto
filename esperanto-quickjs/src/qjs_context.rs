@@ -3,7 +3,7 @@ use crate::qjs_runtime::QJSRuntime;
 use crate::qjs_value::QJSValue;
 use esperanto_shared::errors::{JSContextError, JSConversionError, JSError};
 use esperanto_shared::traits::{JSContext, JSValue};
-use libquickjs_sys::{
+use quickjs_android_suitable_sys::{
     JSContext as QJSRawContext, JS_Eval, JS_FreeContext, JS_NewContext, JS_EVAL_TYPE_GLOBAL,
 };
 use std::ffi::{CStr, CString};
@@ -32,7 +32,7 @@ impl QJSContext {
             JS_Eval(
                 self.raw,
                 script,
-                script_len as _,
+                script_len,
                 fin.as_ptr(),
                 JS_EVAL_TYPE_GLOBAL as i32,
             )

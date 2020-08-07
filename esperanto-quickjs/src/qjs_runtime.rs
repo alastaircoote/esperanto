@@ -1,5 +1,5 @@
 use crate::qjs_classids::ensure_class_ids_created;
-use libquickjs_sys::{JSRuntime as QJSRuntimeRef, JS_FreeRuntime, JS_NewRuntime};
+use quickjs_android_suitable_sys::{JSRuntime as QJSRuntimeRef, JS_FreeRuntime, JS_NewRuntime};
 
 #[derive(Debug)]
 pub struct QJSRuntime {

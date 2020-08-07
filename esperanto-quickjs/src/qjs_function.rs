@@ -1,13 +1,12 @@
-use crate::ref_count::free_value;
 use crate::{
     qjs_classids::{get_class_id, QJSClassType},
     qjs_context::QJSContext,
     qjs_runtime::QJSRuntime,
 };
 use esperanto_shared::util::closures::{FunctionInvocationContext, FunctionToInvoke};
-use libquickjs_sys::{
-    JSClassDef, JSClassID, JSContext, JSValue as QJSRawValue, JS_GetOpaque, JS_IsRegisteredClass,
-    JS_NewCFunctionData, JS_NewClass, JS_NewObjectClass, JS_SetOpaque,
+use quickjs_android_suitable_sys::{
+    JSClassDef, JSClassID, JSContext, JSValue as QJSRawValue, JS_FreeValue__, JS_GetOpaque,
+    JS_IsRegisteredClass, JS_NewCFunctionData, JS_NewClass, JS_NewObjectClass, JS_SetOpaque,
 };
 use std::rc::Rc;
 
@@ -50,8 +49,8 @@ unsafe extern "C" fn run_native_closure(
 // This function is called when the QuickJS garbage collector cleans up the variable.
 // At this point we free the memory associated with the closure.
 unsafe extern "C" fn finalize_closure_context(
-    _: *mut libquickjs_sys::JSRuntime,
-    value: libquickjs_sys::JSValue,
+    _: *mut quickjs_android_suitable_sys::JSRuntime,
+    value: quickjs_android_suitable_sys::JSValue,
 ) {
     let class_id = get_class_id(QJSClassType::ClosureContext);
     let closure_raw = JS_GetOpaque(value, class_id) as *mut FunctionToInvoke<QJSContext>;
@@ -77,7 +76,7 @@ unsafe fn ensure_closure_context_class_registered(runtime: &QJSRuntime) -> JSCla
         runtime.raw,
         class_id,
         &JSClassDef {
-            class_name: CLOSURE_CONTEXT_CLASS_NAME.as_ptr() as *const i8,
+            class_name: CLOSURE_CONTEXT_CLASS_NAME.as_ptr() as _,
             // call is for constructing a new instance of a class, and we don't want
             // to ever allow that on the JS side
             call: None,
@@ -119,7 +118,7 @@ pub fn wrap_closure(
 
     // Since the function is now holding a reference to the hidden pointer container we want to free our reference
     // to it, otherwise it never gets garbage collected
-    unsafe { free_value(in_context.raw, pointer_container) };
+    unsafe { JS_FreeValue__(in_context.raw, pointer_container) };
 
     // And then return the function
     result
