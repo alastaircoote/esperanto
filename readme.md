@@ -23,3 +23,19 @@ Very little is done so there isn't a whole lot to look at yet. But very basic bi
 ## How do I use it?
 
 Right now the easiest way to actually test the thing out is to use the [iOS](https://github.com/alastaircoote/esperanto-example-ios) and [Android](https://github.com/alastaircoote/esperanto-example-android) example apps. You can also download this repo and, if you have Rust installed, run `cargo test` to see it run some tests (that may or may not currently pass).
+
+## What still needs to be done?
+
+A lot! But when this is done my hope is that it will have:
+
+- A [Service Worker-like lifecycle](https://developers.google.com/web/fundamentals/primers/service-workers/lifecycle), allowing you to safely update with fallbacks
+- An equivalent to the [Cache API](https://developer.mozilla.org/en-US/docs/Web/API/Cache)
+- The ability to dispatch `respondWith` events (e.g. [Fetch event](https://developer.mozilla.org/en-US/docs/Web/API/FetchEvent)) to return data from the worker back to the native context. Hopefully complete with streaming.
+- An IndexedDB API (I _guess_, maybe start with something simpler than that...)
+- An OffscreenCanvas API
+
+I'm also interested to explore using Esperanto in a web server to bootstrap service workers before they are installed on client devices. But we're a long way from that right now.
+
+---
+
+<sub><sup>[what is Esperanto?](https://en.wikipedia.org/wiki/Esperanto)</sup></sub>
