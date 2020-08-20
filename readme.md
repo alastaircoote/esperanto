@@ -16,8 +16,9 @@ Very little is done so there isn't a whole lot to look at yet. But very basic bi
 - [esperanto-quickjs](https://github.com/alastaircoote/esperanto/tree/master/esperanto-quickjs): bindings for the QuickJS JavaScript engine. Primarily intended for Android, but can be used anywhere since the runtime is built with the library.
 - [esperanto-ffi](https://github.com/alastaircoote/esperanto/tree/master/esperanto-ffi): The exported C API for Esperanto. Is primarily used by...
 - [esperanto-ios](https://github.com/alastaircoote/esperanto/tree/master/esperanto-ios): An XCode project that wraps the C API into a more usable Swift one.
-- [esperanto-jni](https://github.com/alastaircoote/esperanto/tree/master/esperanto-ffi): The JNI interface for use with Android (project to create AAR forthcoming)
-- [esperanto-shared](https://github.com/alastaircoote/esperanto/tree/master/esperanto-shared): traits and utilities used by the other paackages.
+- [esperanto-jni](https://github.com/alastaircoote/esperanto/tree/master/esperanto-ffi): The JNI interface to bind the library to Java. Primarily used by...
+- [esperanto-android](https://github.com/alastaircoote/esperanto/tree/master/esperanto-android): An Android Studio project to create an AAR file that bundles the library, its interface and builds for all ABIs in one.
+- [esperanto-shared](https://github.com/alastaircoote/esperanto/tree/master/esperanto-shared): traits and utilities used by the other packages.
 - [~~esperanto-core~~](https://github.com/alastaircoote/esperanto/tree/master/esperanto-core): an early thought that didn't go anywere. Will be deleted once I've pulled out the stuff I want from it.
 
 ## How do I use it?

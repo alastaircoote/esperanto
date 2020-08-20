@@ -5,5 +5,5 @@ version = "0.1.0"
 
 [dependencies]
 esperanto_shared = {path = "../esperanto-shared"}
-quickjs_android_suitable_sys = {git = "https://github.com/alastaircoote/quickjs-android-suitable-sys", features = ["dump_leaks"]}
+quickjs_android_suitable_sys = {version = "0.1.0", features = ["dump_leaks"]}
 slotmap = "0.4.0"
