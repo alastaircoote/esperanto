@@ -14,9 +14,7 @@ pub(crate) trait QJSError {
         -> Result<(), JSError>;
 }
 
-fn best_effort_get_error(context_ref: &Rc<QJSContext>) -> Option<JSError> {
-    let exception = unsafe { JS_GetException(context_ref.raw) };
-
+fn best_effort_get_error(exception: QJSValueRef, context_ref: &Rc<QJSContext>) -> Option<JSError> {
     if unsafe { JS_IsUndefined__(exception) } == 1 {
         return None;
     }
@@ -76,6 +74,12 @@ impl QJSError for JSError {
             return Ok(());
         }
 
-        Err(best_effort_get_error(context_ref).unwrap_or(JSError::unknown()))
+        let exception = unsafe { JS_GetException(context_ref.raw) };
+
+        let err = best_effort_get_error(exception, context_ref).unwrap_or(JSError::unknown());
+
+        unsafe { JS_FreeValue__(context_ref.raw, exception) };
+
+        Err(err)
     }
 }
