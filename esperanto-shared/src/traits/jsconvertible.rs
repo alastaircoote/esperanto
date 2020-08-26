@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 pub trait ToJSValue<ValueType: JSValue> {
     fn to_js_value(
-        &self,
+        self,
         in_context: &Rc<ValueType::ContextType>,
     ) -> Result<ValueType, JSContextError>;
 }
@@ -16,12 +16,24 @@ where
     fn from_js_value(val: ValueType) -> Result<Self, JSContextError>;
 }
 
+impl<ValueType: JSValue> ToJSValue<ValueType> for ValueType {
+    fn to_js_value(self, _: &Rc<ValueType::ContextType>) -> Result<ValueType, JSContextError> {
+        Ok(self)
+    }
+}
+
+impl<ValueType: JSValue> FromJSValue<ValueType> for ValueType {
+    fn from_js_value(val: ValueType) -> Result<Self, JSContextError> {
+        Ok(val)
+    }
+}
+
 impl<ValueType: JSValue> ToJSValue<ValueType> for f64 {
     fn to_js_value(
-        &self,
+        self,
         in_context: &Rc<ValueType::ContextType>,
     ) -> Result<ValueType, JSContextError> {
-        ValueType::from_number(*self, in_context)
+        ValueType::from_number(self, in_context)
     }
 }
 

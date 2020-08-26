@@ -9,9 +9,9 @@ use esperanto_shared::{
 };
 use javascriptcore_sys::{
     JSObjectCallAsFunction, JSObjectGetProperty, JSObjectMakeFunction, JSObjectRef,
-    JSValueIsObject, JSValueMakeBoolean, JSValueMakeNumber, JSValueProtect, JSValueRef,
-    JSValueToBoolean, JSValueToNumber, JSValueToObject, JSValueUnprotect, OpaqueJSString,
-    OpaqueJSValue,
+    JSValueIsObject, JSValueMakeBoolean, JSValueMakeNumber, JSValueMakeString, JSValueProtect,
+    JSValueRef, JSValueToBoolean, JSValueToNumber, JSValueToObject, JSValueUnprotect,
+    OpaqueJSString, OpaqueJSValue,
 };
 use std::rc::Rc;
 
@@ -64,6 +64,12 @@ impl JSValue for JSCValue {
             object_raw_ref: None,
             context: in_context.clone(),
         })
+    }
+
+    fn from_string(str: &str, in_context: &Rc<Self::ContextType>) -> Result<Self, JSContextError> {
+        let jsc_string = JSCString::from_string(str)?;
+        let val_ref = unsafe { JSValueMakeString(in_context.raw_ref, jsc_string.raw_ref) };
+        Self::from_raw(val_ref, in_context)
     }
 
     fn from_one_arg_closure<
@@ -212,6 +218,7 @@ impl JSValue for JSCValue {
 
         Self::from_raw(raw, in_context)
     }
+
     // fn call_property_with_arguments(
     //     &self,
     //     name: &str,
@@ -238,6 +245,11 @@ mod test {
     #[test]
     fn converts_from_number() {
         jsvalue_tests::converts_from_number::<JSCValue>()
+    }
+
+    #[test]
+    fn converts_from_string() {
+        jsvalue_tests::converts_from_string::<JSCValue>()
     }
 
     #[test]

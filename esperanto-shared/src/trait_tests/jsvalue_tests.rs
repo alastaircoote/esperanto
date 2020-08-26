@@ -35,6 +35,13 @@ pub fn converts_from_boolean<Value: JSValue>() {
     assert_eq!(f, true);
 }
 
+pub fn converts_from_string<Value: JSValue>() {
+    let ctx = Value::ContextType::new().unwrap();
+    let value = Value::from_string("TEST_STRING", &ctx).unwrap();
+    let back_to_str = value.as_string().unwrap();
+    assert_eq!(back_to_str, "TEST_STRING");
+}
+
 pub fn can_call_functions<Value: JSValue>() {
     let ctx = Value::ContextType::new().unwrap();
     let value = ctx
@@ -80,13 +87,10 @@ pub fn can_get_properties<Value: JSValue>() {
 
 pub fn can_create_function<Value: JSValue>() {
     let ctx = Value::ContextType::new().unwrap();
-    let func = Value::create_function(&ctx, vec!["one", "two"], "return one * two;").unwrap();
+    let func = Value::create_function(&ctx, vec!["one", "two"], "return one * two").unwrap();
     let arg1 = Value::from_number(3.0, &ctx).unwrap();
     let arg2 = Value::from_number(4.0, &ctx).unwrap();
-    let result = func
-        .call_with_arguments(vec![&arg1, &arg2])
-        .unwrap()
-        .as_number()
-        .unwrap();
-    assert_eq!(result, 12.0);
+    let result = func.call_with_arguments(vec![&arg1, &arg2]).unwrap();
+    let result_number = result.as_number().unwrap();
+    assert_eq!(result_number, 12.0);
 }

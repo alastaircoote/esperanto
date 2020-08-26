@@ -16,6 +16,7 @@ where
     fn from_number(number: f64, in_context: &Rc<Self::ContextType>)
         -> Result<Self, JSContextError>;
     fn from_bool(bool: bool, in_context: &Rc<Self::ContextType>) -> Result<Self, JSContextError>;
+    fn from_string(str: &str, in_context: &Rc<Self::ContextType>) -> Result<Self, JSContextError>;
     fn from_one_arg_closure<
         I: FromJSValue<Self> + 'static,
         O: ToJSValue<Self> + 'static,

@@ -1,10 +1,11 @@
-use crate::{qjs_context::QJSContext, qjs_function::wrap_closure};
-use esperanto_shared::errors::{JSContextError, JSConversionError};
-use esperanto_shared::traits::{FromJSValue, JSValue, ToJSValue};
+use crate::{qjs_context::QJSContext, qjs_error::QJSError, qjs_function::wrap_closure};
+use esperanto_shared::errors::{JSContextError, JSConversionError, JSError};
+use esperanto_shared::traits::{FromJSValue, JSContext, JSValue, ToJSValue};
 use esperanto_shared::util::closures::{wrap_one_argument_closure, wrap_two_argument_closure};
 use quickjs_android_suitable_sys::{
-    JSValue as QJSRawValue, JS_Call, JS_Eval, JS_FreeCString, JS_FreeValue__, JS_GetPropertyStr,
-    JS_NewBool__, JS_NewFloat64__, JS_ToBool, JS_ToCStringLen2, JS_ToFloat64,
+    JSValue as QJSRawValue, JS_Call, JS_CallConstructor, JS_FreeCString, JS_FreeValue__,
+    JS_GetPropertyStr, JS_NewBool__, JS_NewFloat64__, JS_NewString, JS_ToBool, JS_ToCStringLen2,
+    JS_ToFloat64,
 };
 use std::ffi::{CStr, CString};
 use std::rc::Rc;
@@ -56,6 +57,7 @@ impl JSValue for QJSValue {
         in_context: &Rc<Self::ContextType>,
     ) -> Result<Self, JSContextError> {
         let val = unsafe { JS_NewFloat64__(in_context.raw, number) };
+        JSError::check_for_exception(val, in_context)?;
         Self::from_raw(val, in_context)
     }
 
@@ -84,6 +86,13 @@ impl JSValue for QJSValue {
         let closure = wrap_two_argument_closure(closure, in_context);
         let raw = wrap_closure(closure, in_context);
         Self::from_raw(raw, in_context)
+    }
+
+    fn from_string(str: &str, in_context: &Rc<Self::ContextType>) -> Result<Self, JSContextError> {
+        let c_string = CString::new(str)?;
+        let value = unsafe { JS_NewString(in_context.raw, c_string.as_ptr()) };
+        JSError::check_for_exception(value, in_context)?;
+        Self::from_raw(value, in_context)
     }
 
     fn call_bound(&self, arguments: Vec<&Self>, bound_to: &Self) -> Result<Self, JSContextError> {
@@ -143,25 +152,36 @@ impl JSValue for QJSValue {
         arg_names: Vec<&str>,
         body: &str,
     ) -> Result<Self, JSContextError> {
-        // I might be wrong but I can't find a way to define a function from a string in QuickJS,
-        // so we just use JS_Eval to do it. This is not good, as it might allow someone the ability
-        // to immediately execute code if they're creative with {}s. Going to leave for now but
-        // should revisit in the future. Maybe look at the struct that gets created to try to
-        // manually construct one ourselves?
+        // QuickJS doesn't seem to have a native-side way of constructing a function from a string,
+        // so we're just going to use Function.constructor:
+        // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/Function
 
-        let combined_arg_names = arg_names.join(",");
-        let function_complete = format!("(function({}) {{ {} }})", combined_arg_names, body);
-        let function_length = function_complete.len();
-        let function_c_string = CString::new(function_complete)?;
+        let function_constructor = in_context.evaluate("Function")?;
+
+        let mut constructor_arguments = arg_names;
+        constructor_arguments.push(body);
+
+        let mapped_arguments = constructor_arguments
+            .iter()
+            .map(|s| Self::from_string(s, in_context))
+            .collect::<Result<Vec<QJSValue>, JSContextError>>()?;
+
+        let mut mapped_arg_ptrs = mapped_arguments
+            .iter()
+            .map(|v| v.raw)
+            .collect::<Vec<QJSRawValue>>();
+
         let result = unsafe {
-            JS_Eval(
+            JS_CallConstructor(
                 in_context.raw,
-                function_c_string.as_ptr(),
-                function_length as _,
-                CString::new("script.js")?.as_ptr(),
-                0,
+                function_constructor.raw,
+                mapped_arguments.len() as i32,
+                mapped_arg_ptrs.as_mut_ptr(),
             )
         };
+
+        JSError::check_for_exception(result, in_context)?;
+
         Self::from_raw(result, in_context)
     }
 }
@@ -214,6 +234,11 @@ mod test {
     #[test]
     fn converts_from_number() {
         jsvalue_tests::converts_from_number::<QJSValue>()
+    }
+
+    #[test]
+    fn converts_from_string() {
+        jsvalue_tests::converts_from_string::<QJSValue>()
     }
 
     #[test]
