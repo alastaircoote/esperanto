@@ -193,29 +193,11 @@ impl QJSValue {
     // }
 }
 
-// pub(crate) const EXCEPTION_RAW: QJSRawValue = QJSRawValue {
-//     tag: JS_TAG_EXCEPTION as i64,
-//     u: JSValueUnion { int32: 0 },
-// };
-
 impl Drop for QJSValue {
     fn drop(&mut self) {
         unsafe { JS_FreeValue__(self.context.raw, self.raw) }
     }
 }
-
-// macro_rules! foo {
-//     ($v:ident) => {
-//         fn what<V>(v: V)
-//         where
-//             : JSValue,
-//         {
-//             v.asdasd
-//         }
-//     };
-// }
-
-// foo!(QJSValue);
 
 #[cfg(test)]
 mod test {
