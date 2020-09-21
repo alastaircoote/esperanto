@@ -11,6 +11,11 @@ pub trait JSContext: Sized + 'static {
         script: *const c_char,
     ) -> Result<Self::ValueType, JSContextError>;
     fn new() -> Result<Rc<Self>, JSContextError>;
+    fn compile_string<'a>(
+        self: &Rc<Self>,
+        script: *const std::os::raw::c_char,
+    ) -> Result<&'a [u8], JSContextError>;
+    fn eval_compiled(self: &Rc<Self>, binary: &[u8]) -> Result<Self::ValueType, JSContextError>;
 }
 
 pub trait RawBackedJSContext: JSContext {

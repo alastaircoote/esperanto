@@ -15,6 +15,9 @@
 		D386AE8024DB026A00619C29 /* libesperanto_ffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = D386AE7F24DB026A00619C29 /* libesperanto_ffi.a */; };
 		D386AE8224DB027F00619C29 /* esperanto_ffi.h in Headers */ = {isa = PBXBuildFile; fileRef = D386AE8124DB027F00619C29 /* esperanto_ffi.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		D386AE8424DB0FDE00619C29 /* NumberGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D386AE8324DB0FDE00619C29 /* NumberGenerator.swift */; };
+		D3F8E3D824FED6E100F59CBF /* EsperantoDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3F8E3D724FED6E100F59CBF /* EsperantoDeviceTests.swift */; };
+		D3F8E3DE24FED74500F59CBF /* jsperf.js in Resources */ = {isa = PBXBuildFile; fileRef = D3F8E3DD24FED74500F59CBF /* jsperf.js */; };
+		D3F8E3E224FED89F00F59CBF /* Esperanto.framework in CopyFiles */ = {isa = PBXBuildFile; fileRef = D386AE2F24D9D1D800619C29 /* Esperanto.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -25,7 +28,27 @@
 			remoteGlobalIDString = D386AE2E24D9D1D800619C29;
 			remoteInfo = Esperanto;
 		};
+		D3F8E3DF24FED89200F59CBF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D386AE2624D9D1D800619C29 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D386AE2E24D9D1D800619C29;
+			remoteInfo = Esperanto;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D3F8E3E124FED89600F59CBF /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				D3F8E3E224FED89F00F59CBF /* Esperanto.framework in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		D386AE2F24D9D1D800619C29 /* Esperanto.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Esperanto.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -40,6 +63,10 @@
 		D386AE7F24DB026A00619C29 /* libesperanto_ffi.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libesperanto_ffi.a; path = ../../../target/universal/debug/libesperanto_ffi.a; sourceTree = "<group>"; };
 		D386AE8124DB027F00619C29 /* esperanto_ffi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = esperanto_ffi.h; path = "../../../esperanto-ffi/target/esperanto_ffi.h"; sourceTree = "<group>"; };
 		D386AE8324DB0FDE00619C29 /* NumberGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NumberGenerator.swift; sourceTree = "<group>"; };
+		D3F8E3D524FED6E100F59CBF /* EsperantoDeviceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EsperantoDeviceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D3F8E3D724FED6E100F59CBF /* EsperantoDeviceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EsperantoDeviceTests.swift; sourceTree = "<group>"; };
+		D3F8E3D924FED6E100F59CBF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		D3F8E3DD24FED74500F59CBF /* jsperf.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; name = jsperf.js; path = ../../../../Desktop/jsperf.js; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,6 +86,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D3F8E3D224FED6E100F59CBF /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -67,6 +101,7 @@
 			children = (
 				D386AE3124D9D1D800619C29 /* Esperanto */,
 				D386AE3C24D9D1D900619C29 /* EsperantoTests */,
+				D3F8E3D624FED6E100F59CBF /* EsperantoDeviceTests */,
 				D386AE3024D9D1D800619C29 /* Products */,
 				D386AE5324D9D6CE00619C29 /* Frameworks */,
 			);
@@ -77,6 +112,7 @@
 			children = (
 				D386AE2F24D9D1D800619C29 /* Esperanto.framework */,
 				D386AE3824D9D1D900619C29 /* EsperantoTests.xctest */,
+				D3F8E3D524FED6E100F59CBF /* EsperantoDeviceTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -118,6 +154,16 @@
 			children = (
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		D3F8E3D624FED6E100F59CBF /* EsperantoDeviceTests */ = {
+			isa = PBXGroup;
+			children = (
+				D3F8E3DD24FED74500F59CBF /* jsperf.js */,
+				D3F8E3D724FED6E100F59CBF /* EsperantoDeviceTests.swift */,
+				D3F8E3D924FED6E100F59CBF /* Info.plist */,
+			);
+			path = EsperantoDeviceTests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -172,13 +218,32 @@
 			productReference = D386AE3824D9D1D900619C29 /* EsperantoTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		D3F8E3D424FED6E100F59CBF /* EsperantoDeviceTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D3F8E3DC24FED6E100F59CBF /* Build configuration list for PBXNativeTarget "EsperantoDeviceTests" */;
+			buildPhases = (
+				D3F8E3D124FED6E100F59CBF /* Sources */,
+				D3F8E3D224FED6E100F59CBF /* Frameworks */,
+				D3F8E3D324FED6E100F59CBF /* Resources */,
+				D3F8E3E124FED89600F59CBF /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D3F8E3E024FED89200F59CBF /* PBXTargetDependency */,
+			);
+			name = EsperantoDeviceTests;
+			productName = EsperantoDeviceTests;
+			productReference = D3F8E3D524FED6E100F59CBF /* EsperantoDeviceTests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
 		D386AE2624D9D1D800619C29 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastSwiftUpdateCheck = 1160;
+				LastSwiftUpdateCheck = 1200;
 				LastUpgradeCheck = 1160;
 				ORGANIZATIONNAME = "Alastair Coote";
 				TargetAttributes = {
@@ -188,6 +253,9 @@
 					};
 					D386AE3724D9D1D900619C29 = {
 						CreatedOnToolsVersion = 11.6;
+					};
+					D3F8E3D424FED6E100F59CBF = {
+						CreatedOnToolsVersion = 12.0;
 					};
 				};
 			};
@@ -206,6 +274,7 @@
 			targets = (
 				D386AE2E24D9D1D800619C29 /* Esperanto */,
 				D386AE3724D9D1D900619C29 /* EsperantoTests */,
+				D3F8E3D424FED6E100F59CBF /* EsperantoDeviceTests */,
 			);
 		};
 /* End PBXProject section */
@@ -222,6 +291,14 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D3F8E3D324FED6E100F59CBF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D3F8E3DE24FED74500F59CBF /* jsperf.js in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -267,6 +344,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D3F8E3D124FED6E100F59CBF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D3F8E3D824FED6E100F59CBF /* EsperantoDeviceTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -274,6 +359,11 @@
 			isa = PBXTargetDependency;
 			target = D386AE2E24D9D1D800619C29 /* Esperanto */;
 			targetProxy = D386AE3A24D9D1D900619C29 /* PBXContainerItemProxy */;
+		};
+		D3F8E3E024FED89200F59CBF /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D386AE2E24D9D1D800619C29 /* Esperanto */;
+			targetProxy = D3F8E3DF24FED89200F59CBF /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -491,6 +581,46 @@
 			};
 			name = Release;
 		};
+		D3F8E3DA24FED6E100F59CBF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = R2YTP5D988;
+				INFOPLIST_FILE = EsperantoDeviceTests/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = esperanto.EsperantoDeviceTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D3F8E3DB24FED6E100F59CBF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = R2YTP5D988;
+				INFOPLIST_FILE = EsperantoDeviceTests/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = esperanto.EsperantoDeviceTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -517,6 +647,15 @@
 			buildConfigurations = (
 				D386AE4724D9D1D900619C29 /* Debug */,
 				D386AE4824D9D1D900619C29 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D3F8E3DC24FED6E100F59CBF /* Build configuration list for PBXNativeTarget "EsperantoDeviceTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D3F8E3DA24FED6E100F59CBF /* Debug */,
+				D3F8E3DB24FED6E100F59CBF /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
