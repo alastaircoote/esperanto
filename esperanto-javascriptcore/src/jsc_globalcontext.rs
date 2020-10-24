@@ -1,4 +1,4 @@
-use crate::jsc_string::JSCString;
+use crate::{jsc_class::JSCClass, jsc_string::JSCString};
 use crate::{jsc_error::JSErrorFromJSC, jsc_value::JSCValue};
 use esperanto_shared::errors::{JSContextError, JSError};
 use esperanto_shared::traits::{JSContext, JSValue};
@@ -39,6 +39,7 @@ impl JSCGlobalContext {
 
 impl JSContext for JSCGlobalContext {
     type ValueType = JSCValue;
+    type ClassType = JSCClass;
 
     fn new() -> Result<Rc<Self>, JSContextError> {
         let group = unsafe { JSContextGroupCreate() };
@@ -71,11 +72,18 @@ impl JSContext for JSCGlobalContext {
         let script_jsstring = JSCString::from_c_string(script)?;
         self.evaluate_jscstring(script_jsstring)
     }
+
+    fn compile_string<'a>(self: &Rc<Self>, _: *const c_char) -> Result<&'a [u8], JSContextError> {
+        Err(JSContextError::NotSupported)
+    }
+
+    fn eval_compiled(self: &Rc<Self>, _: &[u8]) -> Result<Self::ValueType, JSContextError> {
+        Err(JSContextError::NotSupported)
+    }
 }
 
 impl Drop for JSCGlobalContext {
     fn drop(&mut self) {
-        println!("Dropping");
         unsafe { JSGlobalContextRelease(self.raw_ref) }
         unsafe { JSContextGroupRelease(self.group_raw_ref) }
     }

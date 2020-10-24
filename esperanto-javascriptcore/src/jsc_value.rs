@@ -30,6 +30,19 @@ impl Drop for JSCValue {
     }
 }
 
+impl JSCValue {
+    pub fn from_raw_object_ref(
+        obj_ref: *mut OpaqueJSValue,
+        in_context: &Rc<JSCGlobalContext>,
+    ) -> Result<Self, JSContextError> {
+        Ok(JSCValue {
+            context: in_context.clone(),
+            raw_ref: obj_ref,
+            object_raw_ref: Some(obj_ref),
+        })
+    }
+}
+
 impl JSValue for JSCValue {
     type ContextType = JSCGlobalContext;
     type RawType = JSValueRef;

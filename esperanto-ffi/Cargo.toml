@@ -14,7 +14,7 @@ esperanto_shared = {path = "../esperanto-shared"}
 crate-type = ["staticlib"]
 
 [features]
-default = ["javascriptcore"]
+default = ["quickjs"]
 javascriptcore = ["esperanto_javascriptcore"]
 quickjs = ["esperanto_quickjs"]
 

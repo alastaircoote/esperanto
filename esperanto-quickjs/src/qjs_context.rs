@@ -4,9 +4,11 @@ use crate::qjs_value::QJSValue;
 use esperanto_shared::errors::{JSContextError, JSConversionError, JSError};
 use esperanto_shared::traits::{JSContext, JSValue};
 use quickjs_android_suitable_sys::{
-    JSContext as QJSRawContext, JS_Eval, JS_FreeContext, JS_NewContext, JS_EVAL_TYPE_GLOBAL,
+    js_free, JSContext as QJSRawContext, JS_Eval, JS_EvalFunction, JS_FreeContext, JS_FreeValue__,
+    JS_NewContext, JS_ReadObject, JS_WriteObject, JS_EVAL_FLAG_COMPILE_ONLY, JS_EVAL_TYPE_GLOBAL,
+    JS_READ_OBJ_BYTECODE, JS_WRITE_OBJ_BYTECODE,
 };
-use std::ffi::{CStr, CString};
+use std::ffi::{c_void, CStr, CString};
 use std::rc::Rc;
 #[derive(Debug)]
 pub struct QJSContext {
@@ -72,6 +74,60 @@ impl JSContext for QJSContext {
         let cstr_len = unsafe { CStr::from_ptr(script).to_str()?.len() };
         self.evaluate_cstring_with_len(script, cstr_len)
     }
+
+    fn compile_string<'a>(
+        self: &Rc<Self>,
+        script: *const std::os::raw::c_char,
+    ) -> Result<&'a [u8], JSContextError> {
+        let fin = CString::new("file.js").unwrap();
+
+        let cstr_len = unsafe { CStr::from_ptr(script).to_str()?.len() };
+
+        let compile_js_val = unsafe {
+            JS_Eval(
+                self.raw,
+                script,
+                cstr_len,
+                fin.as_ptr(),
+                JS_EVAL_TYPE_GLOBAL as i32 + JS_EVAL_FLAG_COMPILE_ONLY as i32,
+            )
+        };
+
+        JSError::check_for_exception(compile_js_val, &self)?;
+
+        let mut byte_length: usize = 0;
+
+        let stored_obj: *mut u8 = unsafe {
+            JS_WriteObject(
+                self.raw,
+                &mut byte_length,
+                compile_js_val,
+                JS_WRITE_OBJ_BYTECODE as i32,
+            )
+        };
+
+        unsafe { JS_FreeValue__(self.raw, compile_js_val) };
+
+        let byte_array = unsafe { std::slice::from_raw_parts(stored_obj, byte_length) };
+
+        // let mut copy = Vec::with_capacity(byte_length);
+        // copy.resize(byte_length, 0);
+        // copy.copy_from_slice(byte_array);
+
+        // unsafe { js_free(self.raw, stored_obj as *mut c_void) };
+
+        Ok(byte_array)
+    }
+
+    fn eval_compiled(self: &Rc<Self>, binary: &[u8]) -> Result<QJSValue, JSContextError> {
+        let ptr = binary.as_ptr();
+        let val =
+            unsafe { JS_ReadObject(self.raw, ptr, binary.len(), JS_READ_OBJ_BYTECODE as i32) };
+
+        let result = unsafe { JS_EvalFunction(self.raw, val) };
+
+        QJSValue::from_raw(result, self)
+    }
 }
 
 #[cfg(test)]
@@ -87,5 +143,18 @@ mod test {
     #[test]
     fn it_throws_exceptions_on_invalid_code() {
         jscontext_tests::it_throws_exceptions_on_invalid_code::<QJSContext>();
+    }
+
+    #[test]
+    fn it_compiles_code() {
+        let ctx = QJSContext::new().unwrap();
+        let script = "var test = 12345;";
+        let c_string_scr = CString::new(script).unwrap();
+        let byte_array = ctx.compile_string(c_string_scr.as_ptr()).unwrap();
+
+        let new_ctx = QJSContext::new().unwrap();
+        new_ctx.eval_compiled(byte_array).unwrap();
+        let get_val = new_ctx.evaluate("test").unwrap();
+        assert_eq!(get_val.as_number().unwrap(), 12345.0);
     }
 }

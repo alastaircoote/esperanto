@@ -115,6 +115,8 @@ pub enum JSContextError {
     ContextAlreadyDestroyed,
     #[error("An evaluation error occurred")]
     EvaluationError(#[from] JSEvaluationError),
+    #[error("This runtime does not support the operation you attempted")]
+    NotSupported,
 }
 
 impl From<NulError> for JSContextError {

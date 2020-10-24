@@ -20,6 +20,18 @@ public class JSContext {
         return JSValue(ptr: val_ptr!)
     }
 
+    public func compile(script:String) -> UnsafeMutablePointer<CompiledCode> {
+        let compiled = jscontext_compile_string(self.ctx, script)!
+        return compiled
+//        let buffer = UnsafeBufferPointer(start: compiled.pointee.bytes, count: Int(compiled.pointee.len));
+//        return Array(buffer)
+    }
+
+    public func evaluate(compiledCode: UnsafeMutablePointer<CompiledCode>) -> JSValue {
+        let val_ptr = jscontext_eval_compiled(self.ctx, compiledCode)
+        return JSValue(ptr: val_ptr!)
+    }
+
     deinit {
         jscontext_free(self.ctx)
     }

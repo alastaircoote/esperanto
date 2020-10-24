@@ -1,3 +1,5 @@
+mod jsc_class;
+mod jsc_classbuilder;
 mod jsc_error;
 mod jsc_function;
 mod jsc_globalcontext;
