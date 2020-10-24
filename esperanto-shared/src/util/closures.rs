@@ -44,6 +44,24 @@ fn upgrade_context<ContextType: JSContext>(
         .ok_or(JSContextError::ContextAlreadyDestroyed)
 }
 
+pub fn wrap_zero_argument_closure<Output, ClosureType, ContextType>(
+    closure: ClosureType,
+    in_context: &Rc<ContextType>,
+) -> FunctionToInvoke<ContextType>
+where
+    Output: ToJSValue<ContextType::ValueType> + 'static,
+    ClosureType: (Fn() -> Result<Output, JSContextError>) + 'static,
+    ContextType: JSContext,
+{
+    let weak_context = Rc::downgrade(in_context);
+
+    Box::new(move |_| {
+        let context = upgrade_context(&weak_context)?;
+        let output = closure()?;
+        Ok(output.to_js_value(&context)?)
+    })
+}
+
 pub fn wrap_one_argument_closure<Input, Output, ClosureType, ContextType>(
     closure: ClosureType,
     in_context: &Rc<ContextType>,
