@@ -5,32 +5,37 @@ use quote::{format_ident, quote, quote_spanned};
 use syn::{
     self, parse::Parse, parse::ParseStream, parse_macro_input, spanned::Spanned, Attribute,
     AttributeArgs, DeriveInput, FnArg, Ident, ImplItem, ImplItemMethod, Item, ItemFn, ItemImpl,
-    ItemStruct, Meta, MetaList, MetaNameValue,
+    ItemStruct, ItemTrait, Meta, MetaList, MetaNameValue,
 };
 
 #[proc_macro_attribute]
 pub fn js_export(attr: TokenStream, input: TokenStream) -> TokenStream {
-    let mut parsed_input = syn::parse::<ItemImpl>(input).unwrap();
+    let parsed_input = match syn::parse::<Item>(input) {
+        Ok(Item::Trait(t)) => t,
+        _ => panic!("Attribute can only be used on traits"),
+    };
 
-    if parsed_input.trait_ != None {
-        panic!("JSExport can only be used on a struct's own impl (for now)")
-    }
+    // let mut parsed_input = syn::parse::<ItemTrait>(input).unwrap();
 
-    // the impl definition can include types and all kinds of things. We only
-    // care about methods, so let's get them:
-    let methods = parsed_input
-        .items
-        .iter()
-        .filter_map(|item| {
-            if let ImplItem::Method(method) = item {
-                return Some(method);
-            }
-            return None;
-        })
-        .collect::<Vec<&ImplItemMethod>>();
+    // if parsed_input.trait_ != None {
+    //     panic!("JSExport can only be used on a struct's own impl (for now)")
+    // }
 
-    // methods.first().unwrap().attrs
-    parsed_input.items.remove(0);
+    // // the impl definition can include types and all kinds of things. We only
+    // // care about methods, so let's get them:
+    // let methods = parsed_input
+    //     .items
+    //     .iter()
+    //     .filter_map(|item| {
+    //         if let ImplItem::Method(method) = item {
+    //             return Some(method);
+    //         }
+    //         return None;
+    //     })
+    //     .collect::<Vec<&ImplItemMethod>>();
+
+    // // methods.first().unwrap().attrs
+    // parsed_input.items.remove(0);
 
     TokenStream::from(quote! {
         #parsed_input

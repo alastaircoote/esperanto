@@ -1,28 +1,49 @@
 use esperanto_macros::js_export;
-
-struct Huh {}
-
 #[js_export]
-impl Huh {
-    fn hmm() -> String {
-        "wow".to_string()
-    }
+trait One {
+    fn one();
 }
 
-trait Watt {
+trait Two: One {
     fn two();
 }
 
-// #[js_export]
-impl Wat for Huh {}
-trait Wat {}
+const TEST: i8 = 1;
 
-trait Wat2<T> {
-    fn what();
+struct TestStruct {}
+
+impl One for TestStruct {
+    fn one() {
+        todo!()
+    }
 }
+
+impl Two for TestStruct {
+    fn two() {
+        todo!()
+    }
+}
+
+// struct Huh {}
+
+// #[js_export]
+// impl Huh {
+//     fn hmm() -> String {
+//         "wow".to_string()
+//     }
+// }
+
+// trait Watt {
+//     fn two();
+// }
+
+// // #[js_export]
+// impl Wat for Huh {}
+// trait Wat {}
+
+// trait Wat2<T> {
+//     fn what();
+// }
 
 #[test]
-fn it_works() {
-    Huh::hmm();
-    // test22();
-}
+fn it_works() {}
