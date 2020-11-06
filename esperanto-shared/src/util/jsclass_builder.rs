@@ -10,7 +10,7 @@ pub trait JSClassBuilderOutput<ContextType: JSContext> {
     fn build_class(
         self,
         in_context: &Rc<ContextType>,
-    ) -> Result<ContextType::ClassType, JSContextError>;
+    ) -> Result<ContextType::ValueType, JSContextError>;
 }
 
 pub struct JSClassBuilder<ContextType: JSContext, NativeObject> {
@@ -33,7 +33,6 @@ pub struct JSClassBuilder<ContextType: JSContext, NativeObject> {
             ) -> Result<ContextType::ValueType, JSContextError>,
         >,
     >,
-    _ph: PhantomData<NativeObject>,
 }
 
 impl<ContextType: JSContext, NativeObject> JSClassBuilder<ContextType, NativeObject> {
@@ -42,7 +41,6 @@ impl<ContextType: JSContext, NativeObject> JSClassBuilder<ContextType, NativeObj
             name,
             constructor: None,
             methods: HashMap::new(),
-            _ph: PhantomData,
         }
     }
 

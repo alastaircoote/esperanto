@@ -1,4 +1,4 @@
-use crate::{jsc_class::JSCClass, jsc_string::JSCString};
+use crate::jsc_string::JSCString;
 use crate::{jsc_error::JSErrorFromJSC, jsc_value::JSCValue};
 use esperanto_shared::errors::{JSContextError, JSError};
 use esperanto_shared::traits::{JSContext, JSValue};
@@ -39,7 +39,6 @@ impl JSCGlobalContext {
 
 impl JSContext for JSCGlobalContext {
     type ValueType = JSCValue;
-    type ClassType = JSCClass;
 
     fn new() -> Result<Rc<Self>, JSContextError> {
         let group = unsafe { JSContextGroupCreate() };

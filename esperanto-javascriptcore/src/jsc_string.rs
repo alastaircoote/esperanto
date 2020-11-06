@@ -2,7 +2,7 @@ use crate::{jsc_error::JSErrorFromJSC, jsc_value::JSCValue};
 use esperanto_shared::errors::{JSConversionError, JSError};
 use javascriptcore_sys::{
     JSStringCreateWithUTF8CString, JSStringGetLength, JSStringGetUTF8CString, JSStringRelease,
-    JSValueRef, JSValueToStringCopy, OpaqueJSString,
+    JSStringRetain, JSValueRef, JSValueToStringCopy, OpaqueJSString,
 };
 use std::{
     ffi::{CStr, CString},
@@ -29,7 +29,7 @@ impl JSCString {
 
     pub fn from_c_string(c_string: *const c_char) -> Result<Self, JSConversionError> {
         let string_ptr = unsafe { JSStringCreateWithUTF8CString(c_string) };
-
+        unsafe { JSStringRetain(string_ptr) };
         Ok(JSCString {
             raw_ref: string_ptr,
         })
@@ -37,11 +37,16 @@ impl JSCString {
 
     pub fn from_js_value(val: &JSCValue) -> Result<Self, JSError> {
         let mut exception_ptr: JSValueRef = std::ptr::null_mut();
-        let str_ptr =
-            unsafe { JSValueToStringCopy(val.context.raw_ref, val.raw_ref, &mut exception_ptr) };
+        let str_ptr = unsafe {
+            JSValueToStringCopy(
+                val.context.raw_ref,
+                val.raw_ref.get_jsvalue(),
+                &mut exception_ptr,
+            )
+        };
 
         JSError::check_jsc_value_ref(exception_ptr, &val.context)?;
-
+        unsafe { JSStringRetain(str_ptr) };
         Ok(Self::from_ptr(str_ptr))
     }
 

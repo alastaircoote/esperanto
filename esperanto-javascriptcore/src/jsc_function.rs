@@ -37,7 +37,7 @@ unsafe extern "C" fn invoke_function(
 
     Box::into_raw(unwrapped_function);
 
-    output.raw_ref
+    output.raw_ref.get_jsvalue()
 }
 
 unsafe extern "C" fn finalize_native_function(val: *mut OpaqueJSValue) {

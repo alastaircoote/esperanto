@@ -8,24 +8,57 @@ use esperanto_shared::{
     util::closures::{wrap_one_argument_closure, wrap_two_argument_closure},
 };
 use javascriptcore_sys::{
-    JSObjectCallAsFunction, JSObjectGetProperty, JSObjectMakeFunction, JSObjectRef,
-    JSValueIsObject, JSValueMakeBoolean, JSValueMakeNumber, JSValueMakeString, JSValueProtect,
-    JSValueRef, JSValueToBoolean, JSValueToNumber, JSValueToObject, JSValueUnprotect,
-    OpaqueJSString, OpaqueJSValue,
+    JSClassRef, JSClassRelease, JSObjectCallAsFunction, JSObjectGetProperty, JSObjectMakeFunction,
+    JSObjectRef, JSValueIsObject, JSValueMakeBoolean, JSValueMakeNumber, JSValueMakeString,
+    JSValueProtect, JSValueRef, JSValueToBoolean, JSValueToNumber, JSValueToObject,
+    JSValueUnprotect, OpaqueJSString, OpaqueJSValue,
 };
 use std::rc::Rc;
 
 #[derive(Debug)]
+pub enum RawRef {
+    JSValue(JSValueRef),
+    JSObject(JSObjectRef),
+    JSClass(JSClassRef, JSObjectRef),
+}
+
+impl RawRef {
+    pub fn get_jsvalue(&self) -> JSValueRef {
+        match self {
+            RawRef::JSValue(val) => *val,
+            RawRef::JSObject(obj) => *obj,
+            RawRef::JSClass(_, obj) => *obj,
+        }
+    }
+
+    pub fn get_jsobject(&self) -> Option<JSObjectRef> {
+        match self {
+            RawRef::JSValue(_) => None,
+            RawRef::JSObject(obj) => Some(*obj),
+            RawRef::JSClass(_, obj) => Some(*obj),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct JSCValue {
-    pub(crate) raw_ref: JSValueRef,
-    pub(crate) object_raw_ref: Option<JSObjectRef>,
+    pub(crate) raw_ref: RawRef,
+    // pub(crate) object_raw_ref: Option<JSObjectRef>,
     pub(crate) context: Rc<JSCGlobalContext>,
 }
 
 impl Drop for JSCValue {
     fn drop(&mut self) {
-        unsafe {
-            JSValueUnprotect(self.context.raw_ref, self.raw_ref);
+        match self.raw_ref {
+            RawRef::JSValue(val) => unsafe { JSValueUnprotect(self.context.raw_ref, val) },
+            RawRef::JSObject(obj) => unsafe {
+                // Objects are unprotected the same way (I think?!)
+                JSValueUnprotect(self.context.raw_ref, obj)
+            },
+            RawRef::JSClass(class, obj) => unsafe {
+                JSValueUnprotect(self.context.raw_ref, obj);
+                JSClassRelease(class);
+            },
         }
     }
 }
@@ -37,8 +70,7 @@ impl JSCValue {
     ) -> Result<Self, JSContextError> {
         Ok(JSCValue {
             context: in_context.clone(),
-            raw_ref: obj_ref,
-            object_raw_ref: Some(obj_ref),
+            raw_ref: RawRef::JSObject(obj_ref),
         })
     }
 }
@@ -52,14 +84,20 @@ impl JSValue for JSCValue {
     }
 
     fn as_number(&self) -> Result<f64, JSContextError> {
+        let raw_ref = match self.raw_ref {
+            RawRef::JSValue(val) => val,
+            _ => return Err(JSConversionError::ResultIsNotANumber.into()),
+        };
+
         // As best I've been able to tell JSValueToNumber never actually creates an exception.
         // instead the returned value is NaN.
 
         // Will leave this here in the hopes we'll be able to find something that triggers an exception
         // in the future and test for it
+
         let exception: *mut JSValueRef = std::ptr::null_mut();
 
-        let val = unsafe { JSValueToNumber(self.context.raw_ref, self.raw_ref, exception) };
+        let val = unsafe { JSValueToNumber(self.context.raw_ref, raw_ref, exception) };
 
         if val.is_nan() {
             Err(JSConversionError::ResultIsNotANumber.into())
@@ -72,11 +110,7 @@ impl JSValue for JSCValue {
         in_context: &Rc<Self::ContextType>,
     ) -> Result<Self, JSContextError> {
         let raw = unsafe { JSValueMakeNumber(in_context.raw_ref, number) };
-        Ok(JSCValue {
-            raw_ref: raw,
-            object_raw_ref: None,
-            context: in_context.clone(),
-        })
+        Self::from_raw(raw, in_context)
     }
 
     fn from_string(str: &str, in_context: &Rc<Self::ContextType>) -> Result<Self, JSContextError> {
@@ -114,12 +148,18 @@ impl JSValue for JSCValue {
 
     fn call_bound(&self, arguments: Vec<&Self>, bound_to: &Self) -> Result<Self, JSContextError> {
         let obj_ref = self
-            .object_raw_ref
+            .raw_ref
+            .get_jsobject()
             .ok_or(JSEvaluationError::IsNotAFunction)?;
+
+        let bound_obj = bound_to
+            .raw_ref
+            .get_jsobject()
+            .ok_or(JSEvaluationError::IsNotAnObject)?;
 
         let arguments_raw = arguments
             .iter()
-            .map(|a| a.raw_ref)
+            .map(|a| a.raw_ref.get_jsvalue())
             .collect::<Vec<Self::RawType>>();
 
         let mut exception_ptr: JSValueRef = std::ptr::null_mut();
@@ -128,7 +168,7 @@ impl JSValue for JSCValue {
             JSObjectCallAsFunction(
                 self.context.raw_ref,
                 obj_ref,
-                bound_to.raw_ref as *mut OpaqueJSValue,
+                bound_obj,
                 arguments.len(),
                 arguments_raw.as_ptr(),
                 &mut exception_ptr,
@@ -150,23 +190,27 @@ impl JSValue for JSCValue {
         // methods like toFixed() that you can call. So we're wrapping both types in one here (another reason to do so is that
         // QuickJS makes no such distincton)
 
-        let object_ref = match unsafe { JSValueIsObject(in_context.raw_ref, raw) } {
+        let raw_ref = match unsafe { JSValueIsObject(in_context.raw_ref, raw) } {
             true => {
                 let mut exception_ptr: JSValueRef = std::ptr::null_mut();
                 let obj = unsafe { JSValueToObject(in_context.raw_ref, raw, &mut exception_ptr) };
                 JSError::check_jsc_value_ref(exception_ptr, in_context)?;
-                Some(obj)
+                RawRef::JSObject(obj)
             }
-            false => None,
+            false => RawRef::JSValue(raw),
         };
         Ok(JSCValue {
-            raw_ref: raw,
-            object_raw_ref: object_ref,
+            raw_ref,
             context: in_context.clone(),
         })
     }
     fn as_bool(&self) -> Result<bool, JSContextError> {
-        unsafe { Ok(JSValueToBoolean(self.context.raw_ref, self.raw_ref)) }
+        unsafe {
+            Ok(JSValueToBoolean(
+                self.context.raw_ref,
+                self.raw_ref.get_jsvalue(),
+            ))
+        }
     }
     fn from_bool(bool: bool, in_context: &Rc<Self::ContextType>) -> Result<Self, JSContextError> {
         let raw = unsafe { JSValueMakeBoolean(in_context.raw_ref, bool) };
@@ -174,8 +218,10 @@ impl JSValue for JSCValue {
     }
     fn get_property(&self, name: &str) -> Result<Self, JSContextError> {
         let obj_ref = self
-            .object_raw_ref
+            .raw_ref
+            .get_jsobject()
             .ok_or(JSEvaluationError::IsNotAnObject)?;
+
         let name_jscstring = JSCString::from_string(name)?;
 
         let mut exception_ptr: JSValueRef = std::ptr::null_mut();
