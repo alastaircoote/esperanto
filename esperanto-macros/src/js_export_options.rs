@@ -1,20 +1,20 @@
 use proc_macro_error::emit_error;
 use syn::{punctuated::Punctuated, Lit, Meta, NestedMeta, Token};
 
-pub struct JSExportOptions {
+pub struct JSExportAttributeOptions {
     override_name: Option<String>,
 }
 
 pub enum MetaParseResult {
     Failed,
-    Success(JSExportOptions),
+    Success(JSExportAttributeOptions),
 }
 
-impl JSExportOptions {
+impl JSExportAttributeOptions {
     pub fn from_nested_meta(
         nested_meta: Option<Punctuated<NestedMeta, Token![,]>>,
     ) -> MetaParseResult {
-        let mut options = JSExportOptions {
+        let mut options = JSExportAttributeOptions {
             override_name: None,
         };
 

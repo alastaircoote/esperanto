@@ -1,7 +1,7 @@
 // use proc_macro_error::emit_error;
 use syn::{Attribute, Meta};
 
-use crate::js_export_options::{JSExportOptions, MetaParseResult};
+use crate::js_export_options::{JSExportAttributeOptions, MetaParseResult};
 
 enum JSExportAttributeName {
     JSFunction,
@@ -25,9 +25,9 @@ impl JSExportAttributeName {
 }
 
 pub enum JSExportAttribute {
-    Function(JSExportOptions),
-    Getter(JSExportOptions),
-    Setter(JSExportOptions),
+    Function(JSExportAttributeOptions),
+    Getter(JSExportAttributeOptions),
+    Setter(JSExportAttributeOptions),
 }
 
 pub enum JSExportAttributeParseResult {
@@ -66,7 +66,7 @@ impl JSExportAttribute {
             }
         };
 
-        let options = match JSExportOptions::from_nested_meta(meta) {
+        let options = match JSExportAttributeOptions::from_nested_meta(meta) {
             MetaParseResult::Success(o) => o,
             _ => return JSExportAttributeParseResult::CouldNotParse("Could not parse nested meta"),
         };
