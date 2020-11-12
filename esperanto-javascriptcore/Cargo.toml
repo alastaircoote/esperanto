@@ -6,3 +6,9 @@ version = "0.1.0"
 [dependencies]
 esperanto_shared = {path = "../esperanto-shared"}
 javascriptcore-sys = "0.0.4"
+proc-macro2 = {version = "1.0", optional = true}
+quote = {version = "1.0", optional = true}
+
+[features]
+default = ["macro_output"]
+macro_output = ["quote", "proc-macro2"]

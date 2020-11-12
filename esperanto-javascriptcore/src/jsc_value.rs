@@ -8,10 +8,10 @@ use esperanto_shared::{
     util::closures::{wrap_one_argument_closure, wrap_two_argument_closure},
 };
 use javascriptcore_sys::{
-    JSClassRef, JSClassRelease, JSObjectCallAsFunction, JSObjectGetProperty, JSObjectMakeFunction,
-    JSObjectRef, JSValueIsObject, JSValueMakeBoolean, JSValueMakeNumber, JSValueMakeString,
-    JSValueProtect, JSValueRef, JSValueToBoolean, JSValueToNumber, JSValueToObject,
-    JSValueUnprotect, OpaqueJSString, OpaqueJSValue,
+    JSClassRef, JSClassRelease, JSClassRetain, JSObjectCallAsFunction, JSObjectGetProperty,
+    JSObjectMakeFunction, JSObjectRef, JSValueIsObject, JSValueMakeBoolean, JSValueMakeNumber,
+    JSValueMakeString, JSValueProtect, JSValueRef, JSValueToBoolean, JSValueToNumber,
+    JSValueToObject, JSValueUnprotect, OpaqueJSClass, OpaqueJSString, OpaqueJSValue,
 };
 use std::rc::Rc;
 
@@ -71,6 +71,18 @@ impl JSCValue {
         Ok(JSCValue {
             context: in_context.clone(),
             raw_ref: RawRef::JSObject(obj_ref),
+        })
+    }
+
+    pub fn from_class_ref(
+        class_ref: *mut OpaqueJSClass,
+        class_obj_ref: *mut OpaqueJSValue,
+        in_context: &Rc<JSCGlobalContext>,
+    ) -> Result<Self, JSContextError> {
+        unsafe { JSClassRetain(class_ref) };
+        Ok(JSCValue {
+            context: in_context.clone(),
+            raw_ref: RawRef::JSClass(class_ref, class_obj_ref),
         })
     }
 }

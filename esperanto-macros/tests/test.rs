@@ -1,7 +1,8 @@
 use esperanto_macros::js_export;
 #[js_export]
 trait One {
-    fn one();
+    #[js_function(name = "a")]
+    fn one(&self, test: &Vec<TestStruct>, test2: TestStruct) -> TestStruct;
 }
 
 trait Two: One {
@@ -12,17 +13,17 @@ const TEST: i8 = 1;
 
 struct TestStruct {}
 
-impl One for TestStruct {
-    fn one() {
-        todo!()
-    }
-}
+// impl One for TestStruct {
+//     fn one() {
+//         todo!()
+//     }
+// }
 
-impl Two for TestStruct {
-    fn two() {
-        todo!()
-    }
-}
+// impl Two for TestStruct {
+//     fn two() {
+//         todo!()
+//     }
+// }
 
 // struct Huh {}
 

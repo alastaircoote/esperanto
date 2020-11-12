@@ -7,8 +7,14 @@ version = "0.1.0"
 [lib]
 proc-macro = true
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+esperanto_javascriptcore = {path = "../esperanto-javascriptcore", optional = true}
+esperanto_shared = {path = "../esperanto-shared"}
+proc-macro-error = "1.0"
+proc-macro2 = "1.0"
 quote = "1.0"
 syn = {version = "1.0", features = ["full"]}
+
+[features]
+default = ["javascriptcore"]
+javascriptcore = ["esperanto_javascriptcore"]

@@ -124,9 +124,7 @@ impl<NativeObject> JSClassBuilderOutput<JSCGlobalContext>
         let class = unsafe { JSClassCreate(&definition) };
         let js_value = unsafe { JSObjectMake(in_context.raw_ref, class, std::ptr::null_mut()) };
 
-        let pinned = Box::pin(self);
-
-        JSCValue::from_raw_object_ref(js_value, in_context)
+        JSCValue::from_class_ref(class, js_value, in_context)
     }
 }
 
