@@ -10,6 +10,7 @@ use quickjs_android_suitable_sys::{
 };
 use std::ffi::{c_void, CStr, CString};
 use std::rc::Rc;
+
 #[derive(Debug)]
 pub struct QJSContext {
     pub(crate) raw: *mut QJSRawContext,
@@ -48,6 +49,7 @@ impl QJSContext {
 
 impl JSContext for QJSContext {
     type ValueType = QJSValue;
+    type ValueShareTarget = QJSRuntime;
     fn new() -> Result<Rc<Self>, JSContextError> {
         // need to add support for shared runtimes
         let runtime = Rc::new(QJSRuntime::new());
@@ -127,6 +129,10 @@ impl JSContext for QJSContext {
         let result = unsafe { JS_EvalFunction(self.raw, val) };
 
         QJSValue::from_raw(result, self)
+    }
+
+    fn get_value_share_target(&self) -> &Self::ValueShareTarget {
+        &self.runtime
     }
 }
 

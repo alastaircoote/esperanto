@@ -9,14 +9,15 @@ use esperanto_shared::{
 };
 use javascriptcore_sys::{
     JSClassRef, JSClassRelease, JSClassRetain, JSObjectCallAsFunction, JSObjectGetProperty,
-    JSObjectMakeFunction, JSObjectRef, JSValueIsObject, JSValueMakeBoolean, JSValueMakeNumber,
-    JSValueMakeString, JSValueProtect, JSValueRef, JSValueToBoolean, JSValueToNumber,
-    JSValueToObject, JSValueUnprotect, OpaqueJSClass, OpaqueJSString, OpaqueJSValue,
+    JSObjectMake, JSObjectMakeFunction, JSObjectRef, JSObjectSetPrivate, JSValueIsObject,
+    JSValueMakeBoolean, JSValueMakeNumber, JSValueMakeString, JSValueMakeUndefined, JSValueProtect,
+    JSValueRef, JSValueToBoolean, JSValueToNumber, JSValueToObject, JSValueUnprotect,
+    OpaqueJSClass, OpaqueJSString, OpaqueJSValue,
 };
 use std::rc::Rc;
 
 #[derive(Debug)]
-pub enum RawRef {
+pub(crate) enum RawRef {
     JSValue(JSValueRef),
     JSObject(JSObjectRef),
     JSClass(JSClassRef, JSObjectRef),
@@ -194,8 +195,6 @@ impl JSValue for JSCValue {
         raw: Self::RawType,
         in_context: &Rc<Self::ContextType>,
     ) -> Result<Self, JSContextError> {
-        unsafe { JSValueProtect(in_context.raw_ref, raw) };
-
         // JavaScriptCore has two different "value" types: JSValueRef and JSObjectRef. It half makes sense: JSValueRef is
         // a const because it represents values, e.g. the number type, which can't ever be changed internally. JSObjectRef
         // is mutable, and you can change the properties of an object. But at the same time, numbers are objects: they have
@@ -290,13 +289,25 @@ impl JSValue for JSCValue {
         Self::from_raw(raw, in_context)
     }
 
-    // fn call_property_with_arguments(
-    //     &self,
-    //     name: &str,
-    //     arguments: Vec<&Self>,
-    // ) -> Result<Self, JSContextError> {
-    //     todo!()
-    // }
+    fn undefined(in_context: &Rc<Self::ContextType>) -> Result<Self, JSContextError> {
+        let raw = unsafe { JSValueMakeUndefined(in_context.raw_ref) };
+        Self::from_raw(raw, in_context)
+    }
+
+    fn wrapping_native<NativeType>(
+        native_object: NativeType,
+        in_context: &Rc<Self::ContextType>,
+    ) -> Result<Self, JSContextError> {
+        let boxed = Box::new(Rc::new(native_object));
+        let raw = unsafe {
+            JSObjectMake(
+                in_context.raw_ref,
+                std::ptr::null_mut(),
+                Box::into_raw(boxed) as *mut ::std::os::raw::c_void,
+            )
+        };
+        Self::from_raw(raw, in_context)
+    }
 }
 
 #[cfg(test)]

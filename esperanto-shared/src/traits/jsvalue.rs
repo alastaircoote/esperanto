@@ -26,6 +26,8 @@ where
         in_context: &Rc<Self::ContextType>,
     ) -> Result<Self, JSContextError>;
 
+    fn undefined(in_context: &Rc<Self::ContextType>) -> Result<Self, JSContextError>;
+
     fn from_two_arg_closure<
         I1: FromJSValue<Self> + 'static,
         I2: FromJSValue<Self> + 'static,
@@ -62,5 +64,10 @@ where
         in_context: &Rc<Self::ContextType>,
         arg_names: Vec<&str>,
         body: &str,
+    ) -> Result<Self, JSContextError>;
+
+    fn wrapping_native<NativeType>(
+        native_object: NativeType,
+        in_context: &Rc<Self::ContextType>,
     ) -> Result<Self, JSContextError>;
 }

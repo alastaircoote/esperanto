@@ -1,7 +1,7 @@
 use crate::qjs_classids::ensure_class_ids_created;
 use quickjs_android_suitable_sys::{JSRuntime as QJSRuntimeRef, JS_FreeRuntime, JS_NewRuntime};
 
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct QJSRuntime {
     pub(crate) raw: *mut QJSRuntimeRef,
 }

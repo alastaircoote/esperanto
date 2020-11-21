@@ -1,8 +1,10 @@
+use std::hash::Hash;
+
 use esperanto_macros::js_export;
 #[js_export]
-trait One {
-    #[js_function(name = "a")]
-    fn one(&self, test: &Vec<TestStruct>, test2: TestStruct) -> TestStruct;
+trait One: Hash {
+    // #[js_function(name = "a")]
+    fn one(&self, test: &TestStruct, test2: &TestStruct) -> TestStruct;
 }
 
 trait Two: One {
@@ -12,6 +14,11 @@ trait Two: One {
 const TEST: i8 = 1;
 
 struct TestStruct {}
+
+#[derive(Hash)]
+struct DoIt {}
+
+// impl One for DoIt {}
 
 // impl One for TestStruct {
 //     fn one() {

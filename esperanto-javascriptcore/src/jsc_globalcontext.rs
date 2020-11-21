@@ -1,19 +1,22 @@
-use crate::jsc_string::JSCString;
+use crate::{jsc_contextgroup::JSCContextGroup, jsc_string::JSCString};
 use crate::{jsc_error::JSErrorFromJSC, jsc_value::JSCValue};
-use esperanto_shared::errors::{JSContextError, JSError};
 use esperanto_shared::traits::{JSContext, JSValue};
+use esperanto_shared::{
+    errors::{JSContextError, JSError},
+    traits::JSRuntime,
+};
 use javascriptcore_sys::{
     JSContextGroupCreate, JSContextGroupRelease, JSEvaluateScript, JSGlobalContextCreateInGroup,
     JSGlobalContextRelease, JSGlobalContextRetain, JSValueRef, OpaqueJSContext,
     OpaqueJSContextGroup,
 };
 // use slotmap::{DefaultKey, SecondaryMap, SlotMap};
-use std::{os::raw::c_char, rc::Rc};
+use std::{fmt::Debug, hash::Hash, os::raw::c_char, rc::Rc};
 
 #[derive(Debug)]
 pub struct JSCGlobalContext {
     pub(crate) raw_ref: *mut OpaqueJSContext,
-    group_raw_ref: *const OpaqueJSContextGroup,
+    group: Rc<JSCContextGroup>,
 }
 
 impl JSCGlobalContext {
@@ -35,28 +38,39 @@ impl JSCGlobalContext {
 
         JSCValue::from_raw(return_value, self)
     }
+
+    pub(crate) fn new_with_group(
+        group: Option<&Rc<JSCContextGroup>>,
+    ) -> Result<Rc<Self>, JSContextError> {
+        let group_to_use = match group {
+            Some(g) => g.clone(),
+            None => JSCContextGroup::new()?,
+        };
+
+        let ctx =
+            unsafe { JSGlobalContextCreateInGroup(group_to_use.raw_ref, std::ptr::null_mut()) };
+        if ctx.is_null() {
+            return Err(JSContextError::CouldNotCreateContext);
+        }
+        // let retained_ctx = unsafe { JSGlobalContextRetain(ctx) };
+        // if retained_ctx.is_null() {
+        //     return Err(JSContextError::CouldNotCreateContext);
+        // }
+        // assert_eq!(retained_ctx, ctx);
+
+        Ok(Rc::new(JSCGlobalContext {
+            raw_ref: ctx,
+            group: group_to_use,
+        }))
+    }
 }
 
 impl JSContext for JSCGlobalContext {
     type ValueType = JSCValue;
+    type ValueShareTarget = Rc<JSCContextGroup>;
 
     fn new() -> Result<Rc<Self>, JSContextError> {
-        let group = unsafe { JSContextGroupCreate() };
-
-        let ctx = unsafe { JSGlobalContextCreateInGroup(group, std::ptr::null_mut()) };
-        if ctx.is_null() {
-            return Err(JSContextError::CouldNotCreateContext);
-        }
-        let retained_ctx = unsafe { JSGlobalContextRetain(ctx) };
-        if retained_ctx.is_null() {
-            return Err(JSContextError::CouldNotCreateContext);
-        }
-        assert_eq!(retained_ctx, ctx);
-
-        Ok(Rc::new(JSCGlobalContext {
-            raw_ref: ctx,
-            group_raw_ref: group,
-        }))
+        Self::new_with_group(None)
     }
 
     fn evaluate(self: &Rc<Self>, script: &str) -> Result<JSCValue, JSContextError> {
@@ -79,19 +93,36 @@ impl JSContext for JSCGlobalContext {
     fn eval_compiled(self: &Rc<Self>, _: &[u8]) -> Result<Self::ValueType, JSContextError> {
         Err(JSContextError::NotSupported)
     }
+
+    fn get_value_share_target(&self) -> &Self::ValueShareTarget {
+        &self.group
+    }
 }
 
 impl Drop for JSCGlobalContext {
     fn drop(&mut self) {
         unsafe { JSGlobalContextRelease(self.raw_ref) }
-        unsafe { JSContextGroupRelease(self.group_raw_ref) }
     }
 }
 
 #[cfg(test)]
 mod test {
+
+    use std::ffi::CString;
+
+    use crate::jsc_value::RawRef;
+
     use super::*;
     use esperanto_shared::trait_tests::jscontext_tests;
+    use javascriptcore_sys::{
+        JSClassCreate, JSClassDefinition, JSClassRef, JSClassRelease, JSClassRetain,
+        JSContextGetGlobalObject, JSContextRef, JSGlobalContextCreate, JSGlobalContextRef,
+        JSObjectCallAsFunction, JSObjectDeleteProperty, JSObjectGetPrivate, JSObjectMake,
+        JSObjectMakeFunction, JSObjectMakeFunctionWithCallback, JSObjectRef, JSObjectSetPrivate,
+        JSObjectSetProperty, JSObjectSetPrototype, JSStringCreateWithUTF8CString, JSStringRelease,
+        JSStringRetain, JSValueIsUndefined, JSValueProtect, JSValueToStringCopy, JSValueUnprotect,
+        OpaqueJSClass, OpaqueJSValue,
+    };
     // use javascriptcore_sys::{JSContextRef, JSGarbageCollect, JSValueUnprotect};
 
     #[test]
@@ -105,24 +136,278 @@ mod test {
     }
 
     // #[link(name = "JavaScriptCore", kind = "framework")]
-    // extern "C" {
-    //     fn JSSynchronousGarbageCollectForDebugging(ctx: JSContextRef) -> ();
-    // }
+    extern "C" {
+        fn JSSynchronousGarbageCollectForDebugging(
+            ctx: *const javascriptcore_sys::OpaqueJSContext,
+        ) -> ();
+    }
 
-    // // sync garbage collect thing doesn't seem to work, so never mind
+    // sync garbage collect thing doesn't seem to work, so never mind
 
-    // #[test]
-    // fn it_discards_values() {
-    //     let context = JSCGlobalContext::new().unwrap();
-    //     let val = context.evaluate("var test = 'hello'; test").unwrap();
-    //     // let obj = val.to_object().unwrap();
-    //     unsafe {
-    //         JSValueUnprotect(context.raw_ref, val.jsc_ref);
-    //         // JSValueUnprotect(context.raw_ref, val.jsc_ref);
-    //         context.evaluate("test = undefined").unwrap();
-    //         JSSynchronousGarbageCollectForDebugging(context.raw_ref);
-    //     }
-    //     let s = val.as_string().unwrap();
-    //     println!("{}", s)
-    // }
+    // static mut context: JSGlobalContextRef = std::ptr::null_mut();
+
+    unsafe extern "C" fn init(
+        ctx: *const javascriptcore_sys::OpaqueJSContext,
+        val: *mut javascriptcore_sys::OpaqueJSValue,
+    ) {
+        println!("hello!")
+    }
+
+    unsafe extern "C" fn fin(val: *mut javascriptcore_sys::OpaqueJSValue) {
+        println!("fin instance!");
+        // JSObjectSetPrototype(context, val, std::ptr::null_mut())
+    }
+
+    unsafe extern "C" fn fin2(val: *mut javascriptcore_sys::OpaqueJSValue) {
+        println!("fin class!")
+    }
+
+    unsafe extern "C" fn construct(
+        ctx: *const javascriptcore_sys::OpaqueJSContext,
+        constructor: *mut javascriptcore_sys::OpaqueJSValue,
+        argc: usize,
+        argv: *const *const javascriptcore_sys::OpaqueJSValue,
+        exception: *mut *const javascriptcore_sys::OpaqueJSValue,
+    ) -> *mut javascriptcore_sys::OpaqueJSValue {
+        let type_def = JSClassDefinition {
+            version: 1,
+            attributes: 0,
+            className: std::ptr::null_mut(),
+            parentClass: std::ptr::null_mut(),
+            staticValues: std::ptr::null_mut(),
+            staticFunctions: std::ptr::null_mut(),
+            initialize: None,
+            finalize: Some(fin),
+            hasProperty: None,
+            getProperty: None,
+            setProperty: None,
+            deleteProperty: None,
+            getPropertyNames: None,
+            callAsFunction: None,
+            callAsConstructor: None,
+            hasInstance: None,
+            convertToType: None,
+        };
+
+        let class = JSClassCreate(&type_def);
+        println!("Construct");
+        let obj = JSObjectMake(ctx, class, std::ptr::null_mut());
+        JSObjectSetPrototype(ctx, obj, constructor);
+        obj
+    }
+
+    unsafe extern "C" fn func_test(
+        ctx: *const javascriptcore_sys::OpaqueJSContext,
+        func: *mut javascriptcore_sys::OpaqueJSValue,
+        this: *mut javascriptcore_sys::OpaqueJSValue,
+        argc: usize,
+        argv: *const *const javascriptcore_sys::OpaqueJSValue,
+        exception: *mut *const javascriptcore_sys::OpaqueJSValue,
+    ) -> *const javascriptcore_sys::OpaqueJSValue {
+        let v = JSObjectGetPrivate(func);
+        JSObjectMake(ctx, v as JSClassRef, std::ptr::null_mut())
+    }
+
+    #[test]
+    fn it_discards_values() {
+        let grp = unsafe { JSContextGroupCreate() };
+        let context = unsafe { JSGlobalContextCreateInGroup(grp, std::ptr::null_mut()) };
+        unsafe { JSContextGroupRelease(grp) };
+        let script2 = CString::new("'123'").unwrap();
+        let script_str2 = unsafe { JSStringCreateWithUTF8CString(script2.as_ptr()) };
+        let mut exception_ptr: JSValueRef = std::ptr::null_mut();
+        unsafe {
+            JSEvaluateScript(
+                context,
+                script_str2,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                0,
+                &mut exception_ptr,
+            )
+        };
+
+        unsafe { JSGlobalContextRetain(context) };
+        let global_obj = unsafe { JSContextGetGlobalObject(context) };
+
+        let name = CString::new("TestClass").unwrap();
+
+        let type_def = JSClassDefinition {
+            version: 1,
+            attributes: 0,
+            className: name.as_ptr(),
+            parentClass: std::ptr::null_mut(),
+            staticValues: std::ptr::null_mut(),
+            staticFunctions: std::ptr::null_mut(),
+            initialize: None,
+            finalize: Some(fin2),
+            hasProperty: None,
+            getProperty: None,
+            setProperty: None,
+            deleteProperty: None,
+            getPropertyNames: None,
+            callAsFunction: None,
+            callAsConstructor: Some(construct),
+            hasInstance: None,
+            convertToType: None,
+        };
+
+        let class = unsafe { JSClassCreate(&type_def) };
+        unsafe { JSClassRetain(class) };
+        // let js_obj = unsafe { JSObjectMake(context, class, std::ptr::null_mut()) };
+
+        let class2 = unsafe { JSClassCreate(&type_def) };
+        let js_obj2 = unsafe { JSObjectMake(context, class2, std::ptr::null_mut()) };
+
+        let type_def_getter = JSClassDefinition {
+            version: 1,
+            attributes: 0,
+            className: std::ptr::null_mut(),
+            parentClass: std::ptr::null_mut(),
+            staticValues: std::ptr::null_mut(),
+            staticFunctions: std::ptr::null_mut(),
+            initialize: None,
+            finalize: None,
+            hasProperty: None,
+            getProperty: None,
+            setProperty: None,
+            deleteProperty: None,
+            getPropertyNames: None,
+            callAsFunction: Some(func_test),
+            callAsConstructor: None,
+            hasInstance: None,
+            convertToType: None,
+        };
+
+        let getter_class = unsafe { JSClassCreate(&type_def_getter) };
+
+        let test_func = unsafe { JSObjectMake(context, getter_class, std::ptr::null_mut()) };
+
+        // let test_func = unsafe {
+        //     JSObjectMakeFunctionWithCallback(context, std::ptr::null_mut(), Some(func_test))
+        // };
+
+        unsafe { JSObjectSetPrivate(test_func, class as *mut std::ffi::c_void) };
+
+        // let objs = vec![js_obj as JSValueRef, js_obj2 as JSValueRef];
+
+        // unsafe { JSValueProtect(context, js_obj) };
+        // unsafe { JSValueUnprotect(context, js_obj) };
+
+        // unsafe { JSClassRelease(class) };
+
+        let arg_name = CString::new("testClass").unwrap();
+        let arg_str = unsafe { JSStringCreateWithUTF8CString(arg_name.as_ptr()) };
+
+        let arg_name2 = CString::new("testClass2").unwrap();
+        let arg_str2 = unsafe { JSStringCreateWithUTF8CString(arg_name2.as_ptr()) };
+
+        let arg_names = vec![arg_str, arg_str2];
+
+        let func_body = CString::new("var cl = testClass(); new cl()").unwrap();
+        let func_body_str = unsafe { JSStringCreateWithUTF8CString(func_body.as_ptr()) };
+
+        let func = unsafe {
+            JSObjectMakeFunction(
+                context,
+                std::ptr::null_mut(),
+                2,
+                arg_names.as_ptr(),
+                func_body_str,
+                std::ptr::null_mut(),
+                0,
+                std::ptr::null_mut(),
+            )
+        };
+
+        let vals = vec![test_func as JSValueRef, js_obj2];
+
+        let mut exception_ptr: JSValueRef = std::ptr::null_mut();
+
+        unsafe {
+            JSObjectCallAsFunction(
+                context,
+                func,
+                std::ptr::null_mut(),
+                1,
+                vals.as_ptr(),
+                &mut exception_ptr,
+            )
+        };
+
+        if exception_ptr.is_null() == false {
+            // panic!("oh no");
+
+            let str_ptr =
+                unsafe { JSValueToStringCopy(context, exception_ptr, std::ptr::null_mut()) };
+            let s = JSCString::from_ptr(str_ptr);
+            let whaaa = s.to_string().unwrap();
+            println!("{}", whaaa)
+        }
+
+        unsafe {
+            JSSynchronousGarbageCollectForDebugging(context);
+        }
+        println!("RELEASE");
+        unsafe { JSGlobalContextRelease(context) }
+        println!("RELEASE GROUP");
+        unsafe { JSContextGroupRelease(grp) }
+
+        // let script2 = CString::new("'123'").unwrap();
+        // let script_str2 = unsafe { JSStringCreateWithUTF8CString(script2.as_ptr()) };
+        // let mut exception_ptr: JSValueRef = std::ptr::null_mut();
+        // unsafe {
+        //     JSEvaluateScript(
+        //         context,
+        //         script_str2,
+        //         std::ptr::null_mut(),
+        //         std::ptr::null_mut(),
+        //         0,
+        //         &mut exception_ptr,
+        //     )
+        // };
+
+        // std::thread::sleep_ms(10000);
+        // let s = val.as_string().unwrap();
+        // println!("{}", s)
+    }
+
+    static mut is_finalized: bool = false;
+
+    unsafe extern "C" fn test_class_finalizer(val: *mut javascriptcore_sys::OpaqueJSValue) {
+        is_finalized = true
+    }
+
+    unsafe extern "C" fn test_generate_class_with_finalizer(
+        ctx: *const javascriptcore_sys::OpaqueJSContext,
+        func: *mut javascriptcore_sys::OpaqueJSValue,
+        this: *mut javascriptcore_sys::OpaqueJSValue,
+        argc: usize,
+        argv: *const *const javascriptcore_sys::OpaqueJSValue,
+        exception: *mut *const javascriptcore_sys::OpaqueJSValue,
+    ) -> *const javascriptcore_sys::OpaqueJSValue {
+        let test_class_def = JSClassDefinition {
+            version: 1,
+            attributes: 0,
+            className: std::ptr::null_mut(),
+            parentClass: std::ptr::null_mut(),
+            staticValues: std::ptr::null_mut(),
+            staticFunctions: std::ptr::null_mut(),
+            initialize: None,
+            finalize: Some(test_class_finalizer),
+            hasProperty: None,
+            getProperty: None,
+            setProperty: None,
+            deleteProperty: None,
+            getPropertyNames: None,
+            callAsFunction: None,
+            callAsConstructor: None,
+            hasInstance: None,
+            convertToType: None,
+        };
+
+        let class = JSClassCreate(&test_class_def);
+
+        JSObjectMake(ctx, class, std::ptr::null_mut())
+    }
 }

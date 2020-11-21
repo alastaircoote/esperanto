@@ -103,6 +103,11 @@ pub enum JSEvaluationError {
     IsNotAnObject,
 }
 
+// #[derive(Error, Debug)]
+// pub enum JSClassError {
+//     #[error("You cannot create a class prototype with a finalizer")]
+// }
+
 #[derive(Error, Debug)]
 pub enum JSContextError {
     #[error("An error occurred inside the JavaScript environment")]

@@ -1,17 +1,10 @@
-use std::iter;
-
 use crate::feature_imports::jsvalue_ident;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use proc_macro_error::emit_error;
+use quote::quote_spanned;
 use quote::{format_ident, ToTokens};
-use quote::{quote, quote_spanned};
 use syn::{spanned::Spanned, FnArg, Ident, Pat, PatType, ReturnType, TraitItemMethod, Type};
-
-pub enum JSTypeCheckType {
-    ToJSValue,
-    FromJSValue,
-}
 
 pub enum JSTypeCheckPosition {
     FnInput(syn::Ident),
@@ -32,32 +25,33 @@ pub struct JSTypeCheck {
     pub span: Span, // pub check_type: JSTypeCheckType,
 }
 
-fn verify_arg_get_span(arg: &PatType) -> Span {
-    match &*arg.ty {
-        Type::Path(p) => p.span(),
-        Type::Paren(par) => par.span(),
-        _ => {
-            emit_error!(arg.ty.span(), "seems bad");
-            arg.ty.span()
-        }
+fn get_underlying_type(typ: &Box<Type>) -> TokenStream {
+    match &**typ {
+        Type::Path(p) => p.into_token_stream(),
+        Type::Reference(r) => r.elem.clone().into_token_stream(),
+        _ => panic!("oh no"),
     }
 }
 
 impl JSTypeCheck {
     pub fn to_token_stream(&self, method_ident: &Ident, trait_ident: &Ident) -> TokenStream {
         let value_ident = jsvalue_ident();
-        let typ = &self.typ;
+        let ty = get_underlying_type(&self.typ);
         match &self.position {
             JSTypeCheckPosition::Return => {
                 let check_ident = format_ident!("_{}{}return", trait_ident, method_ident);
                 quote_spanned! {self.span=>
-                    struct #check_ident where #typ: esperanto_shared::traits::ToJSValue<#value_ident>;
+                    struct #check_ident where #ty: esperanto_shared::traits::ToJSValue<#value_ident>;
                 }
             }
             JSTypeCheckPosition::FnInput(ident) => {
+                if let Type::Path(_) = &*self.typ {
+                    emit_error!(&self.typ, "All arguments must be references for now")
+                }
+
                 let check_ident = format_ident!("_{}{}{}", trait_ident, method_ident, ident);
                 quote_spanned! {self.span=>
-                    struct #check_ident where #typ: esperanto_shared::traits::FromJSValue<#value_ident>;
+                    struct #check_ident where #ty: esperanto_shared::traits::FromJSValue<#value_ident>;
                 }
             }
         }
@@ -81,13 +75,12 @@ impl JSTypeCheck {
                     }
 
                     FnArg::Typed(t) => {
-                        // t.pat.span()
                         // This is a normal argument
                         if let Pat::Ident(pat_ident) = &*t.pat {
                             return Some(JSTypeCheck {
                                 typ: t.ty.clone(),
                                 position: JSTypeCheckPosition::FnInput(pat_ident.ident.clone()),
-                                span: verify_arg_get_span(&t),
+                                span: arg.span(),
                             });
                         } else {
                             // not sure! need to investigate
