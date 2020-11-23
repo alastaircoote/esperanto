@@ -20,7 +20,6 @@ use std::rc::Rc;
 pub(crate) enum RawRef {
     JSValue(JSValueRef),
     JSObject(JSObjectRef),
-    JSClass(JSClassRef, JSObjectRef),
 }
 
 impl RawRef {
@@ -28,7 +27,6 @@ impl RawRef {
         match self {
             RawRef::JSValue(val) => *val,
             RawRef::JSObject(obj) => *obj,
-            RawRef::JSClass(_, obj) => *obj,
         }
     }
 
@@ -36,7 +34,6 @@ impl RawRef {
         match self {
             RawRef::JSValue(_) => None,
             RawRef::JSObject(obj) => Some(*obj),
-            RawRef::JSClass(_, obj) => Some(*obj),
         }
     }
 }
@@ -50,17 +47,7 @@ pub struct JSCValue {
 
 impl Drop for JSCValue {
     fn drop(&mut self) {
-        match self.raw_ref {
-            RawRef::JSValue(val) => unsafe { JSValueUnprotect(self.context.raw_ref, val) },
-            RawRef::JSObject(obj) => unsafe {
-                // Objects are unprotected the same way (I think?!)
-                JSValueUnprotect(self.context.raw_ref, obj)
-            },
-            RawRef::JSClass(class, obj) => unsafe {
-                JSValueUnprotect(self.context.raw_ref, obj);
-                JSClassRelease(class);
-            },
-        }
+        unsafe { JSValueUnprotect(self.context.raw_ref, self.raw_ref.get_jsvalue()) };
     }
 }
 
@@ -72,18 +59,6 @@ impl JSCValue {
         Ok(JSCValue {
             context: in_context.clone(),
             raw_ref: RawRef::JSObject(obj_ref),
-        })
-    }
-
-    pub fn from_class_ref(
-        class_ref: *mut OpaqueJSClass,
-        class_obj_ref: *mut OpaqueJSValue,
-        in_context: &Rc<JSCGlobalContext>,
-    ) -> Result<Self, JSContextError> {
-        unsafe { JSClassRetain(class_ref) };
-        Ok(JSCValue {
-            context: in_context.clone(),
-            raw_ref: RawRef::JSClass(class_ref, class_obj_ref),
         })
     }
 }
@@ -201,19 +176,18 @@ impl JSValue for JSCValue {
         // methods like toFixed() that you can call. So we're wrapping both types in one here (another reason to do so is that
         // QuickJS makes no such distincton)
 
-        let raw_ref = match unsafe { JSValueIsObject(in_context.raw_ref, raw) } {
+        match unsafe { JSValueIsObject(in_context.raw_ref, raw) } {
             true => {
                 let mut exception_ptr: JSValueRef = std::ptr::null_mut();
                 let obj = unsafe { JSValueToObject(in_context.raw_ref, raw, &mut exception_ptr) };
                 JSError::check_jsc_value_ref(exception_ptr, in_context)?;
-                RawRef::JSObject(obj)
+                Self::from_raw_object_ref(obj, in_context)
             }
-            false => RawRef::JSValue(raw),
-        };
-        Ok(JSCValue {
-            raw_ref,
-            context: in_context.clone(),
-        })
+            false => Ok(JSCValue {
+                raw_ref: RawRef::JSValue(raw),
+                context: in_context.clone(),
+            }),
+        }
     }
     fn as_bool(&self) -> Result<bool, JSContextError> {
         unsafe {
@@ -291,21 +265,6 @@ impl JSValue for JSCValue {
 
     fn undefined(in_context: &Rc<Self::ContextType>) -> Result<Self, JSContextError> {
         let raw = unsafe { JSValueMakeUndefined(in_context.raw_ref) };
-        Self::from_raw(raw, in_context)
-    }
-
-    fn wrapping_native<NativeType>(
-        native_object: NativeType,
-        in_context: &Rc<Self::ContextType>,
-    ) -> Result<Self, JSContextError> {
-        let boxed = Box::new(Rc::new(native_object));
-        let raw = unsafe {
-            JSObjectMake(
-                in_context.raw_ref,
-                std::ptr::null_mut(),
-                Box::into_raw(boxed) as *mut ::std::os::raw::c_void,
-            )
-        };
         Self::from_raw(raw, in_context)
     }
 }

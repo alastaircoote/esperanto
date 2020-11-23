@@ -6,20 +6,21 @@ use esperanto_shared::{
     traits::JSRuntime,
 };
 use javascriptcore_sys::{
-    JSContextGroupCreate, JSContextGroupRelease, JSEvaluateScript, JSGlobalContextCreateInGroup,
-    JSGlobalContextRelease, JSGlobalContextRetain, JSValueRef, OpaqueJSContext,
-    OpaqueJSContextGroup,
+    JSClassCreate, JSClassDefinition, JSContextGetGlobalObject, JSContextGroupCreate,
+    JSContextGroupRelease, JSEvaluateScript, JSGlobalContextCreateInGroup, JSGlobalContextRelease,
+    JSGlobalContextRetain, JSObjectGetPrivate, JSObjectRef, JSObjectSetPrivate, JSValueRef,
+    OpaqueJSContext, OpaqueJSContextGroup,
 };
 // use slotmap::{DefaultKey, SecondaryMap, SlotMap};
-use std::{fmt::Debug, hash::Hash, os::raw::c_char, rc::Rc};
+use std::{cell::Cell, fmt::Debug, hash::Hash, os::raw::c_char, rc::Rc};
 
 #[derive(Debug)]
-pub struct JSCGlobalContext {
+pub struct JSCGlobalContext<'context> {
     pub(crate) raw_ref: *mut OpaqueJSContext,
-    group: Rc<JSCContextGroup>,
+    pub(crate) group: &'context JSCContextGroup<'context>,
 }
 
-impl JSCGlobalContext {
+impl<'context> JSCGlobalContext<'context> {
     fn evaluate_jscstring(self: &Rc<Self>, script: JSCString) -> Result<JSCValue, JSContextError> {
         let mut exception_ptr: JSValueRef = std::ptr::null_mut();
 
@@ -41,31 +42,17 @@ impl JSCGlobalContext {
 
     pub(crate) fn new_with_group(
         group: Option<&Rc<JSCContextGroup>>,
-    ) -> Result<Rc<Self>, JSContextError> {
+    ) -> Result<&Self, JSContextError> {
         let group_to_use = match group {
             Some(g) => g.clone(),
             None => JSCContextGroup::new()?,
         };
 
-        let ctx =
-            unsafe { JSGlobalContextCreateInGroup(group_to_use.raw_ref, std::ptr::null_mut()) };
-        if ctx.is_null() {
-            return Err(JSContextError::CouldNotCreateContext);
-        }
-        // let retained_ctx = unsafe { JSGlobalContextRetain(ctx) };
-        // if retained_ctx.is_null() {
-        //     return Err(JSContextError::CouldNotCreateContext);
-        // }
-        // assert_eq!(retained_ctx, ctx);
-
-        Ok(Rc::new(JSCGlobalContext {
-            raw_ref: ctx,
-            group: group_to_use,
-        }))
+        group_to_use.create_context()
     }
 }
 
-impl JSContext for JSCGlobalContext {
+impl<'context> JSContext for JSCGlobalContext<'context> {
     type ValueType = JSCValue;
     type ValueShareTarget = Rc<JSCContextGroup>;
 
@@ -119,9 +106,10 @@ mod test {
         JSContextGetGlobalObject, JSContextRef, JSGlobalContextCreate, JSGlobalContextRef,
         JSObjectCallAsFunction, JSObjectDeleteProperty, JSObjectGetPrivate, JSObjectMake,
         JSObjectMakeFunction, JSObjectMakeFunctionWithCallback, JSObjectRef, JSObjectSetPrivate,
-        JSObjectSetProperty, JSObjectSetPrototype, JSStringCreateWithUTF8CString, JSStringRelease,
-        JSStringRetain, JSValueIsUndefined, JSValueProtect, JSValueToStringCopy, JSValueUnprotect,
-        OpaqueJSClass, OpaqueJSValue,
+        JSObjectSetProperty, JSObjectSetPropertyAtIndex, JSObjectSetPrototype,
+        JSStringCreateWithUTF8CString, JSStringRelease, JSStringRetain, JSValueIsUndefined,
+        JSValueMakeUndefined, JSValueProtect, JSValueToStringCopy, JSValueUnprotect, OpaqueJSClass,
+        OpaqueJSValue,
     };
     // use javascriptcore_sys::{JSContextRef, JSGarbageCollect, JSValueUnprotect};
 

@@ -1,6 +1,7 @@
-mod jsc_class;
 mod jsc_classbuilder;
+mod jsc_classdefinition;
 mod jsc_contextgroup;
+mod jsc_contextgroup_state;
 mod jsc_error;
 mod jsc_function;
 mod jsc_globalcontext;

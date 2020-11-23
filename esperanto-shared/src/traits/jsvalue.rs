@@ -4,11 +4,11 @@ use super::{
 };
 use crate::errors::JSContextError;
 use std::rc::Rc;
-pub trait JSValue
+pub trait JSValue<'value>
 where
-    Self: Sized + 'static,
+    Self: Sized,
 {
-    type ContextType: JSContext<ValueType = Self> + 'static;
+    type ContextType: JSContext<'value, ValueType = Self>;
     type RawType: Copy;
     fn as_string(&self) -> Result<String, JSContextError>;
     fn as_number(&self) -> Result<f64, JSContextError>;
@@ -18,7 +18,7 @@ where
     fn from_bool(bool: bool, in_context: &Rc<Self::ContextType>) -> Result<Self, JSContextError>;
     fn from_string(str: &str, in_context: &Rc<Self::ContextType>) -> Result<Self, JSContextError>;
     fn from_one_arg_closure<
-        I: FromJSValue<Self> + 'static,
+        I: FromJSValue<Self>,
         O: ToJSValue<Self> + 'static,
         F: Fn(I) -> Result<O, JSContextError> + 'static,
     >(
@@ -66,8 +66,8 @@ where
         body: &str,
     ) -> Result<Self, JSContextError>;
 
-    fn wrapping_native<NativeType>(
-        native_object: NativeType,
-        in_context: &Rc<Self::ContextType>,
-    ) -> Result<Self, JSContextError>;
+    // fn wrapping_native<NativeType>(
+    //     native_object: NativeType,
+    //     in_context: &Rc<Self::ContextType>,
+    // ) -> Result<Self, JSContextError>;
 }

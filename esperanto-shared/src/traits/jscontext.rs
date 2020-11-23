@@ -2,8 +2,8 @@ use crate::errors::JSContextError;
 use crate::traits::JSValue;
 use std::{hash::Hash, os::raw::c_char, rc::Rc};
 
-pub trait JSContext: Sized + 'static {
-    type ValueType: JSValue<ContextType = Self> + 'static;
+pub trait JSContext<'context>: Sized {
+    type ValueType: JSValue<'context, ContextType = Self>;
 
     // Both JSC and QuickJS allow you to share JSValues between context, provided they have the same
     // JSRuntime (QJS) or ContextGroup (JSC). But not all engines will necessarily support this, so this
@@ -25,8 +25,4 @@ pub trait JSContext: Sized + 'static {
     ) -> Result<&'a [u8], JSContextError>;
     fn eval_compiled(self: &Rc<Self>, binary: &[u8]) -> Result<Self::ValueType, JSContextError>;
     fn get_value_share_target(&self) -> &Self::ValueShareTarget;
-}
-
-pub trait RawBackedJSContext: JSContext {
-    type RawValueType;
 }

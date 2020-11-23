@@ -2,7 +2,7 @@ use crate::errors::JSContextError;
 use crate::traits::{JSContext, JSValue};
 use std::fmt::Debug;
 
-pub fn it_evaluates_correct_code<Context: JSContext>() {
+pub fn it_evaluates_correct_code<Context: JSContext<'_>>() {
     let runtime = Context::new().unwrap();
     let result = runtime.evaluate("1+2").unwrap().as_number().unwrap();
     assert_eq!(result, 3.0)
