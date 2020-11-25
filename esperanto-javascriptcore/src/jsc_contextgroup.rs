@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, hash::Hash, ops::Deref, ops::Dere
 
 use esperanto_shared::{
     errors::{JSContextError, JSEvaluationError},
-    traits::{JSClassBuilder, JSRuntime},
+    traits::JSRuntime,
 };
 use javascriptcore_sys::{
     JSClassCreate, JSClassDefinition, JSContextGetGlobalObject, JSContextGroupCreate,
@@ -19,14 +19,14 @@ use crate::{jsc_contextgroup_state::JSCContextGroupState, JSCGlobalContext, JSCV
 
 // type ClassPrototypeStorage = Rc<RefCell<HashMap<ComparableJSClassDefinition, JSObjectRef>>>;
 
-#[derive(Debug)]
-pub struct JSCContextGroup<'a> {
+#[derive(Debug, Clone)]
+pub struct JSCContextGroup {
     pub(crate) raw_ref: *const OpaqueJSContextGroup,
     // class_objects: ClassPrototypeStorage,
-    state: Rc<JSCContextGroupState<'a>>,
+    state: Rc<JSCContextGroupState>,
 }
 
-impl Hash for JSCContextGroup<'_> {
+impl Hash for JSCContextGroup {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         // Not 100% sure if this will be a good idea or not, but we're ingoring the class_objects
         // HashMap because it isn't hashable in itself. But we should still be getting unique values
@@ -41,7 +41,7 @@ impl Hash for JSCContextGroup<'_> {
 //     }
 // }
 
-impl<'g> JSRuntime for JSCContextGroup<'g> {
+impl JSRuntime for JSCContextGroup {
     type ContextType = JSCGlobalContext;
 
     fn new() -> Result<Rc<Self>, JSContextError> {
@@ -54,7 +54,7 @@ impl<'g> JSRuntime for JSCContextGroup<'g> {
         }))
     }
 
-    fn create_context<'context>(&self) -> Result<&'context Self::ContextType, JSContextError> {
+    fn create_context(&self) -> Result<Self::ContextType, JSContextError> {
         // First we create a class for our global scope. At some point we're going to need to expand this to encompass
         // custom items etc. but for now all we want is the finalizer.
 
@@ -83,9 +83,9 @@ impl<'g> JSRuntime for JSCContextGroup<'g> {
 
         self.state.add_global_object(created_global);
 
-        Ok(&JSCGlobalContext {
+        Ok(JSCGlobalContext {
             raw_ref: ctx,
-            group: self.clone(),
+            group: *self.clone(),
         })
     }
 }
@@ -145,7 +145,7 @@ impl<'g> JSRuntime for JSCContextGroup<'g> {
 
 // unsafe impl Sync for ComparableJSClassDefinition {}
 
-impl JSCContextGroup<'_> {
+impl JSCContextGroup {
     // One of the last things the context group does when wrapping up is finalize the global objects in its contexts.
     // When that happens this function gets called:
     unsafe extern "C" fn context_global_object_finalized(global: JSObjectRef) {

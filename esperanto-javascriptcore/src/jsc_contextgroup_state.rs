@@ -8,13 +8,13 @@ pub struct JSCContextState {
 }
 
 #[derive(Debug)]
-pub struct JSCContextGroupState<'a> {
+pub struct JSCContextGroupState {
     context_states: HashMap<JSObjectRef, JSCContextState>,
-    static_classes: HashMap<&'a JSCClassDefinition<'a>, *mut OpaqueJSClass>,
-    class_prototypes: HashMap<&'a JSCClassDefinition<'a>, *mut OpaqueJSClass>,
+    static_classes: HashMap<JSCClassDefinition, *mut OpaqueJSClass>,
+    class_prototypes: HashMap<JSCClassDefinition, *mut OpaqueJSClass>,
 }
 
-impl JSCContextGroupState<'_> {
+impl JSCContextGroupState {
     pub fn new() -> Self {
         JSCContextGroupState {
             context_states: HashMap::new(),
@@ -37,10 +37,10 @@ impl JSCContextGroupState<'_> {
     }
 }
 
-impl<'a> JSClassCache<'a> for JSCContextGroupState<'a> {
+impl JSClassCache for JSCContextGroupState {
     fn get_or_create_class(
         &self,
-        def: &'a JSCClassDefinition,
+        def: &JSCClassDefinition,
     ) -> Result<*mut javascriptcore_sys::OpaqueJSClass, esperanto_shared::errors::JSContextError>
     {
         if let Some(existing) = self.static_classes.get(&def) {
@@ -48,12 +48,12 @@ impl<'a> JSClassCache<'a> for JSCContextGroupState<'a> {
         }
 
         let class = def.to_jsc_class(self)?;
-        self.static_classes.insert(def, class);
+        self.static_classes.insert(*def.clone(), class);
         Ok(class)
     }
 }
 
-impl Drop for JSCContextGroupState<'_> {
+impl Drop for JSCContextGroupState {
     fn drop(&mut self) {
         if self.context_states.len() > 0 {
             panic!("Context group state is being dropped when contexts still depend on it")

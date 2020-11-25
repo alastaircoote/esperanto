@@ -49,7 +49,6 @@ impl QJSContext {
 
 impl JSContext for QJSContext {
     type ValueType = QJSValue;
-    type ValueShareTarget = QJSRuntime;
     fn new() -> Result<Rc<Self>, JSContextError> {
         // need to add support for shared runtimes
         let runtime = Rc::new(QJSRuntime::new());

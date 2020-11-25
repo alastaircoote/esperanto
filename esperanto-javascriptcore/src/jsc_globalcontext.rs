@@ -15,13 +15,13 @@ use javascriptcore_sys::{
 use std::{cell::Cell, fmt::Debug, hash::Hash, os::raw::c_char, rc::Rc};
 
 #[derive(Debug)]
-pub struct JSCGlobalContext<'context> {
+pub struct JSCGlobalContext {
     pub(crate) raw_ref: *mut OpaqueJSContext,
-    pub(crate) group: &'context JSCContextGroup<'context>,
+    pub(crate) group: JSCContextGroup,
 }
 
-impl<'context> JSCGlobalContext<'context> {
-    fn evaluate_jscstring(self: &Rc<Self>, script: JSCString) -> Result<JSCValue, JSContextError> {
+impl JSCGlobalContext {
+    fn evaluate_jscstring(self: &Self, script: JSCString) -> Result<JSCValue, JSContextError> {
         let mut exception_ptr: JSValueRef = std::ptr::null_mut();
 
         let return_value = unsafe {
@@ -35,54 +35,45 @@ impl<'context> JSCGlobalContext<'context> {
             )
         };
 
-        JSError::check_jsc_value_ref(exception_ptr, &self)?;
+        JSError::check_jsc_value_ref(exception_ptr, self)?;
 
         JSCValue::from_raw(return_value, self)
     }
+}
 
-    pub(crate) fn new_with_group(
-        group: Option<&Rc<JSCContextGroup>>,
-    ) -> Result<&Self, JSContextError> {
-        let group_to_use = match group {
-            Some(g) => g.clone(),
-            None => JSCContextGroup::new()?,
-        };
-
-        group_to_use.create_context()
+impl Clone for JSCGlobalContext {
+    fn clone(&self) -> Self {
+        unsafe { JSGlobalContextRetain(self.raw_ref) };
+        JSCGlobalContext {
+            raw_ref: self.raw_ref,
+            group: self.group,
+        }
     }
 }
 
-impl<'context> JSContext for JSCGlobalContext<'context> {
+impl JSContext for JSCGlobalContext {
     type ValueType = JSCValue;
-    type ValueShareTarget = Rc<JSCContextGroup>;
 
-    fn new() -> Result<Rc<Self>, JSContextError> {
-        Self::new_with_group(None)
+    fn new() -> Result<Self, JSContextError> {
+        JSCContextGroup::new()?.create_context()
     }
 
-    fn evaluate(self: &Rc<Self>, script: &str) -> Result<JSCValue, JSContextError> {
+    fn evaluate(self: &Self, script: &str) -> Result<JSCValue, JSContextError> {
         let script_jsstring = JSCString::from_string(script)?;
         self.evaluate_jscstring(script_jsstring)
     }
 
-    fn evaluate_cstring(
-        self: &Rc<Self>,
-        script: *const c_char,
-    ) -> Result<Self::ValueType, JSContextError> {
+    fn evaluate_cstring(&self, script: *const c_char) -> Result<Self::ValueType, JSContextError> {
         let script_jsstring = JSCString::from_c_string(script)?;
         self.evaluate_jscstring(script_jsstring)
     }
 
-    fn compile_string<'a>(self: &Rc<Self>, _: *const c_char) -> Result<&'a [u8], JSContextError> {
+    fn compile_string<'a>(&self, _: *const c_char) -> Result<&'a [u8], JSContextError> {
         Err(JSContextError::NotSupported)
     }
 
-    fn eval_compiled(self: &Rc<Self>, _: &[u8]) -> Result<Self::ValueType, JSContextError> {
+    fn eval_compiled(&self, _: &[u8]) -> Result<Self::ValueType, JSContextError> {
         Err(JSContextError::NotSupported)
-    }
-
-    fn get_value_share_target(&self) -> &Self::ValueShareTarget {
-        &self.group
     }
 }
 

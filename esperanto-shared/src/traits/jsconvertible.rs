@@ -2,21 +2,21 @@ use super::JSValue;
 use crate::errors::JSContextError;
 use std::rc::Rc;
 
-pub trait ToJSValue<'value, ValueType: JSValue<'value>> {
+pub trait ToJSValue<ValueType: JSValue> {
     fn to_js_value(
         self,
         in_context: &Rc<ValueType::ContextType>,
     ) -> Result<ValueType, JSContextError>;
 }
 
-pub trait FromJSValue<'value, ValueType: JSValue<'value>>
+pub trait FromJSValue<ValueType: JSValue>
 where
     Self: Sized,
 {
     fn from_js_value(val: ValueType) -> Result<Self, JSContextError>;
 }
 
-impl<'value, ValueType: JSValue<'value>> ToJSValue<'value, ValueType> for ValueType {
+impl<ValueType: JSValue> ToJSValue<ValueType> for ValueType {
     fn to_js_value(self, _: &Rc<ValueType::ContextType>) -> Result<ValueType, JSContextError> {
         Ok(self)
     }

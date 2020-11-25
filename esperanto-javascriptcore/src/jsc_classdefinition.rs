@@ -9,28 +9,28 @@ use javascriptcore_sys::{
     JSObjectSetPropertyCallback, JSPropertyAttributes, OpaqueJSClass,
 };
 #[derive(Hash, Debug, PartialEq, Eq)]
-struct JSCStaticFunction<'a> {
-    name: &'a str,
+struct JSCStaticFunction {
+    name: &'static str,
     call_as_function: JSObjectCallAsFunctionCallback,
     attributes: JSPropertyAttributes,
 }
 
 #[derive(Hash, Debug, PartialEq, Eq)]
-struct JSCStaticValue<'a> {
-    name: &'a str,
+struct JSCStaticValue {
+    name: &'static str,
     get_property: JSObjectGetPropertyCallback,
     set_property: Option<JSObjectSetPropertyCallback>,
     attributes: JSPropertyAttributes,
 }
 
 #[derive(Hash, Debug, PartialEq, Eq)]
-pub struct JSCClassDefinition<'a> {
-    pub class_name: &'a str,
+pub struct JSCClassDefinition {
+    pub class_name: &'static str,
     pub version: i32,
     pub attributes: JSClassAttributes,
-    pub parent_class: Option<&'a JSCClassDefinition<'a>>,
-    pub static_values: Vec<JSCStaticValue<'a>>,
-    pub static_functions: Vec<JSCStaticFunction<'a>>,
+    pub parent_class: Option<Box<JSCClassDefinition>>,
+    pub static_values: Vec<JSCStaticValue>,
+    pub static_functions: Vec<JSCStaticFunction>,
     pub initialize: JSObjectInitializeCallback,
     /// The callback invoked when an object is finalized (prepared for garbage
     /// collection). Use this callback to release resources allocated for the
@@ -61,15 +61,15 @@ pub struct JSCClassDefinition<'a> {
     pub convert_to_type: JSObjectConvertToTypeCallback,
 }
 
-pub trait JSClassCache<'a> {
+pub trait JSClassCache {
     fn get_or_create_class(
         &self,
-        def: &'a JSCClassDefinition,
+        def: &JSCClassDefinition,
     ) -> Result<*mut OpaqueJSClass, JSContextError>;
 }
 
-impl<'a> JSCClassDefinition<'a> {
-    pub fn to_jsc_class<Cache: JSClassCache<'a>>(
+impl JSCClassDefinition {
+    pub fn to_jsc_class<Cache: JSClassCache>(
         &self,
         cache: &Cache,
     ) -> Result<*mut OpaqueJSClass, JSContextError> {
