@@ -1,12 +1,8 @@
 use crate::{
-    jsc_error::JSErrorFromJSC, jsc_function::wrap_closure, jsc_globalcontext::JSCGlobalContext,
-    jsc_string::JSCString,
+    jsc_error::JSErrorFromJSC, jsc_globalcontext::JSCGlobalContext, jsc_string::JSCString,
 };
 use esperanto_shared::errors::{JSContextError, JSConversionError, JSError, JSEvaluationError};
-use esperanto_shared::{
-    traits::JSValue,
-    util::closures::{wrap_one_argument_closure, wrap_two_argument_closure},
-};
+use esperanto_shared::traits::JSValue;
 use javascriptcore_sys::{
     JSClassRef, JSClassRelease, JSClassRetain, JSObjectCallAsFunction, JSObjectGetProperty,
     JSObjectMake, JSObjectMakeFunction, JSObjectRef, JSObjectSetPrivate, JSValueIsObject,
@@ -14,7 +10,7 @@ use javascriptcore_sys::{
     JSValueRef, JSValueToBoolean, JSValueToNumber, JSValueToObject, JSValueUnprotect,
     OpaqueJSClass, OpaqueJSString, OpaqueJSValue,
 };
-use std::rc::Rc;
+use std::{convert::TryInto, rc::Rc};
 
 #[derive(Debug)]
 pub(crate) enum RawRef {
@@ -39,22 +35,22 @@ impl RawRef {
 }
 
 #[derive(Debug)]
-pub struct JSCValue {
+pub struct JSCValue<'group> {
     pub(crate) raw_ref: RawRef,
     // pub(crate) object_raw_ref: Option<JSObjectRef>,
-    pub(crate) context: Rc<JSCGlobalContext>,
+    pub(crate) context: &'group JSCGlobalContext<'group>,
 }
 
-impl Drop for JSCValue {
+impl Drop for JSCValue<'_> {
     fn drop(&mut self) {
         unsafe { JSValueUnprotect(self.context.raw_ref, self.raw_ref.get_jsvalue()) };
     }
 }
 
-impl JSCValue {
+impl<'group> JSCValue<'group> {
     pub fn from_raw_object_ref(
         obj_ref: *mut OpaqueJSValue,
-        in_context: &Rc<JSCGlobalContext>,
+        in_context: &'group JSCGlobalContext,
     ) -> Result<Self, JSContextError> {
         Ok(JSCValue {
             context: in_context.clone(),
@@ -63,8 +59,35 @@ impl JSCValue {
     }
 }
 
-impl JSValue for JSCValue {
-    type ContextType = JSCGlobalContext;
+impl TryInto<f64> for JSCValue<'_> {
+    type Error = JSContextError;
+
+    fn try_into(self) -> Result<f64, Self::Error> {
+        let raw_ref = match self.raw_ref {
+            RawRef::JSValue(val) => val,
+            _ => return Err(JSConversionError::ResultIsNotANumber.into()),
+        };
+
+        // As best I've been able to tell JSValueToNumber never actually creates an exception.
+        // instead the returned value is NaN.
+
+        // Will leave this here in the hopes we'll be able to find something that triggers an exception
+        // in the future and test for it
+
+        let exception: *mut JSValueRef = std::ptr::null_mut();
+
+        let val = unsafe { JSValueToNumber(self.context.raw_ref, raw_ref, exception) };
+
+        if val.is_nan() {
+            Err(JSConversionError::ResultIsNotANumber.into())
+        } else {
+            Ok(val)
+        }
+    }
+}
+
+impl<'group> JSValue<'group> for JSCValue<'group> {
+    type ContextType = JSCGlobalContext<'group>;
     type RawType = JSValueRef;
     fn as_string(&self) -> Result<String, JSContextError> {
         let jsc = JSCString::from_js_value(self)?;
@@ -107,32 +130,32 @@ impl JSValue for JSCValue {
         Self::from_raw(val_ref, in_context)
     }
 
-    fn from_one_arg_closure<
-        I: esperanto_shared::traits::FromJSValue<Self> + 'static,
-        O: esperanto_shared::traits::ToJSValue<Self> + 'static,
-        F: Fn(I) -> Result<O, JSContextError> + 'static,
-    >(
-        closure: F,
-        in_context: &Rc<Self::ContextType>,
-    ) -> Result<Self, JSContextError> {
-        let closure = wrap_one_argument_closure(closure, in_context);
-        let raw = wrap_closure(closure, in_context);
-        Self::from_raw(raw, in_context)
-    }
+    // fn from_one_arg_closure<
+    //     I: esperanto_shared::traits::FromJSValue<Self> + 'static,
+    //     O: esperanto_shared::traits::ToJSValue<Self> + 'static,
+    //     F: Fn(I) -> Result<O, JSContextError> + 'static,
+    // >(
+    //     closure: F,
+    //     in_context: &Rc<Self::ContextType>,
+    // ) -> Result<Self, JSContextError> {
+    //     let closure = wrap_one_argument_closure(closure, in_context);
+    //     let raw = wrap_closure(closure, in_context);
+    //     Self::from_raw(raw, in_context)
+    // }
 
-    fn from_two_arg_closure<
-        I1: esperanto_shared::traits::FromJSValue<Self> + 'static,
-        I2: esperanto_shared::traits::FromJSValue<Self> + 'static,
-        O: esperanto_shared::traits::ToJSValue<Self> + 'static,
-        F: Fn(I1, I2) -> Result<O, JSContextError> + 'static,
-    >(
-        closure: F,
-        in_context: &Rc<Self::ContextType>,
-    ) -> Result<Self, JSContextError> {
-        let closure = wrap_two_argument_closure(closure, in_context);
-        let raw = wrap_closure(closure, in_context);
-        Self::from_raw(raw, in_context)
-    }
+    // fn from_two_arg_closure<
+    //     I1: esperanto_shared::traits::FromJSValue<Self> + 'static,
+    //     I2: esperanto_shared::traits::FromJSValue<Self> + 'static,
+    //     O: esperanto_shared::traits::ToJSValue<Self> + 'static,
+    //     F: Fn(I1, I2) -> Result<O, JSContextError> + 'static,
+    // >(
+    //     closure: F,
+    //     in_context: &Rc<Self::ContextType>,
+    // ) -> Result<Self, JSContextError> {
+    //     let closure = wrap_two_argument_closure(closure, in_context);
+    //     let raw = wrap_closure(closure, in_context);
+    //     Self::from_raw(raw, in_context)
+    // }
 
     fn call_bound(&self, arguments: Vec<&Self>, bound_to: &Self) -> Result<Self, JSContextError> {
         let obj_ref = self

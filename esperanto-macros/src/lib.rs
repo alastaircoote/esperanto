@@ -15,6 +15,7 @@ use syn::{self, Item, TraitItem, TypeParamBound};
 #[proc_macro_attribute]
 #[proc_macro_error]
 pub fn js_export(_: TokenStream, input: TokenStream) -> TokenStream {
+    let w = input.iter();
     let mut parsed_input = match syn::parse::<Item>(input) {
         Ok(Item::Trait(t)) => t,
         Ok(_) => {

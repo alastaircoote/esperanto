@@ -1,0 +1,9 @@
+[package]
+authors = ["Alastair Coote <rust@alastair.is>"]
+edition = "2018"
+name = "esperanto-engine-javascriptcore"
+version = "0.1.0"
+
+[dependencies]
+esperanto-engine-shared = {path = "../esperanto-engine-shared"}
+javascriptcore-sys = "0.0.4"

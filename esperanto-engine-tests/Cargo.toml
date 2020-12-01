@@ -1,0 +1,12 @@
+[package]
+authors = ["Alastair Coote <rust@alastair.is>"]
+edition = "2018"
+name = "esperanto_engine_tests"
+version = "0.1.0"
+
+[dependencies]
+esperanto-engine-javascriptcore = {path = "../esperanto-engine-javascriptcore"}
+esperanto-engine-shared = {path = "../esperanto-engine-shared"}
+
+proc-macro2 = "1.0"
+test-impl = {path = "../../test_impl"}

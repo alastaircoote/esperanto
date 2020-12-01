@@ -15,12 +15,12 @@ use javascriptcore_sys::{
 use std::{cell::Cell, fmt::Debug, hash::Hash, os::raw::c_char, rc::Rc};
 
 #[derive(Debug)]
-pub struct JSCGlobalContext {
+pub struct JSCGlobalContext<'group> {
     pub(crate) raw_ref: *mut OpaqueJSContext,
-    pub(crate) group: JSCContextGroup,
+    pub(crate) group: &'group JSCContextGroup,
 }
 
-impl JSCGlobalContext {
+impl JSCGlobalContext<'_> {
     fn evaluate_jscstring(self: &Self, script: JSCString) -> Result<JSCValue, JSContextError> {
         let mut exception_ptr: JSValueRef = std::ptr::null_mut();
 
@@ -41,24 +41,20 @@ impl JSCGlobalContext {
     }
 }
 
-impl Clone for JSCGlobalContext {
-    fn clone(&self) -> Self {
-        unsafe { JSGlobalContextRetain(self.raw_ref) };
-        JSCGlobalContext {
-            raw_ref: self.raw_ref,
-            group: self.group,
-        }
-    }
-}
-
-impl JSContext for JSCGlobalContext {
-    type ValueType = JSCValue;
+impl<'group> JSContext<'group> for JSCGlobalContext<'group> {
+    type ValueType = JSCValue<'group>;
+    type RuntimeType = JSCContextGroup;
 
     fn new() -> Result<Self, JSContextError> {
-        JSCContextGroup::new()?.create_context()
+        let runtime = Self::RuntimeType::new()?;
+        Self::new_in_runtime(&runtime)
     }
 
-    fn evaluate(self: &Self, script: &str) -> Result<JSCValue, JSContextError> {
+    fn new_in_runtime(runtime: &'group Self::RuntimeType) -> Result<Self, JSContextError> {
+        runtime.create_context()
+    }
+
+    fn evaluate<'a>(&'group self, script: &'a str) -> Result<JSCValue, JSContextError> {
         let script_jsstring = JSCString::from_string(script)?;
         self.evaluate_jscstring(script_jsstring)
     }
@@ -77,7 +73,7 @@ impl JSContext for JSCGlobalContext {
     }
 }
 
-impl Drop for JSCGlobalContext {
+impl Drop for JSCGlobalContext<'_> {
     fn drop(&mut self) {
         unsafe { JSGlobalContextRelease(self.raw_ref) }
     }

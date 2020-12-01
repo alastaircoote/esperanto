@@ -5,15 +5,11 @@ use javascriptcore_sys::{JSObjectGetProperty, JSValueRef, JSValueToObject, JSVal
 use std::rc::Rc;
 
 pub trait JSErrorFromJSC {
-    fn check_jsc_value_ref(v: JSValueRef, in_context: &Rc<JSCGlobalContext>)
-        -> Result<(), JSError>;
+    fn check_jsc_value_ref(v: JSValueRef, in_context: &JSCGlobalContext) -> Result<(), JSError>;
 }
 
 impl JSErrorFromJSC for JSError {
-    fn check_jsc_value_ref(
-        v: JSValueRef,
-        in_context: &Rc<JSCGlobalContext>,
-    ) -> Result<(), JSError> {
+    fn check_jsc_value_ref(v: JSValueRef, in_context: &JSCGlobalContext) -> Result<(), JSError> {
         if v.is_null() {
             return Ok(());
         }

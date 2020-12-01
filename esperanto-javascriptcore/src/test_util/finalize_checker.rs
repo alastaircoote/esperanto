@@ -9,7 +9,9 @@ use crate::{JSCGlobalContext, JSCValue};
 
 pub struct FinalizerChecker(Rc<RefCell<bool>>);
 
-pub fn make_finalize_checker(in_context: &Rc<JSCGlobalContext>) -> (FinalizerChecker, JSCValue) {
+pub fn make_finalize_checker<'a>(
+    in_context: &Rc<JSCGlobalContext>,
+) -> (FinalizerChecker, JSCValue<'a>) {
     let mut def = JSClassDefinition::default();
     def.finalize = Some(finalize);
     let class_def = unsafe { JSClassCreate(&def) };

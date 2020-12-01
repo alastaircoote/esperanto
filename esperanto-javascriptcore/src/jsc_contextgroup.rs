@@ -35,26 +35,8 @@ impl Hash for JSCContextGroup {
     }
 }
 
-// impl<'g> Clone for JSCContextGroup<'g> {
-//     fn clone(&self) -> Self {
-//         todo!()
-//     }
-// }
-
-impl JSRuntime for JSCContextGroup {
-    type ContextType = JSCGlobalContext;
-
-    fn new() -> Result<Rc<Self>, JSContextError> {
-        let raw_ref = unsafe { JSContextGroupCreate() };
-        // unsafe { JSContextGroupRetain(raw_ref) };
-        Ok(Rc::new(JSCContextGroup {
-            raw_ref,
-            // class_objects: Rc::new(RefCell::new(HashMap::new())),
-            state: Rc::new(JSCContextGroupState::new()),
-        }))
-    }
-
-    fn create_context(&self) -> Result<Self::ContextType, JSContextError> {
+impl JSCContextGroup {
+    pub fn create_context(&self) -> Result<JSCGlobalContext, JSContextError> {
         // First we create a class for our global scope. At some point we're going to need to expand this to encompass
         // custom items etc. but for now all we want is the finalizer.
 
@@ -85,10 +67,87 @@ impl JSRuntime for JSCContextGroup {
 
         Ok(JSCGlobalContext {
             raw_ref: ctx,
-            group: *self.clone(),
+            group: &self,
         })
     }
 }
+
+impl<'runtime> JSRuntime<'runtime> for JSCContextGroup {
+    fn new() -> Result<Self, JSContextError> {
+        let raw_ref = unsafe { JSContextGroupCreate() };
+        // unsafe { JSContextGroupRetain(raw_ref) };
+        Ok(JSCContextGroup {
+            raw_ref,
+            state: Rc::new(JSCContextGroupState::new()),
+        })
+    }
+
+    type ContextType = JSCGlobalContext<'runtime>;
+
+    fn create_context(&self) -> Result<Self::ContextType, JSContextError> {
+        todo!()
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::JSCContextGroup;
+    use esperanto_shared::traits::JSRuntime;
+
+    fn www<'a, C: JSRuntime<'a>>(rt: C) {
+        let ctx = rt.create_context();
+    }
+
+    fn ccc<'a>() -> JSRuntime<'a> {
+        JSCContextGroup::new().unwrap()
+    }
+
+    #[test]
+    fn wat() {
+        let rt = JSCContextGroup::new().unwrap();
+        www(rt);
+    }
+}
+
+// impl<'r> JSContextCreator<'r> for JSCContextGroup {
+//     type ContextType = JSCGlobalContext<'r>;
+
+//     fn create_context(&'runtime self) -> Result<Self::ContextType, JSContextError> {
+//         // First we create a class for our global scope. At some point we're going to need to expand this to encompass
+//         // custom items etc. but for now all we want is the finalizer.
+
+//         let mut class_def = JSClassDefinition::default();
+//         class_def.finalize = Some(Self::context_global_object_finalized);
+//         let class = unsafe { JSClassCreate(&class_def) };
+
+//         // Then we create a context that uses this global object:
+//         let ctx = unsafe { JSGlobalContextCreateInGroup(self.raw_ref, class) };
+//         if ctx.is_null() {
+//             return Err(JSContextError::CouldNotCreateContext);
+//         }
+
+//         // Having created it, we immediately grab the now-instantiated global object:
+//         let created_global = unsafe { JSContextGetGlobalObject(ctx) };
+
+//         // And store a reference to the context group's state object, for use throughout the context
+//         // lifecycle
+//         let boxed_ref = Box::new(self.state.clone());
+//         unsafe {
+//             JSObjectSetPrivate(
+//                 created_global,
+//                 Box::into_raw(boxed_ref) as *mut std::ffi::c_void,
+//             )
+//         };
+
+//         self.state.add_global_object(created_global);
+
+//         Ok(JSCGlobalContext {
+//             raw_ref: ctx,
+//             group: *self.clone(),
+//         })
+//     }
+// }
 
 // /// When JSC is done with the class prototype (i.e. no objects are using it as a prototype any more and
 // /// a garbage collection has completed) we need to remove the reference from our store. We store this

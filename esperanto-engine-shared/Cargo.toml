@@ -1,0 +1,10 @@
+[package]
+authors = ["Alastair Coote <alastair.coote@nytimes.com>"]
+edition = "2018"
+name = "esperanto-engine-shared"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+thiserror = "1.0"
