@@ -1,8 +1,4 @@
-use crate::{
-    errors::{EsperantoError, ImplementationError},
-    shared::traits::jscontext::JSContextError,
-    EsperantoResult,
-};
+use crate::{shared::external_api::context::JSContextError, EsperantoError, EsperantoResult};
 use javascriptcore_sys::{
     JSContextGetGlobalObject, JSObjectGetPrivate, JSObjectSetPrivate, OpaqueJSContext,
     OpaqueJSContextGroup,
@@ -10,7 +6,7 @@ use javascriptcore_sys::{
 use std::ffi::c_void;
 use thiserror::Error;
 
-use super::jscore_context::JSCoreContext;
+use super::jscore_context::JSContext;
 
 #[derive(Error, Debug, PartialEq)]
 pub(super) enum JSCoreContextGlobalDataError {
@@ -22,17 +18,17 @@ pub(super) enum JSCoreContextGlobalDataError {
 
 impl From<JSCoreContextGlobalDataError> for EsperantoError {
     fn from(val: JSCoreContextGlobalDataError) -> Self {
-        EsperantoError::implementation_error_from(val)
+        EsperantoError::external(val)
     }
 }
 
 pub(super) struct JSCoreContextGlobalData<'a> {
-    pub ctx_ptr: *const JSCoreContext<'a>,
+    pub ctx_ptr: *const JSContext<'a>,
 }
 
 impl JSCoreContextGlobalData<'_> {
-    pub fn attach_to_context(context: &JSCoreContext) {
-        let ptr = context as *const JSCoreContext;
+    pub fn attach_to_context(context: &JSContext) {
+        let ptr = context as *const JSContext;
         let data = JSCoreContextGlobalData { ctx_ptr: ptr };
         let boxed = Box::new(data);
         let global = unsafe { JSContextGetGlobalObject(context.raw_ref) };

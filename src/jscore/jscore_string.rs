@@ -9,13 +9,9 @@ use javascriptcore_sys::{
     JSStringIsEqualToUTF8CString, JSValueToStringCopy, OpaqueJSString,
 };
 
-use crate::{
-    errors::{EsperantoError, JSConversionError},
-    traits::{TryAs, TryAsRef},
-    EsperantoResult,
-};
+use crate::{shared::external_api::conversion_error::JSConversionError, EsperantoError};
 
-use super::jscore_value::JSCoreValue;
+use super::jscore_value::JSValue;
 
 pub(crate) struct JSCoreString {
     pub raw_ref: *mut OpaqueJSString,
@@ -81,10 +77,10 @@ impl TryFrom<&JSCoreString> for &str {
     }
 }
 
-impl TryFrom<&JSCoreValue<'_>> for JSCoreString {
+impl TryFrom<&JSValue<'_>> for JSCoreString {
     type Error = EsperantoError;
 
-    fn try_from(value: &JSCoreValue) -> Result<Self, Self::Error> {
+    fn try_from(value: &JSValue) -> Result<Self, Self::Error> {
         let str = check_jscore_exception!(&value.context, exception => {
             unsafe { JSValueToStringCopy(value.context.into(), value.raw_ref.as_const(), exception)}
         })?;

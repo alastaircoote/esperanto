@@ -1,30 +1,36 @@
 use std::{any::TypeId, cell::RefCell, collections::HashMap, pin::Pin};
 
 use javascriptcore_sys::{
-    JSClassCreate, JSClassDefinition, JSContextGroupCreate, JSGlobalContextCreateInGroup,
-    OpaqueJSClass, OpaqueJSContextGroup,
+    JSClassCreate, JSClassRelease, JSContextGroupCreate, OpaqueJSClass, OpaqueJSContextGroup,
 };
 
-use crate::{shared::traits::jsruntime::JSRuntimeError, traits::JSRuntime, EsperantoResult};
+use crate::{
+    shared::external_api::runtime::JSRuntimeError, shared::external_api::runtime::Runtime,
+    EsperantoResult,
+};
 
 use super::{
-    jscore_context::{JSCoreContext, JSCoreContextPrivate},
-    jscore_export::JSExport,
+    jscore_context::JSCoreContext, jscore_context::JSCoreContextPrivate, jscore_export::JSExport,
 };
-pub struct JSCoreRuntime<'r> {
+pub struct JSRuntime<'r> {
     pub(super) raw_ref: &'r OpaqueJSContextGroup,
-    pub(super) class_defs: RefCell<HashMap<TypeId, &'r OpaqueJSClass>>,
+    pub(super) class_defs: RefCell<HashMap<TypeId, *mut OpaqueJSClass>>,
 }
 
+pub type JSCoreRuntime<'r> = JSRuntime<'r>;
+
 impl<'r> JSCoreRuntime<'r> {
-    fn get_class_def<T: JSExport + 'static>(&self) -> EsperantoResult<&'r OpaqueJSClass> {
+    pub(super) fn get_class_def<T: JSExport + 'static>(
+        &self,
+    ) -> EsperantoResult<&mut OpaqueJSClass> {
         let type_id = TypeId::of::<T>();
+
         if let Some(existing) = self.class_defs.borrow().get(&type_id) {
-            return Ok(existing);
+            return unsafe { Ok((*existing).as_mut().unwrap()) };
         }
         let def = T::get_definition();
-        let class = unsafe { JSClassCreate(&def) };
-        match unsafe { class.as_ref() } {
+        let class = unsafe { JSClassCreate(def) };
+        match unsafe { class.as_mut() } {
             Some(r) => Ok(r),
             None => Err(JSRuntimeError::CouldNotCreateClass.into()),
         }
@@ -32,18 +38,20 @@ impl<'r> JSCoreRuntime<'r> {
 
     pub fn create_context_with_global_object<G: JSExport>(
         &'r self,
+        global_object: G,
     ) -> EsperantoResult<Pin<Box<JSCoreContext>>> {
-        let def = self.get_class_def::<G>()?;
-        JSCoreContext::new_in_context_group(self, Some(def))
+        let ctx = JSCoreContext::new_with_global_object(&self, global_object)?;
+        Ok(ctx)
     }
 }
 
-impl<'r> JSRuntime<'r> for JSCoreRuntime<'r> {
+impl<'r> Runtime<'r> for JSCoreRuntime<'r> {
     type Context = JSCoreContext<'r>;
+
     fn new() -> EsperantoResult<Self> {
         let raw_ref = unsafe { JSContextGroupCreate() };
         match unsafe { raw_ref.as_ref() } {
-            Some(r) => Ok(JSCoreRuntime {
+            Some(r) => Ok(JSRuntime {
                 raw_ref: r,
                 class_defs: RefCell::new(HashMap::new()),
             }),
@@ -51,18 +59,7 @@ impl<'r> JSRuntime<'r> for JSCoreRuntime<'r> {
         }
     }
 
-    fn create_context(&'r self) -> EsperantoResult<Pin<Box<Self::Context>>> {
-        JSCoreContext::new_in_context_group(self, None)
+    fn create_context(&'r self) -> EsperantoResult<Pin<Box<JSCoreContext>>> {
+        JSCoreContext::new(&self)
     }
 }
-
-// impl<'r, 'c> JSRuntimeHasContext<'r, 'c> for JSCoreRuntime<'r>
-// where
-//     'r: 'c,
-// {
-//     type Context = JSCoreContext<'c>;
-
-//     fn create_context(&'r self) -> crate::errors::EsperantoResult<Pin<Box<Self::Context>>> {
-//         JSCoreContext::new_in_context_group(self)
-//     }
-// }

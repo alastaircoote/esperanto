@@ -2,13 +2,13 @@ use std::convert::TryFrom;
 
 use javascriptcore_sys::OpaqueJSValue;
 
-use crate::{errors::EsperantoError, shared::traits::jsvalue::JSValueError, EsperantoResult};
+use crate::{shared::external_api::value::JSValueError, EsperantoError, EsperantoResult};
 
 use super::jscore_value::JSCoreValueError;
 
 pub enum JSCoreValueRawRef<'a> {
     Value(&'a OpaqueJSValue),
-    Object(&'a mut OpaqueJSValue),
+    Object(&'a OpaqueJSValue),
 }
 
 impl<'a> JSCoreValueRawRef<'a> {
@@ -18,9 +18,9 @@ impl<'a> JSCoreValueRawRef<'a> {
             JSCoreValueRawRef::Object(o) => *o as _,
         }
     }
-    pub fn as_mut(&mut self) -> EsperantoResult<*mut OpaqueJSValue> {
+    pub fn as_mut(&self) -> EsperantoResult<*mut OpaqueJSValue> {
         match self {
-            JSCoreValueRawRef::Object(o) => Ok(*o as _),
+            JSCoreValueRawRef::Object(o) => Ok(*o as *const OpaqueJSValue as _),
             _ => Err(JSValueError::IsNotAnObject.into()),
         }
     }

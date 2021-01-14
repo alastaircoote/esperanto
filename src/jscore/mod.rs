@@ -4,7 +4,7 @@ pub mod jscore_context;
 mod jscore_ctx_global_data;
 #[macro_use]
 pub mod jscore_export;
-mod jscore_context_with_bundled_runtime;
+pub mod jscore_object_proxy;
 pub mod jscore_runtime;
 pub mod jscore_string;
 pub mod jscore_value;
