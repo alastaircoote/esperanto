@@ -6,10 +6,12 @@ use std::{
 
 use super::{
     jscore_context::JSCoreContext,
-    jscore_export::JSExport,
+    jscore_export::JSCoreExport,
     jscore_value::{JSCoreValue, JSValue},
 };
-use crate::{shared::external_api::esperanto_error::EngineError, EsperantoResult};
+use crate::{
+    jscontext::Context, shared::external_api::esperanto_error::EngineError, EsperantoResult,
+};
 use javascriptcore_sys::{JSObjectMake, OpaqueJSValue};
 use thiserror::Error;
 
@@ -27,13 +29,13 @@ enum JSObjectProxyError {
 
 impl EngineError for JSObjectProxyError {}
 
-pub struct Js<'c, T: JSExport> {
+pub struct Js<'c, T: JSCoreExport> {
     // storage: RefCell<JSObjectProxyStorage<'c, T>>,
     reference: &'c T,
     js_value: RefCell<Option<JSValue<'c>>>,
 }
 
-impl<'c, T: JSExport> Deref for Js<'c, T> {
+impl<'c, T: JSCoreExport> Deref for Js<'c, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -41,7 +43,7 @@ impl<'c, T: JSExport> Deref for Js<'c, T> {
     }
 }
 
-impl<'c, T: JSExport> Js<'c, T> {
+impl<'c, T: JSCoreExport> Js<'c, T> {
     pub fn new(wrapping_obj: T) -> EsperantoResult<Self> {
         let boxed = Box::new(wrapping_obj);
         let ptr = Box::into_raw(boxed);
@@ -54,7 +56,7 @@ impl<'c, T: JSExport> Js<'c, T> {
         }
     }
 
-    pub fn as_js(&self, in_context: &'c JSCoreContext) -> EsperantoResult<*mut OpaqueJSValue> {
+    pub fn as_js(&self, in_context: &'c JSCoreContext<'c>) -> EsperantoResult<*mut OpaqueJSValue> {
         let mut borrowed = self
             .js_value
             .try_borrow_mut()
@@ -82,16 +84,5 @@ impl<'c, T: JSExport> Js<'c, T> {
                 Ok(raw_to_return)
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use crate::jsruntime::*;
-
-    #[test]
-    fn stores_js_value() {
-        let rt = JSRuntime::new().unwrap();
-        let ctx = rt.create_context().unwrap();
     }
 }

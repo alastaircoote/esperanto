@@ -9,5 +9,5 @@ pub trait TryAs<T> {
 }
 
 pub trait TryIntoJS<'c> {
-    fn try_into_js(self, in_context: &'c JSContext) -> EsperantoResult<JSValue<'c>>;
+    fn try_into_js(self, in_context: &'c JSContext<'c>) -> EsperantoResult<JSValue<'c>>;
 }

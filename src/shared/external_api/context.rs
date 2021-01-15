@@ -2,6 +2,7 @@ use crate::EsperantoResult;
 
 use super::runtime::Runtime;
 use super::value::Value;
+use crate::JSExport;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -27,7 +28,7 @@ impl<'a> EvaluateMetadata<'a> {
     }
 }
 
-pub trait Context<'c> {
+pub trait Context<'c>: Sized {
     type Runtime: Runtime<'c>;
     type Value: Value<'c, Context = Self>;
     type SelfInstanceType;
@@ -37,4 +38,10 @@ pub trait Context<'c> {
         script: &str,
         meta: Option<EvaluateMetadata>,
     ) -> EsperantoResult<Self::Value>;
+
+    fn new(runtime: Option<&'c Self::Runtime>) -> EsperantoResult<Self::SelfInstanceType>;
+    fn new_with_global<G: JSExport>(
+        runtime: Option<&'c Self::Runtime>,
+        global_object: G,
+    ) -> EsperantoResult<Self::SelfInstanceType>;
 }

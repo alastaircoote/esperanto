@@ -1,7 +1,8 @@
 use std::{any::TypeId, cell::RefCell, collections::HashMap, pin::Pin};
 
 use javascriptcore_sys::{
-    JSClassCreate, JSClassRelease, JSContextGroupCreate, OpaqueJSClass, OpaqueJSContextGroup,
+    JSClassCreate, JSClassRelease, JSContextGroupCreate, JSContextGroupRelease, OpaqueJSClass,
+    OpaqueJSContextGroup,
 };
 
 use crate::{
@@ -9,18 +10,23 @@ use crate::{
     EsperantoResult,
 };
 
-use super::{
-    jscore_context::JSCoreContext, jscore_context::JSCoreContextPrivate, jscore_export::JSExport,
-};
+use super::{jscore_context::JSCoreContext, jscore_export::JSCoreExport};
+use crate::jscontext::Context;
 pub struct JSRuntime<'r> {
     pub(super) raw_ref: &'r OpaqueJSContextGroup,
     pub(super) class_defs: RefCell<HashMap<TypeId, *mut OpaqueJSClass>>,
 }
 
+impl<'c> Drop for JSCoreRuntime<'c> {
+    fn drop(&mut self) {
+        unsafe { JSContextGroupRelease(self.raw_ref) }
+    }
+}
+
 pub type JSCoreRuntime<'r> = JSRuntime<'r>;
 
 impl<'r> JSCoreRuntime<'r> {
-    pub(super) fn get_class_def<T: JSExport + 'static>(
+    pub(super) fn get_class_def<T: JSCoreExport + 'static>(
         &self,
     ) -> EsperantoResult<&mut OpaqueJSClass> {
         let type_id = TypeId::of::<T>();
@@ -34,14 +40,6 @@ impl<'r> JSCoreRuntime<'r> {
             Some(r) => Ok(r),
             None => Err(JSRuntimeError::CouldNotCreateClass.into()),
         }
-    }
-
-    pub fn create_context_with_global_object<G: JSExport>(
-        &'r self,
-        global_object: G,
-    ) -> EsperantoResult<Pin<Box<JSCoreContext>>> {
-        let ctx = JSCoreContext::new_with_global_object(&self, global_object)?;
-        Ok(ctx)
     }
 }
 
@@ -57,9 +55,5 @@ impl<'r> Runtime<'r> for JSCoreRuntime<'r> {
             }),
             None => Err(JSRuntimeError::CouldNotCreateRuntime.into()),
         }
-    }
-
-    fn create_context(&'r self) -> EsperantoResult<Pin<Box<JSCoreContext>>> {
-        JSCoreContext::new(&self)
     }
 }

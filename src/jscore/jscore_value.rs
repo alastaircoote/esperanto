@@ -17,7 +17,7 @@ pub type JSCoreValue<'c> = JSValue<'c>;
 
 impl<'c> Value<'c> for JSCoreValue<'c> {
     type Context = JSCoreContext<'c>;
-    fn undefined(in_context: &'c JSContext) -> EsperantoResult<Self> {
+    fn undefined(in_context: &'c Self::Context) -> EsperantoResult<Self> {
         let raw = unsafe { JSValueMakeUndefined(in_context.raw_ref) };
         Ok(JSValue {
             raw_ref: raw.try_into()?,
@@ -25,7 +25,7 @@ impl<'c> Value<'c> for JSCoreValue<'c> {
         })
     }
 
-    fn new_error(error_message: &str, in_context: &'c JSContext) -> EsperantoResult<Self> {
+    fn new_error(error_message: &str, in_context: &'c Self::Context) -> EsperantoResult<Self> {
         let msg = JSValue::try_from_js(error_message, in_context)?;
         let args = [msg.raw_ref.as_const()];
         let raw = check_jscore_exception!(in_context, exception =>
@@ -49,7 +49,7 @@ impl<'c> Value<'c> for JSCoreValue<'c> {
 }
 
 pub trait JSCoreValuePrivate<'c> {
-    fn try_from_js<V>(val: V, in_context: &'c JSContext) -> EsperantoResult<JSCoreValue<'c>>
+    fn try_from_js<V>(val: V, in_context: &'c JSCoreContext<'c>) -> EsperantoResult<JSCoreValue<'c>>
     where
         V: TryIntoJS<'c>,
     {

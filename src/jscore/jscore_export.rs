@@ -27,7 +27,7 @@ pub enum JSExportError {
 
 impl EngineError for JSExportError {}
 
-pub trait JSExport: 'static {
+pub trait JSCoreExport: Sized + 'static {
     fn get_definition<'a>() -> &'a JSClassDefinition;
     fn store_private<T>(
         obj: T,
@@ -43,6 +43,18 @@ pub trait JSExport: 'static {
             Ok(())
         } else {
             Err(JSExportError::CouldNotSavePrivateData.into())
+        }
+    }
+
+    fn clear_private(in_object: *mut OpaqueJSValue) {
+        let private = unsafe { JSObjectGetPrivate(in_object) } as *mut [*mut std::ffi::c_void; 2];
+        if let Some(r) = unsafe { private.as_ref() } {
+            let obj_ref = r[0] as *mut Self;
+            unsafe { Box::from_raw(obj_ref) };
+        } else {
+            // this function is used in finalizers where we have no ability to
+            // return an error, so open question here about what we'd do. It shouldn't
+            // ever happen, but..?!??
         }
     }
 
@@ -113,11 +125,11 @@ macro_rules! js_export_definition {
             $($js_func_name: expr => $export_name:ident |$args_ident:ident| $body:expr),*
         }
     }) => {
-        impl esperanto::private::jscore_export::JSExport for $struct_ident {
+        impl esperanto::JSExport for $struct_ident {
 
             fn get_definition<'a>() -> &'a esperanto::private::javascriptcore_sys::JSClassDefinition {
                 use esperanto::private::javascriptcore_sys::{OpaqueJSValue, OpaqueJSContext,JSStaticFunction, JSStaticValue, JSClassDefinition};
-                use esperanto::private::jscore_context::{JSCoreContextPrivate, JSContext};
+                use esperanto::private::jscore_context::{JSContext};
                 use esperanto::private::jscore_value::{JSCoreValuePrivate};
                 use esperanto::jsvalue::*;
 
@@ -154,6 +166,10 @@ macro_rules! js_export_definition {
                     setProperty:None
                 }];
 
+                unsafe extern "C" fn finalize(value: *mut OpaqueJSValue) {
+                    $struct_ident::clear_private(value);
+                }
+
                 const def:JSClassDefinition = JSClassDefinition {
                     version: 1,
                     className: concat!($js_class_name,"\0").as_ptr() as *const std::os::raw::c_char,
@@ -165,7 +181,7 @@ macro_rules! js_export_definition {
                     deleteProperty: None,
                     hasProperty: None,
                     setProperty: None,
-                    finalize: None,
+                    finalize: Some(finalize),
                     getProperty: None,
                     getPropertyNames: None,
                     hasInstance: None,
