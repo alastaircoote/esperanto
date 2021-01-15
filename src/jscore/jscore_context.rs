@@ -21,23 +21,25 @@ use crate::{
 use super::{
     jscore_context_empty_global::EmptyGlobalScope,
     jscore_context_runtime_store::JSCoreContextRuntimeStore,
-    jscore_ctx_global_data::JSCoreContextGlobalData,
     jscore_export::JSCoreExport,
     jscore_runtime::{JSCoreRuntime, JSRuntime},
     jscore_string::JSCoreString,
     jscore_value::{JSCoreValue, JSValue},
 };
 
-pub struct JSContext<'c> {
+pub struct JSContext<'r, 'c> {
     pub(super) raw_ref: &'c mut OpaqueJSContext,
-    pub(super) runtime: JSCoreContextRuntimeStore<'c>,
+    pub(super) runtime: JSCoreContextRuntimeStore<'r>,
 }
 
-pub type JSCoreContext<'c> = JSContext<'c>;
+pub type JSCoreContext<'r, 'c> = JSContext<'r, 'c>;
 
-impl<'c> Context<'c> for JSCoreContext<'c> {
-    type Runtime = JSCoreRuntime<'c>;
-    type Value = JSCoreValue<'c>;
+impl<'r, 'c, 'v> Context<'r, 'c, 'v> for JSCoreContext<'r, 'c>
+where
+    'r: 'c,
+{
+    type Runtime = JSCoreRuntime<'r>;
+    type Value = JSCoreValue<'r, 'c, 'v>;
     type SelfInstanceType = Pin<Box<Self>>;
 
     fn evaluate(
@@ -69,12 +71,12 @@ impl<'c> Context<'c> for JSCoreContext<'c> {
         }
     }
 
-    fn new(runtime: Option<&'c Self::Runtime>) -> EsperantoResult<Self::SelfInstanceType> {
+    fn new(runtime: Option<&'r Self::Runtime>) -> EsperantoResult<Self::SelfInstanceType> {
         Self::new_with_global(runtime, EmptyGlobalScope {})
     }
 
     fn new_with_global<G: crate::JSExport>(
-        runtime: Option<&'c Self::Runtime>,
+        runtime: Option<&'r Self::Runtime>,
         global_object: G,
     ) -> EsperantoResult<Self::SelfInstanceType> {
         let rt_ref = match runtime {
@@ -108,13 +110,13 @@ impl<'c> Context<'c> for JSCoreContext<'c> {
     }
 }
 
-impl Drop for JSCoreContext<'_> {
+impl Drop for JSCoreContext<'_, '_> {
     fn drop(&mut self) {
         unsafe { JSGlobalContextRelease(self.raw_ref) }
     }
 }
 
-impl<'a> From<&'a JSCoreContext<'a>> for *const OpaqueJSContext {
+impl From<&JSCoreContext<'_, '_>> for *const OpaqueJSContext {
     fn from(ctx: &JSCoreContext) -> Self {
         ctx.raw_ref as *const OpaqueJSContext
     }
@@ -130,11 +132,7 @@ mod test {
         JSStringCreateWithUTF8CString, JSValueMakeUndefined, OpaqueJSContext, OpaqueJSValue,
     };
 
-    use crate::{
-        jscontext::Context,
-        jscore::{jscore_ctx_global_data::JSCoreContextGlobalData, jscore_export::JSCoreExport},
-        jsruntime::Runtime,
-    };
+    use crate::{jscontext::Context, jscore::jscore_export::JSCoreExport, jsruntime::Runtime};
 
     use super::{JSContext, JSRuntime};
 

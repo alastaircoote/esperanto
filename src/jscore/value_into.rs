@@ -28,26 +28,26 @@ impl TryFromJSValueRef for &str {
     }
 }
 
-impl TryFrom<&JSValue<'_>> for String {
+impl TryFrom<&JSValue<'_, '_, '_>> for String {
     type Error = EsperantoError;
 
-    fn try_from(value: &JSValue<'_>) -> Result<Self, Self::Error> {
+    fn try_from(value: &JSValue<'_, '_, '_>) -> Result<Self, Self::Error> {
         let st = &JSCoreString::try_from(value)?;
         st.try_into()
     }
 }
 
-impl TryFrom<&JSValue<'_>> for &str {
+impl TryFrom<&JSValue<'_, '_, '_>> for &str {
     type Error = EsperantoError;
 
-    fn try_from(value: &JSValue<'_>) -> Result<Self, Self::Error> {
+    fn try_from(value: &JSValue<'_, '_, '_>) -> Result<Self, Self::Error> {
         let st = &JSCoreString::try_from(value)?;
         st.try_into()
     }
 }
 
-impl<'c> From<JSValue<'c>> for *const OpaqueJSValue {
-    fn from(val: JSValue<'c>) -> Self {
+impl<'c> From<JSValue<'_, '_, '_>> for *const OpaqueJSValue {
+    fn from(val: JSValue<'_, '_, '_>) -> Self {
         val.raw_ref.as_const()
     }
 }

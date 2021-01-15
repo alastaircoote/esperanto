@@ -8,6 +8,7 @@ pub trait TryAs<T> {
     fn try_as(&self) -> EsperantoResult<T>;
 }
 
-pub trait TryIntoJS<'c> {
-    fn try_into_js(self, in_context: &'c JSContext<'c>) -> EsperantoResult<JSValue<'c>>;
+pub trait TryIntoJS<'r, 'c, 'v> {
+    fn try_into_js(self, in_context: &'c JSContext<'r, 'c>)
+        -> EsperantoResult<JSValue<'r, 'c, 'v>>;
 }

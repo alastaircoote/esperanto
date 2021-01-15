@@ -28,9 +28,9 @@ impl<'a> EvaluateMetadata<'a> {
     }
 }
 
-pub trait Context<'c>: Sized {
-    type Runtime: Runtime<'c>;
-    type Value: Value<'c, Context = Self>;
+pub trait Context<'r, 'c, 'v>: Sized {
+    type Runtime: Runtime<'r, 'c, 'v>;
+    type Value: Value<'r, 'c, 'v, Context = Self>;
     type SelfInstanceType;
 
     fn evaluate(
@@ -39,9 +39,9 @@ pub trait Context<'c>: Sized {
         meta: Option<EvaluateMetadata>,
     ) -> EsperantoResult<Self::Value>;
 
-    fn new(runtime: Option<&'c Self::Runtime>) -> EsperantoResult<Self::SelfInstanceType>;
+    fn new(runtime: Option<&'r Self::Runtime>) -> EsperantoResult<Self::SelfInstanceType>;
     fn new_with_global<G: JSExport>(
-        runtime: Option<&'c Self::Runtime>,
+        runtime: Option<&'r Self::Runtime>,
         global_object: G,
     ) -> EsperantoResult<Self::SelfInstanceType>;
 }

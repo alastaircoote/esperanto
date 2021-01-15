@@ -17,8 +17,8 @@ pub enum JSRuntimeError {
 //     type Context: Context<'r>;
 // }
 
-pub trait Runtime<'r>: /*RuntimeHasContext<'r> +*/ Sized {
-    type Context: Context<'r>;
+pub trait Runtime<'r, 'c, 'v>: /*RuntimeHasContext<'r> +*/ Sized {
+    type Context: Context<'r, 'c,'v, Runtime = Self>;
     fn new() -> EsperantoResult<Self>;
     // fn create_context(&'r self) -> EsperantoResult<<Self::Context as Context>::SelfInstanceType>;
 }

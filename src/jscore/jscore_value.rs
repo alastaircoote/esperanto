@@ -8,15 +8,15 @@ use crate::{
     EsperantoError, EsperantoResult,
 };
 
-pub struct JSValue<'c> {
-    pub(super) raw_ref: JSCoreValueRawRef<'c>,
-    pub(super) context: &'c JSContext<'c>,
+pub struct JSValue<'r, 'c, 'v> {
+    pub(super) raw_ref: JSCoreValueRawRef<'v>,
+    pub(super) context: &'c JSContext<'r, 'c>,
 }
 
-pub type JSCoreValue<'c> = JSValue<'c>;
+pub type JSCoreValue<'r, 'c, 'v> = JSValue<'r, 'c, 'v>;
 
-impl<'c> Value<'c> for JSCoreValue<'c> {
-    type Context = JSCoreContext<'c>;
+impl<'r, 'c, 'v> Value<'r, 'c, 'v> for JSCoreValue<'r, 'c, 'v> {
+    type Context = JSCoreContext<'r, 'c>;
     fn undefined(in_context: &'c Self::Context) -> EsperantoResult<Self> {
         let raw = unsafe { JSValueMakeUndefined(in_context.raw_ref) };
         Ok(JSValue {
@@ -48,16 +48,19 @@ impl<'c> Value<'c> for JSCoreValue<'c> {
     }
 }
 
-pub trait JSCoreValuePrivate<'c> {
-    fn try_from_js<V>(val: V, in_context: &'c JSCoreContext<'c>) -> EsperantoResult<JSCoreValue<'c>>
+pub trait JSCoreValuePrivate<'r, 'c, 'v> {
+    fn try_from_js<V>(
+        val: V,
+        in_context: &'c JSCoreContext<'r, 'c>,
+    ) -> EsperantoResult<JSCoreValue<'r, 'c, 'v>>
     where
-        V: TryIntoJS<'c>,
+        V: TryIntoJS<'r, 'c, 'v>,
     {
         val.try_into_js(in_context)
     }
 }
 
-impl<'c> JSCoreValuePrivate<'c> for JSCoreValue<'c> {}
+impl<'r, 'c, 'v> JSCoreValuePrivate<'r, 'c, 'v> for JSCoreValue<'r, 'c, 'v> {}
 
 // impl<'a, T> TryFrom<&'a JSCoreValue<'a>> for Option<T>
 // where

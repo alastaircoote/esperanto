@@ -34,7 +34,6 @@ mod test {
         let global = TestStruct {};
         let ctx = JSContext::new_with_global(None, global).unwrap();
         let result = ctx.evaluate("testString()", None).unwrap();
-        drop(result);
         let as_str = String::try_from(&result).unwrap();
         assert_eq!(as_str, "test_string")
     }

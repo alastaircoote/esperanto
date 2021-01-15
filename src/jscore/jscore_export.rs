@@ -60,7 +60,7 @@ pub trait JSCoreExport: Sized + 'static {
 
     fn get_context_from_object<'c>(
         object: *mut OpaqueJSValue,
-    ) -> EsperantoResult<&'c JSCoreContext<'c>> {
+    ) -> EsperantoResult<&'c JSCoreContext<'c, 'c>> {
         let private = unsafe { JSObjectGetPrivate(object) } as *mut [*mut std::ffi::c_void; 2];
         let ctx_raw = match unsafe { private.as_ref() } {
             Some(r) => r[1],
@@ -72,7 +72,7 @@ pub trait JSCoreExport: Sized + 'static {
 
     fn get_context_from_raw<'c>(
         ctx: *const OpaqueJSContext,
-    ) -> EsperantoResult<&'c JSCoreContext<'c>> {
+    ) -> EsperantoResult<&'c JSCoreContext<'c, 'c>> {
         let global_obj = unsafe { JSContextGetGlobalObject(ctx) };
         Self::get_context_from_object(global_obj)
     }

@@ -43,8 +43,11 @@ impl<'r> JSCoreRuntime<'r> {
     }
 }
 
-impl<'r> Runtime<'r> for JSCoreRuntime<'r> {
-    type Context = JSCoreContext<'r>;
+impl<'r, 'c> Runtime<'r, 'c, '_> for JSCoreRuntime<'r>
+where
+    'r: 'c,
+{
+    type Context = JSCoreContext<'r, 'c>;
 
     fn new() -> EsperantoResult<Self> {
         let raw_ref = unsafe { JSContextGroupCreate() };

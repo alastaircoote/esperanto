@@ -77,7 +77,7 @@ impl TryFrom<&JSCoreString> for &str {
     }
 }
 
-impl TryFrom<&JSValue<'_>> for JSCoreString {
+impl TryFrom<&JSValue<'_, '_, '_>> for JSCoreString {
     type Error = EsperantoError;
 
     fn try_from(value: &JSValue) -> Result<Self, Self::Error> {
