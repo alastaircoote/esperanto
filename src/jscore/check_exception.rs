@@ -1,6 +1,5 @@
 macro_rules! check_jscore_exception {
     ($ctx:expr, $exception:ident => $stmt:expr) => {{
-        // use std::convert::TryFrom;
         let mut exception_val: *const javascriptcore_sys::OpaqueJSValue = std::ptr::null();
         let $exception = &mut exception_val;
         let out = $stmt;

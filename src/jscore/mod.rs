@@ -1,7 +1,6 @@
 #[macro_use]
 pub mod check_exception;
 pub mod jscore_context;
-mod jscore_ctx_global_data;
 #[macro_use]
 pub mod jscore_export;
 mod jscore_context_empty_global;

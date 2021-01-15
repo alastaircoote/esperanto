@@ -1,12 +1,17 @@
-use std::convert::{TryFrom, TryInto};
-
+use super::{
+    jscore_context::{JSContext, JSCoreContext},
+    jscore_string::JSCoreString,
+    jscore_value_rawref::JSCoreValueRawRef,
+};
 use crate::{
-    shared::{
-        external_api::{conversion_error::JSConversionError, value::Value},
-        traits::tryas::TryIntoJS,
-    },
+    shared::{external_api::value::Value, traits::tryas::TryIntoJS},
     EsperantoError, EsperantoResult,
 };
+use javascriptcore_sys::{
+    JSObjectGetProperty, JSObjectMakeError, JSValueMakeUndefined, JSValueProtect,
+};
+use std::convert::{TryFrom, TryInto};
+use thiserror::Error;
 
 pub struct JSValue<'r, 'c, 'v> {
     pub(super) raw_ref: JSCoreValueRawRef<'v>,
@@ -61,44 +66,6 @@ pub trait JSCoreValuePrivate<'r, 'c, 'v> {
 }
 
 impl<'r, 'c, 'v> JSCoreValuePrivate<'r, 'c, 'v> for JSCoreValue<'r, 'c, 'v> {}
-
-// impl<'a, T> TryFrom<&'a JSCoreValue<'a>> for Option<T>
-// where
-//     T: TryFrom<&'a JSCoreValue<'a>>,
-// {
-//     type Error = EsperantoError;
-
-//     fn try_from(value: &'a JSCoreValue<'a>) -> Result<Self, Self::Error> {
-//         todo!()
-//     }
-// }
-
-// use std::convert::{TryFrom, TryInto};
-
-// use javascriptcore_sys::{JSValueMakeUndefined, JSValueToNumber, OpaqueJSValue};
-
-// use crate::{
-//     errors::{EsperantoError, JSConversionError},
-//     shared::traits::{jsconvertable::TryIntoJSValue, jsvalue::JSValue},
-//     traits::TryAsRef,
-//     EsperantoResult,
-// };
-
-use javascriptcore_sys::{
-    JSObjectGetProperty, JSObjectMakeError, JSValueMakeString, JSValueMakeUndefined,
-    JSValueProtect, JSValueToNumber, OpaqueJSValue,
-};
-// use super::{
-//     check_exception, jscore_context::JSCoreContext, jscore_string::JSCoreString,
-//     jscore_value_rawref::JSCoreValueRawRef,
-// };
-use thiserror::Error;
-
-use super::{
-    jscore_context::{JSContext, JSCoreContext},
-    jscore_string::{self, JSCoreString},
-    jscore_value_rawref::JSCoreValueRawRef,
-};
 
 #[derive(Error, Debug, PartialEq)]
 pub(super) enum JSCoreValueError {

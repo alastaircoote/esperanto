@@ -1,8 +1,7 @@
-use std::{any::TypeId, cell::RefCell, collections::HashMap, pin::Pin};
+use std::{any::TypeId, cell::RefCell, collections::HashMap};
 
 use javascriptcore_sys::{
-    JSClassCreate, JSClassRelease, JSContextGroupCreate, JSContextGroupRelease, OpaqueJSClass,
-    OpaqueJSContextGroup,
+    JSClassCreate, JSContextGroupCreate, JSContextGroupRelease, OpaqueJSClass, OpaqueJSContextGroup,
 };
 
 use crate::{
@@ -11,7 +10,6 @@ use crate::{
 };
 
 use super::{jscore_context::JSCoreContext, jscore_export::JSCoreExport};
-use crate::jscontext::Context;
 pub struct JSRuntime<'r> {
     pub(super) raw_ref: &'r OpaqueJSContextGroup,
     pub(super) class_defs: RefCell<HashMap<TypeId, *mut OpaqueJSClass>>,

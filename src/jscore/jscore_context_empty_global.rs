@@ -1,7 +1,8 @@
+use super::jscore_export::JSCoreExport;
 use javascriptcore_sys::{JSClassDefinition, OpaqueJSValue};
 
-use super::jscore_export::JSCoreExport;
-
+/// Even if we don't want to use a custom global scope we do need *some* kind of
+/// struct in there. In that case we'll just use this empty scope placeholder.
 pub struct EmptyGlobalScope {}
 
 unsafe extern "C" fn dummy_export_finalize(val: *mut OpaqueJSValue) {
@@ -12,7 +13,7 @@ impl JSCoreExport for EmptyGlobalScope {
     fn get_definition<'a>() -> &'a JSClassDefinition {
         const DEFAULT: JSClassDefinition = JSClassDefinition {
             version: 1,
-            className: "EmptyGlobalScope\0".as_ptr() as *const std::os::raw::c_char,
+            className: "EsperantoGlobalObject\0".as_ptr() as *const std::os::raw::c_char,
             attributes: 0,
             staticFunctions: std::ptr::null_mut(),
             callAsConstructor: None,

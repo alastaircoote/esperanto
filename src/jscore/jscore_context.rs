@@ -1,30 +1,22 @@
-use std::{
-    convert::{TryFrom, TryInto},
-    pin::Pin,
+use super::{
+    jscore_context_empty_global::EmptyGlobalScope,
+    jscore_context_runtime_store::JSCoreContextRuntimeStore, jscore_runtime::JSCoreRuntime,
+    jscore_string::JSCoreString, jscore_value::JSCoreValue,
 };
-
-use javascriptcore_sys::{
-    JSClassCreate, JSClassDefinition, JSContextGetGlobalObject, JSEvaluateScript,
-    JSGlobalContextCreateInGroup, JSGlobalContextRelease, JSObjectGetPrivate, JSObjectSetPrivate,
-    JSValueIsObject, OpaqueJSClass, OpaqueJSContext, OpaqueJSValue,
-};
-
 use crate::{
-    jsruntime::Runtime,
     shared::{
         external_api::context::{Context, EvaluateMetadata, JSContextError},
         traits::tryas::TryIntoJS,
     },
-    EsperantoError, EsperantoResult,
+    EsperantoResult,
 };
-
-use super::{
-    jscore_context_empty_global::EmptyGlobalScope,
-    jscore_context_runtime_store::JSCoreContextRuntimeStore,
-    jscore_export::JSCoreExport,
-    jscore_runtime::{JSCoreRuntime, JSRuntime},
-    jscore_string::JSCoreString,
-    jscore_value::{JSCoreValue, JSValue},
+use javascriptcore_sys::{
+    JSContextGetGlobalObject, JSEvaluateScript, JSGlobalContextCreateInGroup,
+    JSGlobalContextRelease, JSValueIsObject, OpaqueJSContext, OpaqueJSValue,
+};
+use std::{
+    convert::{TryFrom, TryInto},
+    pin::Pin,
 };
 
 pub struct JSContext<'r, 'c> {
@@ -79,26 +71,21 @@ where
         runtime: Option<&'r Self::Runtime>,
         global_object: G,
     ) -> EsperantoResult<Self::SelfInstanceType> {
-        let rt_ref = match runtime {
+        let runtime = match runtime {
             Some(rt) => JSCoreContextRuntimeStore::External(rt),
-            None => {
-                let new_runtime = JSCoreRuntime::new()?;
-                let boxed = Box::new(new_runtime);
-                let boxed_ref = Box::into_raw(boxed);
-                JSCoreContextRuntimeStore::SelfContained(boxed_ref)
-            }
+            None => JSCoreContextRuntimeStore::new_self_contained()?,
         };
 
         let raw_ref = {
-            let class_def = rt_ref.get_class_def::<G>()?;
-            unsafe { JSGlobalContextCreateInGroup(rt_ref.raw_ref, class_def) }
+            let class_def = runtime.get_class_def::<G>()?;
+            unsafe { JSGlobalContextCreateInGroup(runtime.raw_ref, class_def) }
         };
 
         match unsafe { raw_ref.as_mut() } {
             Some(r) => {
                 let context = Box::pin(JSContext {
                     raw_ref: r,
-                    runtime: rt_ref,
+                    runtime,
                 });
 
                 let js_global_obj = unsafe { JSContextGetGlobalObject(context.raw_ref) };
@@ -124,28 +111,21 @@ impl From<&JSCoreContext<'_, '_>> for *const OpaqueJSContext {
 
 #[cfg(test)]
 mod test {
-    use std::ffi::CString;
 
-    use javascriptcore_sys::{
-        JSClassCreate, JSClassDefinition, JSContextGetGlobalObject, JSContextGroupCreate,
-        JSEvaluateScript, JSGlobalContextCreate, JSGlobalContextCreateInGroup, JSStaticFunction,
-        JSStringCreateWithUTF8CString, JSValueMakeUndefined, OpaqueJSContext, OpaqueJSValue,
-    };
+    // use crate::{jscontext::Context, jscore::jscore_export::JSCoreExport, jsruntime::Runtime};
 
-    use crate::{jscontext::Context, jscore::jscore_export::JSCoreExport, jsruntime::Runtime};
+    // use super::JSContext;
 
-    use super::{JSContext, JSRuntime};
+    // #[test]
+    // fn creates_in_context_group() {
+    //     let runtime = JSRuntime::new().unwrap();
+    //     JSContext::new(Some(&runtime)).unwrap();
+    // }
 
-    #[test]
-    fn creates_in_context_group() {
-        let runtime = JSRuntime::new().unwrap();
-        JSContext::new(Some(&runtime)).unwrap();
-    }
-
-    #[test]
-    fn creates_isolated() {
-        JSContext::new(None).unwrap();
-    }
+    // #[test]
+    // fn creates_isolated() {
+    //     JSContext::new(None).unwrap();
+    // }
 
     // #[test]
     // fn fetches_context_in_c_callback() {

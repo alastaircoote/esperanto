@@ -1,15 +1,11 @@
 use javascriptcore_sys::{
-    JSClassDefinition, JSContextGetGlobalObject, JSObjectCallAsFunctionCallback,
-    JSObjectGetPrivate, JSObjectMakeError, JSObjectSetPrivate, JSStaticFunction,
-    JSStringCreateWithUTF8CString, JSStringRelease, JSValueMakeString, JSValueMakeUndefined,
-    JSValueUnprotect, OpaqueJSContext, OpaqueJSValue,
+    JSClassDefinition, JSContextGetGlobalObject, JSObjectGetPrivate, JSObjectMakeError,
+    JSObjectSetPrivate, JSStringCreateWithUTF8CString, JSStringRelease, JSValueMakeString,
+    JSValueMakeUndefined, JSValueUnprotect, OpaqueJSContext, OpaqueJSValue,
 };
 use thiserror::Error;
 
-use crate::{
-    shared::external_api::{context::JSContextError, esperanto_error::EngineError},
-    EsperantoError, EsperantoResult,
-};
+use crate::{shared::external_api::esperanto_error::EngineError, EsperantoError, EsperantoResult};
 
 use super::jscore_context::JSCoreContext;
 

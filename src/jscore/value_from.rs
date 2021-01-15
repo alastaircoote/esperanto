@@ -1,6 +1,6 @@
 use std::convert::{TryFrom, TryInto};
 
-use javascriptcore_sys::{JSValueMakeString, JSValueMakeUndefined, JSValueProtect, OpaqueJSValue};
+use javascriptcore_sys::{JSValueMakeString, JSValueProtect, OpaqueJSValue};
 
 use crate::{jsvalue::Value, shared::traits::tryas::TryIntoJS, EsperantoResult};
 

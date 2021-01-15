@@ -1,10 +1,9 @@
 #[cfg(test)]
 mod test {
-    use std::{any::TypeId, convert::TryInto, fmt::Display};
+    use std::fmt::Display;
     use std::{convert::TryFrom, error::Error};
     // use Hmm::what::wat::hmm;
-    use esperanto::{convert::TryFromJSValueRef, jsruntime::*, jsvalue::Value};
-    use esperanto::{jscontext::*, private::jscore_export::JSExportError};
+    use esperanto::jscontext::*;
     // use thiserror::Error;
     use esperanto::EsperantoError;
 
