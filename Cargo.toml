@@ -1,0 +1,5 @@
+[workspace]
+
+members = [
+  "esperanto", #   "esperanto-macro",
+]

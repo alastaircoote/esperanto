@@ -1,0 +1,21 @@
+[package]
+authors = ["Alastair Coote <rusty@alastair.is>"]
+edition = "2018"
+name = "esperanto"
+version = "0.1.0"
+
+[features]
+default = ["quickjs"]
+javascriptcore = ["javascriptcore-sys"]
+quickjs = ["quickjs_android_suitable_sys"]
+
+[dependencies]
+javascriptcore-sys = {version = "0.0.4", optional = true}
+lazy_static = "1.4.0"
+paste = "1.0"
+thiserror = "1.0"
+
+[dependencies.quickjs_android_suitable_sys]
+features = ["dump_leaks"]
+optional = true
+version = "0.20201108.12"
