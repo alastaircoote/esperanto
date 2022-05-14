@@ -2,7 +2,7 @@
 
 A Rust-powered JavaScript worker environment designed to be embedded in native mobile apps. It builds on work established in [SWWebView](https://github.com/gdnmobilelab/SWWebView) but seeks to be fully comprehensive and platform-independent.
 
-**...at least, it will be at some point, right now it's little more than a proof of concept.**
+**...at least, it will be at some point, right now it's little more than a proof of concept that I haven't been able o return to in a long while.**
 
 ## Some background
 
@@ -51,6 +51,16 @@ A trait you can implement in Rust to allow you to pass a Rust struct in and out 
 
 - `call_as_function`
 - `call_as_constructor`
+
+At some point I'll make a procedural macro that will allow you to make a JS class via macro decorators. I have a [branch](https://github.com/alastaircoote/esperanto/blob/macros/esperanto-macros/tests/test.rs) of a previous codebase interation that allows this:
+
+```rust
+#[js_export]
+trait Example {
+    #[js_function(name = "testFunction")]
+    fn test_function(&self, test: &Vec<TestStruct>, test2: TestStruct) -> TestStruct;
+}
+```
 
 ## Examples:
 
