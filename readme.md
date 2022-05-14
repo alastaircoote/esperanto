@@ -2,7 +2,7 @@
 
 A Rust-powered JavaScript worker environment designed to be embedded in native mobile apps. It builds on work established in [SWWebView](https://github.com/gdnmobilelab/SWWebView) but seeks to be fully comprehensive and platform-independent.
 
-**...at least, it will be at some point, right now it's little more than a proof of concept that I haven't been able o return to in a long while.**
+**...at least, it will be at some point, right now it's little more than a proof of concept that I haven't been able to return to in a long while.**
 
 ## Some background
 
