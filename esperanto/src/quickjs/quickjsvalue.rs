@@ -1,11 +1,12 @@
 use std::ffi::{c_void, CStr, CString};
 
 use quickjs_android_suitable_sys::{
-    JSValue as QuickJSValue, JS_Call, JS_CallConstructor, JS_DupValue__, JS_FreeCString,
-    JS_FreeValue__, JS_GetPropertyStr, JS_GetRuntime, JS_IsEqual__, JS_IsError, JS_IsInstanceOf,
-    JS_IsObject__, JS_IsString__, JS_NewBool__, JS_NewClass, JS_NewClassID, JS_NewError,
-    JS_NewFloat64__, JS_NewObjectProtoClass, JS_NewString, JS_SetOpaque, JS_SetPropertyStr,
-    JS_ToBool, JS_ToCStringLen2, JS_ToFloat64, JS_UNDEFINED__,
+    JSValue as QuickJSValue, JS_Call, JS_CallConstructor, JS_DeleteProperty, JS_DupValue__,
+    JS_FreeAtom, JS_FreeCString, JS_FreeValue__, JS_GetOpaque, JS_GetPropertyStr, JS_GetRuntime,
+    JS_IsEqual__, JS_IsError, JS_IsInstanceOf, JS_IsObject__, JS_IsString__, JS_NewAtom,
+    JS_NewBool__, JS_NewClass, JS_NewClassID, JS_NewError, JS_NewFloat64__, JS_NewObjectProtoClass,
+    JS_NewString, JS_SetOpaque, JS_SetPropertyStr, JS_ToBool, JS_ToCStringLen2, JS_ToFloat64,
+    JS_UNDEFINED__,
 };
 
 use crate::{
@@ -16,12 +17,13 @@ use crate::{
         errors::EsperantoResult,
         value::{JSValueError, JSValueInternal},
     },
-    JSValueRef,
+    JSExportClass, JSValueRef,
 };
 
-use super::quickjs_prototype_storage::get_or_create_prototype;
 use super::quickjscontextpointer::QuickJSContextPointer;
-use super::quickjsexport::QuickJSExportExtensions;
+use super::{
+    quickjs_prototype_storage::get_class_constructor, quickjsruntime::get_class_id_for_type,
+};
 pub type QuickJSValueInternal = QuickJSValue;
 
 impl JSValueInternal for QuickJSValueInternal {
@@ -110,31 +112,23 @@ impl JSValueInternal for QuickJSValueInternal {
     fn native_prototype_for<T: crate::JSExportClass>(
         ctx: Self::ContextType,
     ) -> EsperantoResult<Self> {
-        get_or_create_prototype::<T>(*ctx)
+        get_class_constructor::<T>(*ctx)
     }
 
-    fn from_native_class<T: crate::JSExportClass>(
+    fn from_native_class<T: JSExportClass>(
         instance: T,
         ctx: Self::ContextType,
     ) -> EsperantoResult<Self> {
-        let proto = Self::native_prototype_for::<T>(ctx)?;
+        todo!();
+        // let obj = create_native_class_object::<T>(*ctx)?;
+        // let boxed = Box::new(instance);
+        // unsafe { JS_SetOpaque(obj, Box::into_raw(boxed) as *mut c_void) }
+        // Ok(obj.into())
+    }
 
-        let runtime = unsafe { JS_GetRuntime(*ctx) };
-
-        let mut cid: u32 = 0;
-        let definition = T::class_def();
-        let class_id = unsafe { JS_NewClassID(&mut cid) };
-        unsafe { JS_NewClass(runtime, class_id, &definition) };
-        let obj = unsafe { JS_NewObjectProtoClass(*ctx, proto, class_id) };
-
-        proto.release(ctx);
-
-        // proto.release(ctx);
-
-        let boxed = Box::new(instance);
-
-        unsafe { JS_SetOpaque(obj, Box::into_raw(boxed) as *mut c_void) }
-        Ok(obj.into())
+    fn get_native_ref<T: JSExportClass>(self, ctx: Self::ContextType) -> T {
+        todo!();
+        // let instance = JS_GetOpaque(self, class_id)
     }
 
     fn set_property(
@@ -166,6 +160,16 @@ impl JSValueInternal for QuickJSValueInternal {
         name: &std::ffi::CStr,
     ) -> Result<Self, crate::EsperantoError> {
         Ok(unsafe { JS_GetPropertyStr(*ctx, self, name.as_ptr()) }.into())
+    }
+
+    fn delete_property(self, ctx: Self::ContextType, name: &CStr) -> EsperantoResult<()> {
+        let name = unsafe { JS_NewAtom(*ctx, name.as_ptr()) };
+        check_quickjs_exception!(ctx => {
+            unsafe {JS_DeleteProperty(*ctx, self, name, 0) }
+        })?;
+        unsafe { JS_FreeAtom(*ctx, name) };
+
+        Ok(())
     }
 
     fn new_function(

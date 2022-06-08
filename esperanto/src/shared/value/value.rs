@@ -66,6 +66,14 @@ impl<'c> JSValueRef<'c> {
             })
     }
 
+    pub fn delete_property(&self, name: &str) -> EsperantoResult<()> {
+        let name_cstring =
+            CString::new(name).map_err(|e| ConversionError::CouldNotConvertToJSString(e))?;
+
+        self.internal
+            .delete_property(self.context.internal, &name_cstring)
+    }
+
     pub(crate) fn wrap_internal(
         val: JSValueInternalImpl,
         new_context: &'c JSContext<'c>,

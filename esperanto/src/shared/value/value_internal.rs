@@ -50,6 +50,8 @@ pub(crate) trait JSValueInternal: Sized + Copy {
         ctx: Self::ContextType,
     ) -> EsperantoResult<Self>;
 
+    fn get_native_ref<T:JSExportClass>(self, ctx: Self::ContextType) -> T;
+
     fn release(self, ctx: Self::ContextType);
 
     #[must_use]
@@ -63,6 +65,8 @@ pub(crate) trait JSValueInternal: Sized + Copy {
     ) -> Result<(), EsperantoError>;
 
     fn get_property(self, ctx: Self::ContextType, name: &CStr) -> Result<Self, EsperantoError>;
+
+    fn delete_property(self, ctx: Self::ContextType, name: &CStr) -> EsperantoResult<()>;
 
     fn new_function(
         function_text: &CString,

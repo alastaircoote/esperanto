@@ -26,7 +26,7 @@ pub enum JSExportClassCall {
 //     const PROTOTYPE_DEFINITION: Option<JSClassDefinitionImpl>;
 // }
 
-pub trait JSExportClass {
+pub trait JSExportClass : 'static {
     const METADATA: JSExportMetadata;
 }
 

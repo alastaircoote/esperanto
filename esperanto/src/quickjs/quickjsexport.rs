@@ -9,21 +9,21 @@ pub type QuickJSCallAsConstructor =
     unsafe extern "C" fn(*mut JSContext, JSValue, JSValue, i32, *mut JSValue, i32) -> JSValue;
 
 pub(super) trait QuickJSExportExtensions: JSExportClass + Sized {
-    fn prototype_def() -> JSClassDef {
-        JSClassDef {
-            class_name: Self::METADATA.class_name as *const i8,
-            call: Self::METADATA.optional.call_as_constructor,
-            finalizer: Some(delete_stored_prototype::<Self>),
-            gc_mark: None,
-            exotic: std::ptr::null_mut(),
-        }
-    }
+    // fn prototype_def() -> JSClassDef {
+    //     JSClassDef {
+    //         class_name: Self::METADATA.class_name as *const i8,
+    //         call: Self::METADATA.optional.call_as_constructor,
+    //         finalizer: Some(delete_stored_prototype::<Self>),
+    //         gc_mark: None,
+    //         exotic: std::ptr::null_mut(),
+    //     }
+    // }
 
     fn class_def() -> JSClassDef {
         JSClassDef {
             class_name: Self::METADATA.class_name as *const i8,
             call: Self::METADATA.optional.call_as_function,
-            finalizer: None,
+            finalizer: Some(delete_stored_prototype::<Self>),
             gc_mark: None,
             exotic: std::ptr::null_mut(),
         }
