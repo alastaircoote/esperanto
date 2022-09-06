@@ -1,10 +1,13 @@
-use std::{collections::HashMap, ffi::c_void};
+use std::{any::TypeId, collections::HashMap, convert::TryInto, ffi::c_void, slice};
 
+use by_address::ByAddress;
 use quickjs_android_suitable_sys::{
-    JSCFunctionEnum_JS_CFUNC_constructor, JSContext as QuickJSContext, JSValue as QuickJSValue,
-    JS_GetClassProto, JS_GetPropertyStr, JS_GetRuntime, JS_GetRuntimeOpaque, JS_IsEqual__,
-    JS_NewCFunction2, JS_NewClass, JS_NewClassID, JS_NewObject, JS_NewObjectProtoClass,
-    JS_SetClassProto, JS_SetConstructor, JS_SetRuntimeOpaque, JS_EXCEPTION__, JS_UNDEFINED__,
+    JSCFunctionEnum_JS_CFUNC_constructor, JSCFunctionEnum_JS_CFUNC_constructor_or_func,
+    JSCFunctionEnum_JS_CFUNC_generic, JSContext as QuickJSContext, JSRuntime,
+    JSValue as QuickJSValue, JS_DupValue__, JS_GetClassProto, JS_GetOpaque, JS_GetPropertyStr,
+    JS_GetRuntime, JS_GetRuntimeOpaque, JS_GetTag__, JS_IsEqual__, JS_NewCFunction2, JS_NewClass,
+    JS_NewClassID, JS_NewObject, JS_NewObjectProtoClass, JS_SetClassProto, JS_SetConstructor,
+    JS_SetOpaque, JS_SetRuntimeOpaque, JS_EXCEPTION__, JS_NULL__, JS_UNDEFINED__,
 };
 
 use super::{
@@ -12,14 +15,18 @@ use super::{
     quickjsruntime::QuickJSRuntimeInternal,
 };
 use crate::{
-    export::JSExportMetadata,
-    shared::{errors::EsperantoResult, runtime::JSRuntimeError, value::JSValueInternal},
-    JSExportClass,
+    export::{JSExportCall, JSExportMetadata},
+    shared::{
+        errors::{EsperantoResult, JSExportError},
+        runtime::JSRuntimeError,
+        value::JSValueInternal,
+    },
+    JSContext, JSExportClass, JSValueRef,
 };
 
-type JSClassIDStorage<'a> = HashMap<&'a JSExportMetadata, u32>;
+type JSClassIDStorage<'a> = HashMap<ByAddress<&'a JSExportMetadata<'a>>, u32>;
 
-fn get_classid_storage<'a>(
+pub(super) fn get_classid_storage<'a>(
     runtime: QuickJSRuntimeInternal,
 ) -> EsperantoResult<&'a mut JSClassIDStorage<'a>> {
     // The storage is embedded in the runtime's opaque storage so let's grab it:
@@ -51,17 +58,17 @@ pub(super) fn drop_classid_storage(runtime: QuickJSRuntimeInternal) {
     drop(boxed);
 }
 
-fn get_class_id<T: JSExportClass>(
-    ctx: QuickJSContextPointer,
+pub(super) fn get_class_id<T: JSExportClass>(
+    runtime: *mut JSRuntime,
     storage: &mut JSClassIDStorage,
 ) -> EsperantoResult<u32> {
+    let addr = ByAddress(&T::METADATA);
+
     // QuickJS uses u32 class "IDs" to ensure there aren't ever any
     // collisions between two different classes. First check: do we
     // already have a class ID for this class?
 
-    let runtime = unsafe { JS_GetRuntime(*ctx) };
-
-    if let Some(class_id) = storage.get(&T::METADATA) {
+    if let Some(class_id) = storage.get(&addr) {
         // If yes just directly return it:
         return Ok(*class_id);
     }
@@ -73,12 +80,10 @@ fn get_class_id<T: JSExportClass>(
 
     // Then create a class from our definition using that ID:
     let definition = T::class_def();
-    check_quickjs_exception!(ctx => {
-        unsafe { JS_NewClass(runtime, class_id, &definition) };
-    })?;
+    unsafe { JS_NewClass(runtime, class_id, &definition) };
 
     // Finally we save this ID so that we can use it later
-    storage.insert(&T::METADATA, class_id);
+    storage.insert(addr, class_id);
 
     return Ok(class_id);
 }
@@ -86,126 +91,141 @@ fn get_class_id<T: JSExportClass>(
 const STR_PROTOTYPE: *const i8 = b"prototype\0" as *const u8 as _;
 const STR_CONSTRUCTOR: *const i8 = b"constructor\0" as *const u8 as _;
 
-unsafe extern "C" fn custom_class_constructor<T: JSExportClass>(
+fn custom_class_constructor<T: JSExportClass>(
+    ctx: *mut QuickJSContext,
+    new_target: QuickJSValue,
+    argc: i32,
+    argv: *mut QuickJSValue,
+) -> EsperantoResult<QuickJSValue> {
+    // This gets called whenever e.g. "new NativeClass()" gets called in JS code.
+    // let runtime = unsafe { JS_GetRuntime(ctx) };
+    // let storage = get_classid_storage(runtime)?;
+
+    let context: JSContext = ctx.into();
+
+    // let class_id = get_class_id::<T>(runtime, storage)?;
+
+    // // examples in the QuickJS codebase tell us "using new_target to get the prototype is
+    // // necessary when the class is extended", so, OK then!
+    // // https://github.com/bellard/quickjs/blob/b5e62895c619d4ffc75c9d822c8d85f1ece77e5b/examples/point.c#L60
+    // let proto = unsafe { JS_GetPropertyStr(ctx, new_target, STR_PROTOTYPE) };
+
+    // Then we create a new object with this prototype:
+    // let new_object = unsafe { JS_NewObjectProtoClass(ctx, proto, class_id) };
+
+    // Ensure that we release the prototype or we'll get a memory leak
+    // proto.release(ctx.into());
+
+    let constructor = match T::METADATA.call_as_constructor {
+        Some(constructor) => constructor,
+        _ => return Err(JSExportError::ConstructorCalledOnNonConstructableClass.into()),
+    };
+
+    let argc_size: usize = argc
+        .try_into()
+        .map_err(|err| JSExportError::CouldNotConvertArgumentNumber(err))?;
+    let args = unsafe { slice::from_raw_parts(argv, argc_size) };
+
+    let wrapped_args: Vec<JSValueRef> = args
+        .iter()
+        .map(|raw| JSValueRef::wrap_internal(unsafe { JS_DupValue__(ctx, *raw) }, &context))
+        .collect();
+
+    let item = (constructor.func)(&wrapped_args, &context)?;
+
+    return Ok(item.internal.retain(context.internal));
+}
+
+unsafe extern "C" fn custom_class_call_extern<T: JSExportClass>(
     ctx: *mut QuickJSContext,
     new_target: QuickJSValue,
     argc: i32,
     argv: *mut QuickJSValue,
 ) -> QuickJSValue {
-    let runtime = JS_GetRuntime(ctx);
+    let tag = unsafe { JS_GetTag__(new_target) };
 
-    // This gets called whenever e.g. "new NativeClass()" gets called in JS code. It's a C function so
-    // we can't return a Result<> and use ? operators, instead we do some and_then chaining to get
-    // things going:
-
-    get_classid_storage(runtime)
-        .and_then(|storage| get_class_id::<T>(ctx.into(), storage))
-        .and_then(|class_id| {
-            // examples in the QuickJS codebase tell us "using new_target to get the prototype is
-            // necessary when the class is extended", so, OK then!
-            // https://github.com/bellard/quickjs/blob/b5e62895c619d4ffc75c9d822c8d85f1ece77e5b/examples/point.c#L60
-            let proto = JS_GetPropertyStr(ctx, new_target, STR_PROTOTYPE);
-
-            // Then we create a new object with this prototype:
-            let new_object = JS_NewObjectProtoClass(ctx, proto, class_id);
-
-            // Ensure that we release the prototype or we'll get a memory leak
-            proto.release(ctx.into());
-
-            // Then finally return our new JS object
-            Ok(new_object)
-        })
-        // Might want to work out how to provide an actual useful error here:
-        .unwrap_or(JS_EXCEPTION__)
+    custom_class_constructor::<T>(ctx, new_target, argc, argv).unwrap_or(JS_EXCEPTION__)
 }
 
-pub(super) fn get_class_constructor<T: JSExportClass>(
+pub(super) fn get_class_prototype<T: JSExportClass>(
+    class_id: u32,
     in_context: *mut QuickJSContext,
 ) -> EsperantoResult<QuickJSValue> {
-    let runtime = unsafe { JS_GetRuntime(in_context) };
-    let storage = get_classid_storage(runtime)?;
     let ctx: QuickJSContextPointer = in_context.into();
 
-    // We only create these constructors once, reusing if we already have one. So let's
-    // check if we already have one:
+    // Haven't been able to replicate it but in theory QuickJS could garbage collect the prototype
+    // at some point, so let's check here whether it actually still exists. If not we'll just create
+    // it again.
+    let existing_proto = unsafe { JS_GetClassProto(in_context, class_id) };
+    if unsafe { JS_IsEqual__(existing_proto, JS_NULL__) == 0 } {
+        // it isn't undefined so we assume it is the prototype. Could add extra checks but don't
+        // think they're necessary?
+        return Ok(existing_proto);
+    }
 
-    match storage.get(&T::METADATA).and_then(|class_id| unsafe {
-        // Haven't been able to replicate it but in theory QuickJS could garbage collect the prototype
-        // at some point, so let's check here whether it actually still exists. If not we'll just create
-        // it again.
-        let proto = JS_GetClassProto(in_context, *class_id);
-        if JS_IsEqual__(proto, JS_UNDEFINED__) != 1 {
-            return None;
-        }
-        Some(proto)
-    }) {
-        Some(proto) => {
-            // QuickJS actually makes it a little difficult to get a reference to the constructor
-            // (there's JS_SetConstructor but no JS_GetConstructor!) so we have to manually grab
-            // it by name:
-            let constructor = unsafe { JS_GetPropertyStr(in_context, proto, STR_CONSTRUCTOR) };
-            proto.release(ctx);
-            return Ok(constructor);
-        }
-        None => {
-            // Get the ID for the class we're looking to create:
-            let proto_class_id = get_class_id::<T>(ctx, storage)?;
+    // If we can't find it, make it!
+    // Create an 'empty' object that we'll throw all of this onto:
+    let proto = unsafe { JS_NewObject(*ctx) };
 
-            // First we create our constructor function that calls the generic function
-            // defined above here
-
-            let constructor = unsafe {
-                JS_NewCFunction2(
-                    *ctx,
-                    Some(custom_class_constructor::<T>),
-                    T::METADATA.class_name as *const i8,
-                    1,
-                    JSCFunctionEnum_JS_CFUNC_constructor,
-                    0,
-                )
-            };
-
-            // Create an 'empty' object that we'll throw all of this onto:
-            let proto = unsafe { JS_NewObject(*ctx) };
-
-            unsafe { JS_SetConstructor(*ctx, constructor, proto) }
-            unsafe { JS_SetClassProto(*ctx, proto_class_id, proto) };
-
-            return Ok(constructor);
-        }
+    let proto_retained = unsafe {
+        // Annoying thing: I don't know why this is required. You'd think
+        // JS_NewObject would return a retained object. But if we don't do it
+        // the runtime fails to free correctly.
+        JS_DupValue__(in_context, proto)
     };
+
+    // let cproto = match (
+    //     T::METADATA.call_as_constructor,
+    //     T::METADATA.call_as_function,
+    // ) {
+    //     (Some(_), Some(_)) => Some(JSCFunctionEnum_JS_CFUNC_constructor_or_func),
+    //     (Some(_), None) => Some(JSCFunctionEnum_JS_CFUNC_constructor),
+    //     (None, Some(_)) => Some(JSCFunctionEnum_JS_CFUNC_generic),
+    //     (None, None) => None,
+    // };
+
+    if T::METADATA.call_as_constructor.is_some() {
+        // First we create our constructor function that calls the generic function
+        // defined above here
+        let constructor = unsafe {
+            JS_NewCFunction2(
+                *ctx,
+                Some(custom_class_call_extern::<T>),
+                T::METADATA.class_name as *const i8,
+                2,
+                JSCFunctionEnum_JS_CFUNC_constructor,
+                0,
+            )
+        };
+        unsafe { JS_SetConstructor(*ctx, constructor, proto_retained) }
+        // since this constructor is now attached to the prototype we don't need to hold our
+        // own reference to it, so we release.
+        constructor.release(ctx);
+    }
+
+    unsafe { JS_SetClassProto(*ctx, class_id, proto_retained) };
+
+    return Ok(proto);
 }
 
-pub(super) unsafe extern "C" fn delete_stored_prototype<T: JSExportClass>(
-    runtime: *mut quickjs_android_suitable_sys::JSRuntime,
+fn delete_stored_prototype<T: JSExportClass>(
+    runtime: *mut JSRuntime,
+    value: QuickJSValue,
+) -> EsperantoResult<()> {
+    println!("DELETE VALUE {:?}", value);
+    let storage = get_classid_storage(runtime)?;
+
+    let class_id = get_class_id::<T>(runtime, storage)?;
+    let ptr = unsafe { JS_GetOpaque(value, class_id) as *mut T };
+
+    let obj = unsafe { Box::from_raw(ptr) };
+    drop(obj);
+    Ok(())
+}
+
+pub(super) unsafe extern "C" fn delete_stored_prototype_extern<T: JSExportClass>(
+    runtime: *mut JSRuntime,
     value: QuickJSValue,
 ) {
-    println!("DELETE VALUE {:?}", value);
-
-    // let storage = match get_prototype_storage(runtime) {
-    //     Ok(store) => store,
-    //     Err(err) => {
-    //         panic!("Could not get prototype storage: {}", err)
-    //     }
-    // };
-
-    // let stored_value = {
-    //     storage
-    //         .in_use_prototypes
-    //         .iter()
-    //         .find_map(|(key, iter_value)| match JS_IsEqual__(value, *iter_value) {
-    //             1 => Some(*key),
-    //             _ => None,
-    //         })
-    // };
-    // // .find(|(_, iter_value)| JS_IsEqual__(value, **iter_value) == 1);
-
-    // match stored_value {
-    //     None => {
-    //         println!("Tried to remove a prototype when it isn't stored. This should never happen.");
-    //     }
-    //     Some(key) => {
-    //         storage.in_use_prototypes.remove(&key);
-    //     },
-    // };
+    delete_stored_prototype::<T>(runtime, value).unwrap();
 }

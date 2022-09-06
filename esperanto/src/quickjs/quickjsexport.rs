@@ -1,12 +1,23 @@
 use quickjs_android_suitable_sys::{JSClassDef, JSContext, JSValue};
 
-use super::quickjs_prototype_storage::delete_stored_prototype;
+use super::quickjs_prototype_storage::delete_stored_prototype_extern;
 use crate::JSExportClass;
 
 pub type QuickJSCallAsFunction =
     unsafe extern "C" fn(*mut JSContext, JSValue, JSValue, i32, *mut JSValue, i32) -> JSValue;
 pub type QuickJSCallAsConstructor =
     unsafe extern "C" fn(*mut JSContext, JSValue, JSValue, i32, *mut JSValue, i32) -> JSValue;
+
+unsafe extern "C" fn test_call(
+    ctx: *mut JSContext,
+    val_one: JSValue,
+    val_two: JSValue,
+    argc: i32,
+    argv: *mut JSValue,
+    flags: i32,
+) -> JSValue {
+    panic!("wtf");
+}
 
 pub(super) trait QuickJSExportExtensions: JSExportClass + Sized {
     // fn prototype_def() -> JSClassDef {
@@ -22,8 +33,9 @@ pub(super) trait QuickJSExportExtensions: JSExportClass + Sized {
     fn class_def() -> JSClassDef {
         JSClassDef {
             class_name: Self::METADATA.class_name as *const i8,
-            call: Self::METADATA.optional.call_as_function,
-            finalizer: Some(delete_stored_prototype::<Self>),
+            // call: None,
+            call: Some(test_call),
+            finalizer: Some(delete_stored_prototype_extern::<Self>),
             gc_mark: None,
             exotic: std::ptr::null_mut(),
         }

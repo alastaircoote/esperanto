@@ -4,7 +4,7 @@ use crate::shared::{
 };
 use thiserror::Error;
 
-use super::{CatchExceptionError, JavaScriptError};
+use super::{CatchExceptionError, JSExportError, JavaScriptError};
 
 #[derive(Debug, Error, Eq, PartialEq)]
 pub enum EsperantoError {
@@ -25,6 +25,9 @@ pub enum EsperantoError {
 
     #[error(transparent)]
     CatchExceptionError(#[from] Box<CatchExceptionError>),
+
+    #[error(transparent)]
+    ExportError(#[from] JSExportError),
 }
 
 pub type EsperantoResult<T> = Result<T, EsperantoError>;

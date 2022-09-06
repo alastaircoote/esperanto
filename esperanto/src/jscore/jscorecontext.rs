@@ -115,8 +115,8 @@ mod test {
     fn get_protected_object_count(ctx: &JSContext) -> i32 {
         let hmm = unsafe { JSGetMemoryUsageStatistics(*ctx.internal) };
         let val = JSValueRef::wrap_internal(hmm.into(), &ctx);
-        let num = val.get_property("protectedObjectCount").unwrap();
-        return num.try_into().unwrap();
+        let num_js = val.get_property("protectedObjectCount").unwrap();
+        return (&num_js).try_into().unwrap();
     }
 
     #[test]

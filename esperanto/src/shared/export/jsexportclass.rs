@@ -1,9 +1,36 @@
-use crate::shared::engine_impl::export::{JSCallAsConstructorImpl, JSCallAsFunctionImpl};
+use crate::{
+    shared::{
+        engine_impl::export::{JSCallAsConstructorImpl, JSCallAsFunctionImpl},
+        errors::EsperantoResult,
+    },
+    JSContext, JSValueRef,
+};
 
-#[derive(Eq, PartialEq, Hash, Copy, Clone, Debug)]
-pub struct JSExportMetadata {
+pub enum JSExportAttribute {
+    Function {
+        call: &'static dyn for<'a> Fn(Vec<JSValueRef<'a>>) -> JSValueRef<'a>,
+    },
+}
+
+pub struct JSClassFunction<'a> {
+    pub num_args: usize,
+    pub func: &'a dyn for<'c> Fn(
+        &'c Vec<JSValueRef<'c>>,
+        &'c JSContext<'c>,
+    ) -> EsperantoResult<JSValueRef<'c>>,
+}
+
+pub enum JSExportCall<T: 'static> {
+    AsConstructor(&'static dyn for<'a> Fn(&Vec<JSValueRef<'a>>) -> EsperantoResult<T>),
+}
+
+pub struct JSExportMetadata<'a> {
     pub class_name: *const u8,
-    pub optional: JSExportMetadataOptional,
+    // pub optional: JSExportMetadataOptional,
+    pub attributes: Option<phf::OrderedMap<&'static str, JSExportAttribute>>,
+    // pub call: Option<JSExportCall<T>>,
+    pub call_as_constructor: Option<JSClassFunction<'a>>,
+    // pub call_as_function: Option<JSClassFunction<'a>>,
 }
 
 #[derive(Eq, PartialEq, Hash, Copy, Clone, Debug)]
@@ -26,8 +53,8 @@ pub enum JSExportClassCall {
 //     const PROTOTYPE_DEFINITION: Option<JSClassDefinitionImpl>;
 // }
 
-pub trait JSExportClass : 'static {
-    const METADATA: JSExportMetadata;
+pub trait JSExportClass {
+    const METADATA: JSExportMetadata<'static>;
 }
 
 #[macro_export]
@@ -84,23 +111,34 @@ macro_rules! js_export_class {
 
         impl $crate::export::JSExportClass for $struct_ident {
 
-            const METADATA: $crate::export::JSExportMetadata = $crate::export::JSExportMetadata {
+
+
+            const METADATA: $crate::export::JSExportMetadata<'static> = $crate::export::JSExportMetadata {
                 class_name: concat!(stringify!($struct_ident), "\0").as_ptr(),
-                optional: $crate::export::JSExportMetadataOptional {
+                // optional: $crate::export::JSExportMetadataOptional {
 
-                    $(
-                        #[doc = "" $cc_ctx_ident ""]
-                        call_as_constructor: Some([< __jsexport_call_as_constructor_ $struct_ident:lower >]),
-                    )?
+                //     $(
+                //         #[doc = "" $cc_ctx_ident ""]
+                //         call_as_constructor: Some([< __jsexport_call_as_constructor_ $struct_ident:lower >]),
+                //     )?
 
-                    $(
-                        #[doc = "" $cf_ctx_ident ""]
-                        call_as_function: Some([< __jsexport_call_as_function_ $struct_ident:lower >]),
-                    )?
+                //     $(
+                //         #[doc = "" $cf_ctx_ident ""]
+                //         call_as_function: Some([< __jsexport_call_as_function_ $struct_ident:lower >]),
+                //     )?
 
 
-                    ..$crate::export::OPTIONAL_METADATA_DEFAULT
-                }
+                //     ..$crate::export::OPTIONAL_METADATA_DEFAULT
+                // },
+
+                attributes: Some(phf::phf_ordered_map! {
+                    "WOW" => $crate::export::JSExportAttribute::Function {
+                        call: & |vals| {
+                            todo!()
+                        }
+                    }
+                }),
+                call_as_constructor: None
             };
 
         }

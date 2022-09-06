@@ -50,7 +50,8 @@ pub(crate) trait JSValueInternal: Sized + Copy {
         ctx: Self::ContextType,
     ) -> EsperantoResult<Self>;
 
-    fn get_native_ref<T:JSExportClass>(self, ctx: Self::ContextType) -> T;
+    fn get_native_ref<'a, T: JSExportClass>(self, ctx: Self::ContextType)
+        -> EsperantoResult<&'a T>;
 
     fn release(self, ctx: Self::ContextType);
 

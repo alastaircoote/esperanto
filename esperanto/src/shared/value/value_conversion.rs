@@ -40,10 +40,10 @@ where
 
 // String
 
-impl TryFrom<JSValueRef<'_>> for String {
+impl TryFrom<&JSValueRef<'_>> for String {
     type Error = EsperantoError;
 
-    fn try_from(value: JSValueRef<'_>) -> Result<Self, Self::Error> {
+    fn try_from(value: &JSValueRef<'_>) -> Result<Self, Self::Error> {
         let cstring = value.internal.as_cstring(value.context.internal)?;
         println!("GOT CSTRING");
         let str = cstring
@@ -75,10 +75,10 @@ impl<'c> TryJSValueFrom<'c, f64> for JSValueRef<'c> {
     }
 }
 
-impl TryFrom<JSValueRef<'_>> for f64 {
+impl TryFrom<&JSValueRef<'_>> for f64 {
     type Error = EsperantoError;
 
-    fn try_from(value: JSValueRef<'_>) -> Result<Self, Self::Error> {
+    fn try_from(value: &JSValueRef<'_>) -> Result<Self, Self::Error> {
         let n = value.internal.as_number(value.context.internal)?;
         Ok(n)
     }
@@ -92,10 +92,10 @@ impl<'c> TryJSValueFrom<'c, i32> for JSValueRef<'c> {
     }
 }
 
-impl TryFrom<JSValueRef<'_>> for i32 {
+impl TryFrom<&JSValueRef<'_>> for i32 {
     type Error = EsperantoError;
 
-    fn try_from(value: JSValueRef<'_>) -> Result<Self, Self::Error> {
+    fn try_from(value: &JSValueRef<'_>) -> Result<Self, Self::Error> {
         let n = f64::try_from(value)?;
         Ok(n as i32)
     }
@@ -111,10 +111,10 @@ impl<'c> TryJSValueFrom<'c, bool> for JSValueRef<'c> {
     }
 }
 
-impl<'c> TryFrom<JSValueRef<'c>> for bool {
+impl<'c> TryFrom<&JSValueRef<'c>> for bool {
     type Error = EsperantoError;
 
-    fn try_from(value: JSValueRef<'c>) -> Result<Self, Self::Error> {
+    fn try_from(value: &JSValueRef<'c>) -> Result<Self, Self::Error> {
         value.internal.as_bool(value.context.internal)
     }
 }
@@ -198,7 +198,7 @@ mod test {
         ($type:ty, $script: expr, $value: expr) => {
             let ctx = JSContext::new().unwrap();
             let value = ctx.evaluate($script, None).unwrap();
-            let converted: $type = value.try_into().unwrap();
+            let converted: $type = (&value).try_into().unwrap();
             assert_eq!(converted, $value);
         };
     }
@@ -210,9 +210,9 @@ mod test {
             ctx.global_object()
                 .set_property("testValue", &converted)
                 .unwrap();
-            let is_match: bool = ctx
+            let is_match: bool = (&ctx
                 .evaluate(concat!("testValue === ", $js_string_match), None)
-                .unwrap()
+                .unwrap())
                 .try_into()
                 .unwrap();
             assert_eq!(is_match, true);

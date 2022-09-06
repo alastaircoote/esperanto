@@ -103,11 +103,12 @@ impl JSValueInternal for JSCoreValueInternal {
         instance: T,
         ctx: Self::ContextType,
     ) -> EsperantoResult<Self> {
-        let definition = T::CLASS_DEFINITION;
-        let class_def = unsafe { JSClassCreate(&definition) };
-        let boxed = Box::new(instance);
-        let obj = unsafe { JSObjectMake(*ctx, class_def, Box::into_raw(boxed) as *mut c_void) };
-        Ok(obj.into())
+        // let definition = T::CLASS_DEFINITION;
+        // let class_def = unsafe { JSClassCreate(&definition) };
+        // let boxed = Box::new(instance);
+        // let obj = unsafe { JSObjectMake(*ctx, class_def, Box::into_raw(boxed) as *mut c_void) };
+        // Ok(obj.into())
+        todo!();
     }
 
     fn new_error(name: CString, message: CString, ctx: Self::ContextType) -> Self {
@@ -247,6 +248,17 @@ impl JSValueInternal for JSCoreValueInternal {
     }
 
     fn is_instanceof(self, target: Self, ctx: Self::ContextType) -> EsperantoResult<bool> {
+        todo!()
+    }
+
+    fn get_native_ref<'a, T: JSExportClass>(
+        self,
+        ctx: Self::ContextType,
+    ) -> EsperantoResult<&'a T> {
+        todo!()
+    }
+
+    fn delete_property(self, ctx: Self::ContextType, name: &CStr) -> EsperantoResult<()> {
         todo!()
     }
 }

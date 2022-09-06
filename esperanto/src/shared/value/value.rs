@@ -105,19 +105,34 @@ impl<'c> JSValueRef<'c> {
     {
         let ptr = JSValueInternalImpl::native_prototype_for::<T>(in_context.internal)?;
         let val = JSValueRef::wrap_internal(ptr, in_context);
+
         Ok(val)
     }
 
-    pub fn wrap_native<'new, T>(
+    pub fn constructor_for<T>(in_context: &'c JSContext<'c>) -> EsperantoResult<JSValueRef<'c>>
+    where
+        T: JSExportClass,
+    {
+        return Self::prototype_for::<T>(in_context)?.get_property("constructor");
+    }
+
+    pub fn wrap_native<T>(
         instance: T,
-        in_context: &'new JSContext<'c>,
-    ) -> EsperantoResult<JSValueRef<'new>>
+        in_context: &'c JSContext<'c>,
+    ) -> EsperantoResult<JSValueRef<'c>>
     where
         T: JSExportClass,
     {
         let ptr = JSValueInternalImpl::from_native_class(instance, in_context.internal)?;
         let val = JSValueRef::wrap_internal(ptr, in_context);
         Ok(val)
+    }
+
+    pub fn get_native<T: JSExportClass>(
+        &self,
+        in_context: &'c JSContext<'c>,
+    ) -> EsperantoResult<&T> {
+        self.internal.get_native_ref(in_context.internal)
     }
 
     pub fn new_function(
@@ -141,25 +156,19 @@ impl<'c> JSValueRef<'c> {
     }
 
     pub fn call_as_function(&self, arguments: Vec<&Self>) -> EsperantoResult<Self> {
-        let internal_vec = arguments.iter().map(|a| a.internal).collect();
-
-        let internal_result =
-            self.internal
-                .call_as_function(internal_vec, None, self.context.internal)?;
-
-        Ok(Self::wrap_internal(internal_result, self.context))
+        return self.call_as_function_bound(arguments, None);
     }
 
     pub fn call_as_function_bound(
         &self,
         arguments: Vec<&Self>,
-        bind_to: &Self,
+        bind_to: Option<&Self>,
     ) -> EsperantoResult<Self> {
         let internal_vec = arguments.iter().map(|a| a.internal).collect();
 
         let internal_result = self.internal.call_as_function(
             internal_vec,
-            Some(bind_to.internal),
+            bind_to.map(|b| b.internal),
             self.context.internal,
         )?;
 

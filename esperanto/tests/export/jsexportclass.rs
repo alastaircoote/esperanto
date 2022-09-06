@@ -1,108 +1,133 @@
 #[cfg(test)]
 mod test {
-    use std::convert::TryInto;
+    use std::convert::{TryFrom, TryInto};
 
-    use esperanto::{js_export_class, JSContext};
+    use esperanto::export::{
+        JSClassFunction, JSExportCall, JSExportMetadata, JSExportMetadataOptional,
+    };
+    use esperanto::{js_export_class, JSContext, JSExportClass};
     use esperanto::{JSValueRef, TryJSValueFrom};
+    use quickjs_android_suitable_sys::JSValue;
 
     #[test]
-    fn exports_sets_prototype() {
+    fn exports_sets_constructor() {
         struct TestStruct {}
 
-        js_export_class! { TestStruct as "TestStruct" =>
-            call_as_function: (ctx, _this_obj, _values) {
-                Ok(JSValueRef::try_new_value_from(1234, ctx)?.into())
-            },
-        };
+        impl JSExportClass for TestStruct {
+            const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
+                class_name: b"TestStruct\0" as _,
+                attributes: None,
+                call_as_constructor: None,
+            };
+        }
 
         let test = TestStruct {};
         let ctx = JSContext::new().unwrap();
         let wrapped = JSValueRef::wrap_native(test, &ctx).unwrap();
-        let proto = JSValueRef::prototype_for::<TestStruct>(&ctx).unwrap();
+        let constructor = JSValueRef::constructor_for::<TestStruct>(&ctx).unwrap();
 
-        assert_eq!(wrapped.is_instance_of(&proto).unwrap(), true);
-    }
-
-    #[test]
-    fn exports_call_as_function_successfully() {
-        struct TestStruct {}
-
-        js_export_class! { TestStruct as "TestStruct" =>
-            call_as_function: (ctx, _this_obj, _values) {
-                Ok(JSValueRef::try_new_value_from(1234, ctx)?.into())
-            },
-        };
-
-        let test = TestStruct {};
-        let ctx = JSContext::new().unwrap();
-        let wrapped = JSValueRef::wrap_native(test, &ctx).unwrap();
-
-        ctx.global_object()
-            .set_property("testValue", &wrapped)
-            .unwrap();
-
-        let str = ctx.evaluate("new String(testValue)", None).unwrap();
-        println!("{}", str.to_string());
-
-        let result = ctx.evaluate("testValue()", None).unwrap();
-        let num: i32 = result.try_into().unwrap();
-        assert_eq!(num, 1234)
+        assert_eq!(wrapped.is_instance_of(&constructor).unwrap(), true);
     }
 
     #[test]
     fn exports_calls_constructor_successfully() {
         struct TestStruct {}
 
-        js_export_class! { TestStruct as "TestStruct" =>
-            call_as_constructor: (_, _lifetime) {
-                Ok(TestStruct {})
-            },
-        };
+        impl JSExportClass for TestStruct {
+            const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
+                class_name: b"TestStruct\0" as _,
+                attributes: None,
+                call_as_constructor: Some(JSClassFunction {
+                    num_args: 1,
+                    func: &|_, ctx| {
+                        let item = TestStruct {};
+                        return JSValueRef::wrap_native(item, ctx);
+                    },
+                }),
+            };
+        }
 
         let ctx = JSContext::new().unwrap();
-        let wrapped = JSValueRef::prototype_for::<TestStruct>(&ctx).unwrap();
+        let wrapped = JSValueRef::constructor_for::<TestStruct>(&ctx).unwrap();
         ctx.global_object()
             .set_property("TestValue", &wrapped)
             .unwrap();
 
-        let str = ctx.evaluate("TestValue.toString()", None).unwrap();
-        println!("{}", str.to_string());
-
         let result = ctx.evaluate("new TestValue()", None).unwrap();
-
-        println!("{}", result.to_string());
-        println!(
-            "are they equal? {}",
-            ctx.evaluate("new TestValue() instanceof TestValue", None)
-                .unwrap()
-        );
 
         let is_instance = result.is_instance_of(&wrapped).unwrap();
         assert_eq!(is_instance, true)
     }
 
     #[test]
+    fn constructor_arguments_are_passed() {
+        struct TestStruct {
+            value_one: f64,
+            value_two: String,
+        }
+
+        impl JSExportClass for TestStruct {
+            const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
+                class_name: b"TestStruct\0" as _,
+                attributes: None,
+                call_as_constructor: Some(JSClassFunction {
+                    num_args: 1,
+                    func: &|args, ctx| {
+                        let num = f64::try_from(&args[0])?;
+                        let str = String::try_from(&args[1])?;
+
+                        let item = TestStruct {
+                            value_one: num,
+                            value_two: str,
+                        };
+                        return JSValueRef::wrap_native(item, ctx);
+                    },
+                }),
+            };
+        }
+
+        let ctx = JSContext::new().unwrap();
+
+        let wrapped = JSValueRef::constructor_for::<TestStruct>(&ctx).unwrap();
+
+        let f = JSValueRef::new_function(
+            "return new TestStruct(123,'test')",
+            vec!["TestStruct"],
+            &ctx,
+        )
+        .unwrap();
+
+        let result = f.call_as_function(vec![&wrapped]).unwrap();
+        let as_ref: &TestStruct = result.get_native(&ctx).unwrap();
+
+        assert_eq!(as_ref.value_one, 123 as f64);
+        assert_eq!(as_ref.value_two, "test");
+    }
+
+    #[test]
     fn reuses_prototypes() {
         struct TestStruct {}
 
-        js_export_class! { TestStruct as "TestStruct" =>
-            call_as_constructor: (_, _lifetime) {
-                Ok(TestStruct {})
-            },
-        };
+        impl JSExportClass for TestStruct {
+            const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
+                class_name: b"TestStruct\0" as _,
+                attributes: None,
+                call_as_constructor: None,
+            };
+        }
 
         let ctx = JSContext::new().unwrap();
         ctx.global_object()
             .set_property(
                 "TestValue",
-                &JSValueRef::prototype_for::<TestStruct>(&ctx).unwrap(),
+                &JSValueRef::constructor_for::<TestStruct>(&ctx).unwrap(),
             )
             .unwrap();
 
         ctx.global_object()
             .set_property(
                 "TestValue2",
-                &JSValueRef::prototype_for::<TestStruct>(&ctx).unwrap(),
+                &JSValueRef::constructor_for::<TestStruct>(&ctx).unwrap(),
             )
             .unwrap();
 
@@ -117,18 +142,20 @@ mod test {
     fn works_across_garbage_collections() {
         struct TestStruct {}
 
-        js_export_class! { TestStruct as "TestStruct" =>
-            call_as_constructor: (_, _lifetime) {
-                Ok(TestStruct {})
-            },
-        };
+        impl JSExportClass for TestStruct {
+            const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
+                class_name: b"TestStruct\0" as _,
+                attributes: None,
+                call_as_constructor: None,
+            };
+        }
 
         let ctx = JSContext::new().unwrap();
         {
             ctx.global_object()
                 .set_property(
                     "TestValue",
-                    &JSValueRef::prototype_for::<TestStruct>(&ctx).unwrap(),
+                    &JSValueRef::constructor_for::<TestStruct>(&ctx).unwrap(),
                 )
                 .unwrap();
 
@@ -140,7 +167,7 @@ mod test {
         ctx.global_object()
             .set_property(
                 "TestValue2",
-                &JSValueRef::prototype_for::<TestStruct>(&ctx).unwrap(),
+                &JSValueRef::constructor_for::<TestStruct>(&ctx).unwrap(),
             )
             .unwrap();
 
@@ -148,16 +175,24 @@ mod test {
     }
 
     #[test]
-    fn stringy() {
+    fn calls_as_function() {
         struct TestStruct {}
 
-        js_export_class! { TestStruct as "TestStruct" =>
-
-        };
+        impl JSExportClass for TestStruct {
+            const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
+                class_name: b"TestStruct\0" as _,
+                attributes: None,
+                call_as_constructor: None,
+            };
+        }
 
         let ctx = JSContext::new().unwrap();
-        let wrapped = JSValueRef::wrap_native(TestStruct {}, &ctx).unwrap();
-        let to_str: String = wrapped.try_into().unwrap();
-        println!("huh: {}", to_str)
+        let constructor = JSValueRef::constructor_for::<TestStruct>(&ctx).unwrap();
+        ctx.global_object()
+            .set_property("TestStruct", &constructor)
+            .unwrap();
+
+        let result = ctx.evaluate("new TestStruct()", None).unwrap();
+        println!("{}", result.to_string())
     }
 }

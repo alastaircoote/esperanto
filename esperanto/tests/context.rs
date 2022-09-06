@@ -14,7 +14,7 @@ mod test {
     fn evaluates_code_successfully() {
         let ctx = JSContext::new().unwrap();
         let result = ctx.evaluate("['one','two'].join(', ')", None).unwrap();
-        let str = String::try_from(result).unwrap();
+        let str = String::try_from(&result).unwrap();
         assert_eq!(str, "one, two");
     }
 
@@ -24,7 +24,7 @@ mod test {
         let ctx = JSContext::new().unwrap();
         let result = ctx.evaluate("'hello'", None).unwrap();
         ctx.garbage_collect();
-        let str = String::try_from(result).unwrap();
+        let str = String::try_from(&result).unwrap();
         assert_eq!(str, "hello");
     }
 
