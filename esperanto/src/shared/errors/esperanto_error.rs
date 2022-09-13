@@ -1,6 +1,9 @@
-use crate::shared::{
-    context::JSContextError, errors::conversion_error::ConversionError, runtime::JSRuntimeError,
-    value::JSValueError,
+use crate::{
+    shared::{
+        context::JSContextError, errors::conversion_error::ConversionError,
+        runtime::JSRuntimeError, value::JSValueError,
+    },
+    JSContext,
 };
 use thiserror::Error;
 

@@ -1,4 +1,10 @@
-use std::{any::TypeId, collections::HashMap, convert::TryInto, ffi::c_void, slice};
+use std::{
+    any::TypeId,
+    collections::HashMap,
+    convert::TryInto,
+    ffi::{c_void, CString},
+    slice,
+};
 
 use by_address::ByAddress;
 use quickjs_android_suitable_sys::{
@@ -7,7 +13,8 @@ use quickjs_android_suitable_sys::{
     JSValue as QuickJSValue, JS_DupValue__, JS_GetClassProto, JS_GetOpaque, JS_GetPropertyStr,
     JS_GetRuntime, JS_GetRuntimeOpaque, JS_GetTag__, JS_IsEqual__, JS_NewCFunction2, JS_NewClass,
     JS_NewClassID, JS_NewObject, JS_NewObjectProtoClass, JS_SetClassProto, JS_SetConstructor,
-    JS_SetOpaque, JS_SetRuntimeOpaque, JS_EXCEPTION__, JS_NULL__, JS_UNDEFINED__,
+    JS_SetOpaque, JS_SetRuntimeOpaque, JS_ThrowInternalError, JS_EXCEPTION__, JS_NULL__,
+    JS_TAG_OBJECT, JS_TAG_UNDEFINED, JS_UNDEFINED__,
 };
 
 use super::{
@@ -17,7 +24,7 @@ use super::{
 use crate::{
     export::{JSExportCall, JSExportMetadata},
     shared::{
-        errors::{EsperantoResult, JSExportError},
+        errors::{ConversionError, EsperantoResult, JSExportError},
         runtime::JSRuntimeError,
         value::JSValueInternal,
     },
@@ -79,7 +86,7 @@ pub(super) fn get_class_id<T: JSExportClass>(
     unsafe { JS_NewClassID(&mut class_id) };
 
     // Then create a class from our definition using that ID:
-    let definition = T::class_def();
+    let definition = T::class_def()?;
     unsafe { JS_NewClass(runtime, class_id, &definition) };
 
     // Finally we save this ID so that we can use it later
@@ -88,52 +95,46 @@ pub(super) fn get_class_id<T: JSExportClass>(
     return Ok(class_id);
 }
 
-const STR_PROTOTYPE: *const i8 = b"prototype\0" as *const u8 as _;
-const STR_CONSTRUCTOR: *const i8 = b"constructor\0" as *const u8 as _;
-
-fn custom_class_constructor<T: JSExportClass>(
-    ctx: *mut QuickJSContext,
+fn custom_class_call<T: JSExportClass>(
+    ctx: &JSContext,
     new_target: QuickJSValue,
     argc: i32,
     argv: *mut QuickJSValue,
 ) -> EsperantoResult<QuickJSValue> {
-    // This gets called whenever e.g. "new NativeClass()" gets called in JS code.
-    // let runtime = unsafe { JS_GetRuntime(ctx) };
-    // let storage = get_classid_storage(runtime)?;
+    // This gets called whenever one of our custom classes is called EITHER
+    // as a function (e.g. myClass()) or as a constructor (e.g. new MyClass())
+    // the way we differentiate between the two is whether new_target is
+    // an object (constructor) or undefined (a function)
 
-    let context: JSContext = ctx.into();
-
-    // let class_id = get_class_id::<T>(runtime, storage)?;
-
-    // // examples in the QuickJS codebase tell us "using new_target to get the prototype is
-    // // necessary when the class is extended", so, OK then!
-    // // https://github.com/bellard/quickjs/blob/b5e62895c619d4ffc75c9d822c8d85f1ece77e5b/examples/point.c#L60
-    // let proto = unsafe { JS_GetPropertyStr(ctx, new_target, STR_PROTOTYPE) };
-
-    // Then we create a new object with this prototype:
-    // let new_object = unsafe { JS_NewObjectProtoClass(ctx, proto, class_id) };
-
-    // Ensure that we release the prototype or we'll get a memory leak
-    // proto.release(ctx.into());
-
-    let constructor = match T::METADATA.call_as_constructor {
-        Some(constructor) => constructor,
-        _ => return Err(JSExportError::ConstructorCalledOnNonConstructableClass.into()),
+    let target_is_constructor = match unsafe { JS_GetTag__(new_target) } {
+        JS_TAG_OBJECT => true,
+        JS_TAG_UNDEFINED => false,
+        _ => {
+            // It's possible that QuickJS might do something entirely unexpected here
+            // so if that's the case let's just exit.
+            return Err(JSExportError::UnexpectedBehaviour.into());
+        }
     };
 
     let argc_size: usize = argc
         .try_into()
         .map_err(|err| JSExportError::CouldNotConvertArgumentNumber(err))?;
-    let args = unsafe { slice::from_raw_parts(argv, argc_size) };
 
-    let wrapped_args: Vec<JSValueRef> = args
+    let args: Vec<JSValueRef> = unsafe { slice::from_raw_parts(argv, argc_size) }
         .iter()
-        .map(|raw| JSValueRef::wrap_internal(unsafe { JS_DupValue__(ctx, *raw) }, &context))
+        .map(|raw| JSValueRef::wrap_internal(unsafe { JS_DupValue__(*ctx.internal, *raw) }, &ctx))
         .collect();
 
-    let item = (constructor.func)(&wrapped_args, &context)?;
+    let result = match (target_is_constructor, T::METADATA.call_as_constructor) {
+        (true, Some(constructor)) => (constructor.func)(&args, &ctx),
+        (true, None) => Err(JSExportError::ConstructorCalledOnNonConstructableClass(
+            T::METADATA.class_name.to_string(),
+        )
+        .into()),
+        _ => Err(JSExportError::UnexpectedBehaviour.into()),
+    };
 
-    return Ok(item.internal.retain(context.internal));
+    return result.map(|val| val.internal.retain(ctx.internal));
 }
 
 unsafe extern "C" fn custom_class_call_extern<T: JSExportClass>(
@@ -142,9 +143,11 @@ unsafe extern "C" fn custom_class_call_extern<T: JSExportClass>(
     argc: i32,
     argv: *mut QuickJSValue,
 ) -> QuickJSValue {
-    let tag = unsafe { JS_GetTag__(new_target) };
-
-    custom_class_constructor::<T>(ctx, new_target, argc, argv).unwrap_or(JS_EXCEPTION__)
+    let context: JSContext = ctx.into();
+    custom_class_call::<T>(&context, new_target, argc, argv).unwrap_or_else(|e| {
+        context.throw_error(e);
+        JS_UNDEFINED__
+    })
 }
 
 pub(super) fn get_class_prototype<T: JSExportClass>(
@@ -163,25 +166,32 @@ pub(super) fn get_class_prototype<T: JSExportClass>(
         return Ok(existing_proto);
     }
 
-    // If we can't find it, make it!
-    // Create an 'empty' object that we'll throw all of this onto:
-    let proto = unsafe { JS_NewObject(*ctx) };
+    let name_as_cstring = CString::new(T::METADATA.class_name)
+        .map_err(|e| ConversionError::CouldNotConvertToJSString(e))?;
 
-    let proto_retained = unsafe {
-        // Annoying thing: I don't know why this is required. You'd think
-        // JS_NewObject would return a retained object. But if we don't do it
-        // the runtime fails to free correctly.
-        JS_DupValue__(in_context, proto)
+    let proto = unsafe {
+        JS_NewCFunction2(
+            *ctx,
+            Some(custom_class_call_extern::<T>),
+            name_as_cstring.as_ptr(),
+            2,
+            JSCFunctionEnum_JS_CFUNC_generic,
+            0,
+        )
     };
 
-    // let cproto = match (
-    //     T::METADATA.call_as_constructor,
-    //     T::METADATA.call_as_function,
-    // ) {
-    //     (Some(_), Some(_)) => Some(JSCFunctionEnum_JS_CFUNC_constructor_or_func),
-    //     (Some(_), None) => Some(JSCFunctionEnum_JS_CFUNC_constructor),
-    //     (None, Some(_)) => Some(JSCFunctionEnum_JS_CFUNC_generic),
-    //     (None, None) => None,
+    unsafe { JS_DupValue__(*ctx, proto) };
+
+    // If we can't find it, make it!
+    // Create an 'empty' object that we'll throw all of this onto:
+
+    // let proto = unsafe { JS_NewObject(*ctx) };
+
+    // let proto_retained = unsafe {
+    //     // Annoying thing: I don't know why this is required. You'd think
+    //     // JS_NewObject would return a retained object. But if we don't do it
+    //     // the runtime fails to free correctly.
+    //     JS_DupValue__(in_context, proto)
     // };
 
     if T::METADATA.call_as_constructor.is_some() {
@@ -191,19 +201,19 @@ pub(super) fn get_class_prototype<T: JSExportClass>(
             JS_NewCFunction2(
                 *ctx,
                 Some(custom_class_call_extern::<T>),
-                T::METADATA.class_name as *const i8,
+                name_as_cstring.as_ptr(),
                 2,
                 JSCFunctionEnum_JS_CFUNC_constructor,
                 0,
             )
         };
-        unsafe { JS_SetConstructor(*ctx, constructor, proto_retained) }
+        unsafe { JS_SetConstructor(*ctx, constructor, proto) }
         // since this constructor is now attached to the prototype we don't need to hold our
         // own reference to it, so we release.
         constructor.release(ctx);
     }
 
-    unsafe { JS_SetClassProto(*ctx, class_id, proto_retained) };
+    unsafe { JS_SetClassProto(*ctx, class_id, proto) };
 
     return Ok(proto);
 }

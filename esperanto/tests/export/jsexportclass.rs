@@ -5,7 +5,7 @@ mod test {
     use esperanto::export::{
         JSClassFunction, JSExportCall, JSExportMetadata, JSExportMetadataOptional,
     };
-    use esperanto::{js_export_class, JSContext, JSExportClass};
+    use esperanto::{JSContext, JSExportClass};
     use esperanto::{JSValueRef, TryJSValueFrom};
     use quickjs_android_suitable_sys::JSValue;
 
@@ -15,7 +15,7 @@ mod test {
 
         impl JSExportClass for TestStruct {
             const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
-                class_name: b"TestStruct\0" as _,
+                class_name: "TestStruct",
                 attributes: None,
                 call_as_constructor: None,
             };
@@ -35,7 +35,7 @@ mod test {
 
         impl JSExportClass for TestStruct {
             const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
-                class_name: b"TestStruct\0" as _,
+                class_name: "TestStruct",
                 attributes: None,
                 call_as_constructor: Some(JSClassFunction {
                     num_args: 1,
@@ -68,7 +68,7 @@ mod test {
 
         impl JSExportClass for TestStruct {
             const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
-                class_name: b"TestStruct\0" as _,
+                class_name: "TestStruct",
                 attributes: None,
                 call_as_constructor: Some(JSClassFunction {
                     num_args: 1,
@@ -110,7 +110,7 @@ mod test {
 
         impl JSExportClass for TestStruct {
             const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
-                class_name: b"TestStruct\0" as _,
+                class_name: "TestStruct",
                 attributes: None,
                 call_as_constructor: None,
             };
@@ -144,7 +144,7 @@ mod test {
 
         impl JSExportClass for TestStruct {
             const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
-                class_name: b"TestStruct\0" as _,
+                class_name: "TestStruct",
                 attributes: None,
                 call_as_constructor: None,
             };
@@ -180,19 +180,19 @@ mod test {
 
         impl JSExportClass for TestStruct {
             const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
-                class_name: b"TestStruct\0" as _,
+                class_name: "TestStruct",
                 attributes: None,
                 call_as_constructor: None,
             };
         }
 
         let ctx = JSContext::new().unwrap();
-        let constructor = JSValueRef::constructor_for::<TestStruct>(&ctx).unwrap();
+        let constructor = JSValueRef::prototype_for::<TestStruct>(&ctx).unwrap();
         ctx.global_object()
             .set_property("TestStruct", &constructor)
             .unwrap();
 
-        let result = ctx.evaluate("new TestStruct()", None).unwrap();
+        let result = ctx.evaluate("TestStruct()", None).unwrap();
         println!("{}", result.to_string())
     }
 }

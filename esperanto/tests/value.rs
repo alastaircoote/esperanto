@@ -86,7 +86,9 @@ mod value_tests {
         let func = ctx
             .evaluate("(function() { return this.testValue })", None)
             .unwrap();
-        let result = func.call_as_function_bound(vec![], &bound_obj).unwrap();
+        let result = func
+            .call_as_function_bound(vec![], Some(&bound_obj))
+            .unwrap();
         assert_eq!(i32::try_from(&result).unwrap(), 4567);
     }
 
@@ -179,7 +181,7 @@ mod value_tests {
 
         impl JSExportClass for TestStruct {
             const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
-                class_name: b"TestStruct\0" as _,
+                class_name: "TestStruct",
                 attributes: None,
                 call_as_constructor: None,
             };
@@ -208,7 +210,7 @@ mod value_tests {
 
         impl JSExportClass for TestStruct {
             const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
-                class_name: b"TestStruct\0" as _,
+                class_name: "TestStruct",
                 attributes: None,
                 call_as_constructor: None,
             };

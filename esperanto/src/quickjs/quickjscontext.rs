@@ -2,7 +2,7 @@ use std::ffi::CString;
 
 use quickjs_android_suitable_sys::{
     JS_Eval, JS_FreeContext, JS_GetGlobalObject, JS_GetRuntime, JS_NewContext, JS_RunGC,
-    JS_EVAL_TYPE_GLOBAL,
+    JS_ThrowInternalError, JS_EVAL_TYPE_GLOBAL,
 };
 
 use super::quickjscontextpointer::QuickJSContextPointer;
@@ -72,5 +72,10 @@ impl JSContextInternal for QuickJSContextInternal {
     fn get_globalobject(self) -> Self::ValueType {
         let obj = unsafe { JS_GetGlobalObject(*self) };
         obj.into()
+    }
+
+    fn throw_error(self, err: crate::EsperantoError) {
+        let err_as_string = err.to_string();
+        unsafe { JS_ThrowInternalError(*self, err_as_string.as_ptr() as _) };
     }
 }

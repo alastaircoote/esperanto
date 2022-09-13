@@ -73,6 +73,10 @@ impl<'c> JSContext<'c> {
         let raw = self.internal.get_globalobject();
         JSValueRef::wrap_internal(raw, self)
     }
+
+    pub fn throw_error(&self, err: EsperantoError) {
+        self.internal.throw_error(err)
+    }
 }
 
 impl Drop for JSContext<'_> {

@@ -1,7 +1,12 @@
+use std::ffi::CString;
+
 use quickjs_android_suitable_sys::{JSClassDef, JSContext, JSValue};
 
 use super::quickjs_prototype_storage::delete_stored_prototype_extern;
-use crate::JSExportClass;
+use crate::{
+    shared::errors::{ConversionError, EsperantoResult},
+    JSExportClass,
+};
 
 pub type QuickJSCallAsFunction =
     unsafe extern "C" fn(*mut JSContext, JSValue, JSValue, i32, *mut JSValue, i32) -> JSValue;
@@ -30,15 +35,17 @@ pub(super) trait QuickJSExportExtensions: JSExportClass + Sized {
     //     }
     // }
 
-    fn class_def() -> JSClassDef {
-        JSClassDef {
-            class_name: Self::METADATA.class_name as *const i8,
-            // call: None,
-            call: Some(test_call),
+    fn class_def() -> EsperantoResult<JSClassDef> {
+        let name_cstring = CString::new(Self::METADATA.class_name)
+            .map_err(|e| ConversionError::CouldNotConvertToJSString(e))?;
+        Ok(JSClassDef {
+            class_name: name_cstring.as_ptr(),
+            call: None,
+            // call: Some(test_call),
             finalizer: Some(delete_stored_prototype_extern::<Self>),
             gc_mark: None,
             exotic: std::ptr::null_mut(),
-        }
+        })
     }
 }
 
