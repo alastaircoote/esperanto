@@ -1,3 +1,5 @@
+use std::ffi::NulError;
+
 use crate::{
     shared::{
         context::JSContextError, errors::conversion_error::ConversionError,
@@ -34,3 +36,9 @@ pub enum EsperantoError {
 }
 
 pub type EsperantoResult<T> = Result<T, EsperantoError>;
+
+impl From<NulError> for EsperantoError {
+    fn from(err: NulError) -> Self {
+        return EsperantoError::ConversionError(ConversionError::CouldNotConvertToJSString(err));
+    }
+}

@@ -60,6 +60,33 @@ mod test {
     }
 
     #[test]
+    fn exports_safely_fails_with_no_constructor() {
+        struct TestStruct {}
+
+        impl JSExportClass for TestStruct {
+            const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
+                class_name: "TestStruct",
+                attributes: None,
+                call_as_constructor: None,
+            };
+        }
+
+        let ctx = JSContext::new().unwrap();
+        let wrapped = JSValueRef::constructor_for::<TestStruct>(&ctx).unwrap();
+        ctx.global_object()
+            .set_property("TestValue", &wrapped)
+            .unwrap();
+
+        let result = ctx.evaluate("new TestValue()", None).unwrap_err();
+        match result {
+            esperanto::EsperantoError::JavaScriptError(err) => {
+                assert_eq!(err.message, "Class TestStruct does not have a constuctor");
+            }
+            _ => panic!("Unexpected result"),
+        }
+    }
+
+    #[test]
     fn constructor_arguments_are_passed() {
         struct TestStruct {
             value_one: f64,

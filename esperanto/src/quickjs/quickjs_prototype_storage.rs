@@ -95,16 +95,18 @@ pub(super) fn get_class_id<T: JSExportClass>(
     return Ok(class_id);
 }
 
+/**
+ * This gets called whenever a native class is invoked either as a function (e.g. myClass())
+ * or as a constructor (e.g. new MyClass())
+ */
 fn custom_class_call<T: JSExportClass>(
     ctx: &JSContext,
     new_target: QuickJSValue,
     argc: i32,
     argv: *mut QuickJSValue,
 ) -> EsperantoResult<QuickJSValue> {
-    // This gets called whenever one of our custom classes is called EITHER
-    // as a function (e.g. myClass()) or as a constructor (e.g. new MyClass())
-    // the way we differentiate between the two is whether new_target is
-    // an object (constructor) or undefined (a function)
+    // First off we need to check whether this invoke is as a constructor or as
+    // a function. We detect that by seeing if new_target is an object or not.
 
     let target_is_constructor = match unsafe { JS_GetTag__(new_target) } {
         JS_TAG_OBJECT => true,
@@ -116,27 +118,45 @@ fn custom_class_call<T: JSExportClass>(
         }
     };
 
+    // Now we convert out raw value pointers into a Vec<JSValueRef>
+
     let argc_size: usize = argc
         .try_into()
         .map_err(|err| JSExportError::CouldNotConvertArgumentNumber(err))?;
 
     let args: Vec<JSValueRef> = unsafe { slice::from_raw_parts(argv, argc_size) }
         .iter()
-        .map(|raw| JSValueRef::wrap_internal(unsafe { JS_DupValue__(*ctx.internal, *raw) }, &ctx))
+        .map(|raw| {
+            // We do an extra retain here because we'll perform a release when the JSValueRef gets dropped.
+            // If we don't retain we'll end up with too many releases and QuickJS will crash.
+            let extra_retain = raw.retain(ctx.internal);
+            JSValueRef::wrap_internal(extra_retain, &ctx)
+        })
         .collect();
 
     let result = match (target_is_constructor, T::METADATA.call_as_constructor) {
-        (true, Some(constructor)) => (constructor.func)(&args, &ctx),
-        (true, None) => Err(JSExportError::ConstructorCalledOnNonConstructableClass(
-            T::METADATA.class_name.to_string(),
-        )
-        .into()),
+        (true, Some(constructor)) => {
+            // This was called as a constructor and we have a constructor. Expected behaviour.
+            (constructor.func)(&args, &ctx)
+        }
+        (true, None) => {
+            // This called as a constructor but we don't have one. Unexpected behaviour.
+            Err(JSExportError::ConstructorCalledOnNonConstructableClass(
+                T::METADATA.class_name.to_string(),
+            )
+            .into())
+        }
+        // Any other combination: unexpected behaviour.
         _ => Err(JSExportError::UnexpectedBehaviour.into()),
     };
 
     return result.map(|val| val.internal.retain(ctx.internal));
 }
 
+/**
+ * This is just a tiny wrapper around custom_class_call that means we can use the ? operator there
+ * (since it returns a Result) and then unwrap that for a correct return to QuickJS.
+ */
 unsafe extern "C" fn custom_class_call_extern<T: JSExportClass>(
     ctx: *mut QuickJSContext,
     new_target: QuickJSValue,
@@ -146,6 +166,8 @@ unsafe extern "C" fn custom_class_call_extern<T: JSExportClass>(
     let context: JSContext = ctx.into();
     custom_class_call::<T>(&context, new_target, argc, argv).unwrap_or_else(|e| {
         context.throw_error(e);
+        // Once we've thrown an error the return value never actually gets used but we should still
+        // return one anyway, so let's return undefined.
         JS_UNDEFINED__
     })
 }
@@ -194,7 +216,7 @@ pub(super) fn get_class_prototype<T: JSExportClass>(
     //     JS_DupValue__(in_context, proto)
     // };
 
-    if T::METADATA.call_as_constructor.is_some() {
+    if T::METADATA.call_as_constructor.is_some() || 1 == 1 {
         // First we create our constructor function that calls the generic function
         // defined above here
         let constructor = unsafe {

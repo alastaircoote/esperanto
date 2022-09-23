@@ -2,7 +2,6 @@ macro_rules! check_quickjs_exception {
     ($ctx:expr => $stmt:expr) => {{
         let result = $stmt;
         let exception = unsafe { quickjs_android_suitable_sys::JS_GetException(*$ctx) };
-
         if unsafe { quickjs_android_suitable_sys::JS_IsError(*$ctx, exception) } == 0 {
             Ok(result)
         } else {

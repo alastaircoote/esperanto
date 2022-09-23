@@ -19,5 +19,5 @@ pub(crate) trait JSContextInternal: Sized {
     fn get_runtime(self) -> Self::RuntimeType;
     fn get_globalobject(self) -> Self::ValueType;
     fn garbage_collect(self);
-    fn throw_error(self, err: EsperantoError);
+    fn throw_error(self, err: Self::ValueType);
 }

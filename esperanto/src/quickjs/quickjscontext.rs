@@ -1,8 +1,8 @@
 use std::ffi::CString;
 
 use quickjs_android_suitable_sys::{
-    JS_Eval, JS_FreeContext, JS_GetGlobalObject, JS_GetRuntime, JS_NewContext, JS_RunGC,
-    JS_ThrowInternalError, JS_EVAL_TYPE_GLOBAL,
+    JSValue, JS_Eval, JS_FreeContext, JS_GetGlobalObject, JS_GetRuntime, JS_IsError, JS_NewContext,
+    JS_NewError, JS_RunGC, JS_Throw, JS_ThrowInternalError, JS_EVAL_TYPE_GLOBAL,
 };
 
 use super::quickjscontextpointer::QuickJSContextPointer;
@@ -10,6 +10,7 @@ use super::quickjsruntime::QuickJSRuntimeInternal;
 use crate::shared::{
     context::{EvaluateMetadata, JSContextError, JSContextInternal},
     errors::EsperantoResult,
+    value::JSValueInternal,
 };
 
 use super::quickjsvalue::QuickJSValueInternal;
@@ -74,8 +75,10 @@ impl JSContextInternal for QuickJSContextInternal {
         obj.into()
     }
 
-    fn throw_error(self, err: crate::EsperantoError) {
-        let err_as_string = err.to_string();
-        unsafe { JS_ThrowInternalError(*self, err_as_string.as_ptr() as _) };
+    fn throw_error(self, err: Self::ValueType) {
+        // quickjs.c states that JS_Throw frees the value. Why? No clue but if we don't
+        // do a retain here it disappears and there is no exception to look at.
+        let retained = err.retain(self);
+        unsafe { JS_Throw(*self, retained) };
     }
 }

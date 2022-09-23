@@ -1,6 +1,7 @@
 use std::ffi::CString;
 
 use super::{context_error::JSContextError, evaluate_metadata::EvaluateMetadata};
+use crate::shared::value::JSValueInternal;
 use crate::shared::{context::JSContextInternal, errors::EsperantoResult};
 use crate::shared::{engine_impl::JSContextInternalImpl, errors::EsperantoError};
 use crate::shared::{runtime::JSRuntime, value::JSValueRef};
@@ -74,8 +75,10 @@ impl<'c> JSContext<'c> {
         JSValueRef::wrap_internal(raw, self)
     }
 
-    pub fn throw_error(&self, err: EsperantoError) {
-        self.internal.throw_error(err)
+    pub fn throw_error(&self, err: EsperantoError) -> EsperantoResult<()> {
+        let error = JSValueRef::new_error("EsperantoError", &err.to_string(), &self)?;
+        self.internal.throw_error(error.internal);
+        Ok(())
     }
 }
 

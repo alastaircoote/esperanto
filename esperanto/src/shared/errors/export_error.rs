@@ -5,7 +5,7 @@ use thiserror::Error;
 use super::EsperantoError;
 #[derive(Debug, Error, Eq, PartialEq)]
 pub enum JSExportError {
-    #[error("Class constructor `${0}` cannot be invoked without 'new'")]
+    #[error("Class {0} does not have a constuctor")]
     ConstructorCalledOnNonConstructableClass(String),
 
     #[error("Could not process the argument number value provided by the runtime")]

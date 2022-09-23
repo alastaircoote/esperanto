@@ -146,13 +146,26 @@ impl<'c> JSValueRef<'c> {
         let arguments_cstr: Vec<CString> = arguments
             .iter()
             .map(|v| CString::new(*v))
-            .collect::<Result<Vec<CString>, _>>()
-            .map_err(|e| ConversionError::CouldNotConvertToJSString(e))?;
+            .collect::<Result<Vec<CString>, _>>()?;
 
         let raw =
             JSValueInternalImpl::new_function(&body_cstr, &arguments_cstr, in_context.internal)?;
 
         Ok(Self::wrap_internal(raw, in_context))
+    }
+
+    pub fn new_error(
+        name: &str,
+        message: &str,
+        in_context: &'c JSContext<'c>,
+    ) -> EsperantoResult<Self> {
+        let name_cstring = CString::new(name)?;
+        let message_cstring = CString::new(message)?;
+
+        let created =
+            JSValueInternalImpl::new_error(name_cstring, message_cstring, in_context.internal);
+
+        Ok(Self::wrap_internal(created, in_context))
     }
 
     pub fn call_as_function(&self, arguments: Vec<&Self>) -> EsperantoResult<Self> {

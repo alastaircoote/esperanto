@@ -89,6 +89,5 @@ pub(crate) trait JSValueInternal: Sized + Copy {
     ) -> EsperantoResult<Self>;
 
     fn equals(self, other: Self, ctx: Self::ContextType) -> bool;
-
     fn is_instanceof(self, target: Self, ctx: Self::ContextType) -> EsperantoResult<bool>;
 }
