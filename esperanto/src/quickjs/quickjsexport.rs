@@ -13,16 +13,6 @@ pub type QuickJSCallAsFunction =
 pub type QuickJSCallAsConstructor =
     unsafe extern "C" fn(*mut JSContext, JSValue, JSValue, i32, *mut JSValue, i32) -> JSValue;
 
-unsafe extern "C" fn test_call(
-    ctx: *mut JSContext,
-    val_one: JSValue,
-    val_two: JSValue,
-    argc: i32,
-    argv: *mut JSValue,
-    flags: i32,
-) -> JSValue {
-    panic!("wtf");
-}
 
 pub(super) trait QuickJSExportExtensions: JSExportClass + Sized {
     // fn prototype_def() -> JSClassDef {

@@ -1,7 +1,6 @@
 use std::ffi::CString;
 
 use super::{context_error::JSContextError, evaluate_metadata::EvaluateMetadata};
-use crate::shared::value::JSValueInternal;
 use crate::shared::{context::JSContextInternal, errors::EsperantoResult};
 use crate::shared::{engine_impl::JSContextInternalImpl, errors::EsperantoError};
 use crate::shared::{runtime::JSRuntime, value::JSValueRef};
@@ -84,6 +83,10 @@ impl<'c> JSContext<'c> {
 
 impl Drop for JSContext<'_> {
     fn drop(&mut self) {
+        if let Some(_) = &self.stored_runtime {
+            // this is really just here to stop a compiler error about stored_runtime
+            // never being used.
+        }
         self.internal.release();
     }
 }

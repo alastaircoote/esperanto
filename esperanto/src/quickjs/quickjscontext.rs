@@ -1,8 +1,7 @@
 use std::ffi::CString;
 
 use quickjs_android_suitable_sys::{
-    JSValue, JS_Eval, JS_FreeContext, JS_GetGlobalObject, JS_GetRuntime, JS_IsError, JS_NewContext,
-    JS_NewError, JS_RunGC, JS_Throw, JS_ThrowInternalError, JS_EVAL_TYPE_GLOBAL,
+    JS_Eval, JS_FreeContext, JS_GetGlobalObject, JS_GetRuntime, JS_NewContext, JS_RunGC, JS_Throw, JS_EVAL_TYPE_GLOBAL,
 };
 
 use super::quickjscontextpointer::QuickJSContextPointer;

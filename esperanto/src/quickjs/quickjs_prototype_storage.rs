@@ -1,5 +1,4 @@
 use std::{
-    any::TypeId,
     collections::HashMap,
     convert::TryInto,
     ffi::{c_void, CString},
@@ -8,12 +7,12 @@ use std::{
 
 use by_address::ByAddress;
 use quickjs_android_suitable_sys::{
-    JSCFunctionEnum_JS_CFUNC_constructor, JSCFunctionEnum_JS_CFUNC_constructor_or_func,
+    JSCFunctionEnum_JS_CFUNC_constructor,
     JSCFunctionEnum_JS_CFUNC_generic, JSContext as QuickJSContext, JSRuntime,
-    JSValue as QuickJSValue, JS_DupValue__, JS_GetClassProto, JS_GetOpaque, JS_GetPropertyStr,
-    JS_GetRuntime, JS_GetRuntimeOpaque, JS_GetTag__, JS_IsEqual__, JS_NewCFunction2, JS_NewClass,
-    JS_NewClassID, JS_NewObject, JS_NewObjectProtoClass, JS_SetClassProto, JS_SetConstructor,
-    JS_SetOpaque, JS_SetRuntimeOpaque, JS_ThrowInternalError, JS_EXCEPTION__, JS_NULL__,
+    JSValue as QuickJSValue, JS_DupValue__, JS_GetClassProto, JS_GetOpaque,
+     JS_GetRuntimeOpaque, JS_GetTag__, JS_IsEqual__, JS_NewCFunction2, JS_NewClass,
+    JS_NewClassID, JS_SetClassProto, JS_SetConstructor,
+     JS_SetRuntimeOpaque, JS_NULL__,
     JS_TAG_OBJECT, JS_TAG_UNDEFINED, JS_UNDEFINED__,
 };
 
@@ -22,7 +21,7 @@ use super::{
     quickjsruntime::QuickJSRuntimeInternal,
 };
 use crate::{
-    export::{JSExportCall, JSExportMetadata},
+    export::JSExportMetadata,
     shared::{
         errors::{ConversionError, EsperantoResult, JSExportError},
         runtime::JSRuntimeError,
@@ -45,6 +44,7 @@ pub(super) fn get_classid_storage<'a>(
 }
 
 pub(super) fn attach_classid_storage(runtime: QuickJSRuntimeInternal) {
+    println!("ATTACHING CLASSID STORAGE ${:?}", runtime);
     // When we create a new runtime we make a new ID store for later use. We need to Box<>
     // it up in order to store it within QuickJS's opaque storage.
 
@@ -60,7 +60,7 @@ pub(super) fn drop_classid_storage(runtime: QuickJSRuntimeInternal) {
     let storage_ptr = unsafe { JS_GetRuntimeOpaque(runtime) } as *mut JSClassIDStorage;
     unsafe { JS_SetRuntimeOpaque(runtime, std::ptr::null_mut()) };
     let boxed = unsafe { Box::from_raw(storage_ptr) };
-
+    
     // Not necessary but let's be explicit about why we're doing this:
     drop(boxed);
 }
@@ -77,6 +77,7 @@ pub(super) fn get_class_id<T: JSExportClass>(
 
     if let Some(class_id) = storage.get(&addr) {
         // If yes just directly return it:
+        println!("Returning reference to existing class id {:?}", runtime);
         return Ok(*class_id);
     }
 
@@ -165,7 +166,7 @@ unsafe extern "C" fn custom_class_call_extern<T: JSExportClass>(
 ) -> QuickJSValue {
     let context: JSContext = ctx.into();
     custom_class_call::<T>(&context, new_target, argc, argv).unwrap_or_else(|e| {
-        context.throw_error(e);
+        context.throw_error(e).unwrap();
         // Once we've thrown an error the return value never actually gets used but we should still
         // return one anyway, so let's return undefined.
         JS_UNDEFINED__
@@ -216,7 +217,7 @@ pub(super) fn get_class_prototype<T: JSExportClass>(
     //     JS_DupValue__(in_context, proto)
     // };
 
-    if T::METADATA.call_as_constructor.is_some() || 1 == 1 {
+    if T::METADATA.call_as_constructor.is_some() {
         // First we create our constructor function that calls the generic function
         // defined above here
         let constructor = unsafe {
@@ -244,7 +245,6 @@ fn delete_stored_prototype<T: JSExportClass>(
     runtime: *mut JSRuntime,
     value: QuickJSValue,
 ) -> EsperantoResult<()> {
-    println!("DELETE VALUE {:?}", value);
     let storage = get_classid_storage(runtime)?;
 
     let class_id = get_class_id::<T>(runtime, storage)?;

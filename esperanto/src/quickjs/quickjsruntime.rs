@@ -1,26 +1,19 @@
-use std::{any::TypeId, cell::RefCell, collections::HashMap, hash::Hash, iter::Map};
 
-use super::{
-    quickjs_prototype_storage::attach_classid_storage, quickjsexport::QuickJSExportExtensions,
-};
-use by_address::ByAddress;
+use super::quickjs_prototype_storage::attach_classid_storage;
+
 use quickjs_android_suitable_sys::{
-    JSRuntime as QuickJSRuntime, JS_FreeRuntime, JS_GetRuntimeOpaque, JS_NewClass, JS_NewClassID,
+    JSRuntime as QuickJSRuntime, JS_FreeRuntime,
     JS_NewRuntime,
 };
 
 use crate::{
     quickjs::quickjs_prototype_storage::drop_classid_storage,
     shared::{
-        errors::EsperantoResult,
         runtime::{JSRuntimeError, JSRuntimeInternal},
     },
-    JSExportClass,
 };
 
 pub type QuickJSRuntimeInternal = *mut QuickJSRuntime;
-
-type ClassIDStore = HashMap<TypeId, u32>;
 
 // pub(super) fn get_class_id_for_type<T: JSExportClass>(
 //     runtime: QuickJSRuntimeInternal,
@@ -58,8 +51,8 @@ impl JSRuntimeInternal for QuickJSRuntimeInternal {
 
     fn release(self) {
         println!("FREE RUNTIME");
-
-        unsafe { JS_FreeRuntime(self) }
         drop_classid_storage(self);
+        unsafe { JS_FreeRuntime(self) }
+        
     }
 }

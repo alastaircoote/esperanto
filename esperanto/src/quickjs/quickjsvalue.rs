@@ -4,7 +4,7 @@ use quickjs_android_suitable_sys::{
     JSValue as QuickJSValue, JS_Call, JS_CallConstructor, JS_DeleteProperty, JS_DupValue__,
     JS_FreeAtom, JS_FreeCString, JS_FreeValue__, JS_GetOpaque, JS_GetPropertyStr, JS_GetRuntime,
     JS_IsEqual__, JS_IsError, JS_IsInstanceOf, JS_IsObject__, JS_IsString__, JS_NewAtom,
-    JS_NewBool__, JS_NewClass, JS_NewClassID, JS_NewError, JS_NewFloat64__, JS_NewObjectProtoClass,
+    JS_NewBool__, JS_NewError, JS_NewFloat64__, JS_NewObjectProtoClass,
     JS_NewString, JS_SetOpaque, JS_SetPropertyStr, JS_ToBool, JS_ToCStringLen2, JS_ToFloat64,
     JS_UNDEFINED__,
 };

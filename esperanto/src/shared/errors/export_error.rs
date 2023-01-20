@@ -1,8 +1,7 @@
-use std::{ffi::NulError, num::TryFromIntError};
+use std::num::TryFromIntError;
 
 use thiserror::Error;
 
-use super::EsperantoError;
 #[derive(Debug, Error, Eq, PartialEq)]
 pub enum JSExportError {
     #[error("Class {0} does not have a constuctor")]

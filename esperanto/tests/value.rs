@@ -3,7 +3,7 @@ mod value_tests {
     use std::convert::TryFrom;
 
     use esperanto::errors::JSValueError;
-    use esperanto::export::{JSClassFunction, JSExportMetadata, JSExportMetadataOptional};
+    use esperanto::export::JSExportMetadata;
     use esperanto::{EsperantoError, JSContext, JSExportClass, JSValueRef, TryJSValueFrom};
 
     #[test]

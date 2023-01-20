@@ -1,13 +1,12 @@
 #[cfg(test)]
 mod test {
-    use std::convert::{TryFrom, TryInto};
+    use std::convert::{TryFrom};
 
     use esperanto::export::{
-        JSClassFunction, JSExportCall, JSExportMetadata, JSExportMetadataOptional,
+        JSClassFunction, JSExportMetadata,
     };
     use esperanto::{JSContext, JSExportClass};
-    use esperanto::{JSValueRef, TryJSValueFrom};
-    use quickjs_android_suitable_sys::JSValue;
+    use esperanto::{JSValueRef};
 
     #[test]
     fn exports_sets_constructor() {
