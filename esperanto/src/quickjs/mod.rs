@@ -8,7 +8,6 @@ mod quickjs_prototype_storage;
 mod quickjscontextpointer;
 mod quickjsruntime;
 mod quickjsvalue;
-mod quickjsvalueholder;
 
 pub(crate) use quickjscontext::QuickJSContextInternal as JSContextInternalImpl;
 pub(crate) use quickjsruntime::QuickJSRuntimeInternal as JSRuntimeInternalImpl;

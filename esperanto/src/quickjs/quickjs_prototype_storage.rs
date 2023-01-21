@@ -7,13 +7,11 @@ use std::{
 
 use by_address::ByAddress;
 use quickjs_android_suitable_sys::{
-    JSCFunctionEnum_JS_CFUNC_constructor,
-    JSCFunctionEnum_JS_CFUNC_generic, JSContext as QuickJSContext, JSRuntime,
-    JSValue as QuickJSValue, JS_DupValue__, JS_GetClassProto, JS_GetOpaque,
-     JS_GetRuntimeOpaque, JS_GetTag__, JS_IsEqual__, JS_NewCFunction2, JS_NewClass,
-    JS_NewClassID, JS_SetClassProto, JS_SetConstructor,
-     JS_SetRuntimeOpaque, JS_NULL__,
-    JS_TAG_OBJECT, JS_TAG_UNDEFINED, JS_UNDEFINED__,
+    JSCFunctionEnum_JS_CFUNC_generic,
+    JSContext as QuickJSContext, JSRuntime, JSValue as QuickJSValue, JS_DupValue__,
+    JS_GetClassProto, JS_GetOpaque, JS_GetRuntimeOpaque, JS_GetTag__, JS_IsEqual__,
+    JS_NewCFunction2, JS_NewClass, JS_NewClassID, JS_SetClassProto, JS_SetConstructor,
+    JS_SetRuntimeOpaque, JS_NULL__, JS_TAG_OBJECT, JS_TAG_UNDEFINED, JS_UNDEFINED__, JSCFunctionEnum_JS_CFUNC_constructor_or_func,
 };
 
 use super::{
@@ -30,7 +28,7 @@ use crate::{
     JSContext, JSExportClass, JSValueRef,
 };
 
-type JSClassIDStorage<'a> = HashMap<ByAddress<&'a JSExportMetadata<'a>>, u32>;
+type JSClassIDStorage<'a> = HashMap<ByAddress<&'a JSExportMetadata>, u32>;
 
 pub(super) fn get_classid_storage<'a>(
     runtime: QuickJSRuntimeInternal,
@@ -60,7 +58,7 @@ pub(super) fn drop_classid_storage(runtime: QuickJSRuntimeInternal) {
     let storage_ptr = unsafe { JS_GetRuntimeOpaque(runtime) } as *mut JSClassIDStorage;
     unsafe { JS_SetRuntimeOpaque(runtime, std::ptr::null_mut()) };
     let boxed = unsafe { Box::from_raw(storage_ptr) };
-    
+
     // Not necessary but let's be explicit about why we're doing this:
     drop(boxed);
 }
@@ -135,20 +133,29 @@ fn custom_class_call<T: JSExportClass>(
         })
         .collect();
 
-    let result = match (target_is_constructor, T::METADATA.call_as_constructor) {
-        (true, Some(constructor)) => {
+    let result = match (target_is_constructor, T::METADATA.call_as_constructor, T::METADATA.call_as_function) {
+        (true, Some(constructor), _) => {
             // This was called as a constructor and we have a constructor. Expected behaviour.
             (constructor.func)(&args, &ctx)
         }
-        (true, None) => {
+        (true, None, _) => {
             // This called as a constructor but we don't have one. Unexpected behaviour.
             Err(JSExportError::ConstructorCalledOnNonConstructableClass(
                 T::METADATA.class_name.to_string(),
             )
             .into())
         }
-        // Any other combination: unexpected behaviour.
-        _ => Err(JSExportError::UnexpectedBehaviour.into()),
+        (false, _ ,Some(call_as_function)) => {
+            (call_as_function.func)(&args, &ctx)
+        }
+        (false, _, None) => {
+            // This called as a constructor but we don't have one. Unexpected behaviour.
+            Err(JSExportError::CalledNonFunctionClass(
+                T::METADATA.class_name.to_string(),
+            )
+            .into())
+        }
+        
     };
 
     return result.map(|val| val.internal.retain(ctx.internal));
@@ -203,38 +210,29 @@ pub(super) fn get_class_prototype<T: JSExportClass>(
         )
     };
 
+    // We need to retain this. Why? Not sure. But it fails if we don't.
     unsafe { JS_DupValue__(*ctx, proto) };
 
-    // If we can't find it, make it!
-    // Create an 'empty' object that we'll throw all of this onto:
 
-    // let proto = unsafe { JS_NewObject(*ctx) };
+    // no matter whether our JSExportClass has a constructor or not we still need to
+    // define one because the JS code is always able to call the class as a constructor.
+    // the custom_class_call_extern code will check for the presence of a constructor.
 
-    // let proto_retained = unsafe {
-    //     // Annoying thing: I don't know why this is required. You'd think
-    //     // JS_NewObject would return a retained object. But if we don't do it
-    //     // the runtime fails to free correctly.
-    //     JS_DupValue__(in_context, proto)
-    // };
+    let constructor = unsafe {
+        JS_NewCFunction2(
+            *ctx,
+            Some(custom_class_call_extern::<T>),
+            name_as_cstring.as_ptr(),
+            2,
+            JSCFunctionEnum_JS_CFUNC_constructor_or_func,
+            0,
+        )
+    };
+    unsafe { JS_SetConstructor(*ctx, constructor, proto) }
 
-    if T::METADATA.call_as_constructor.is_some() {
-        // First we create our constructor function that calls the generic function
-        // defined above here
-        let constructor = unsafe {
-            JS_NewCFunction2(
-                *ctx,
-                Some(custom_class_call_extern::<T>),
-                name_as_cstring.as_ptr(),
-                2,
-                JSCFunctionEnum_JS_CFUNC_constructor,
-                0,
-            )
-        };
-        unsafe { JS_SetConstructor(*ctx, constructor, proto) }
-        // since this constructor is now attached to the prototype we don't need to hold our
-        // own reference to it, so we release.
-        constructor.release(ctx);
-    }
+    // since this constructor is now attached to the prototype we don't need to hold our
+    // own reference to it, so we release.
+    constructor.release(ctx);
 
     unsafe { JS_SetClassProto(*ctx, class_id, proto) };
 

@@ -6,10 +6,8 @@ use crate::{
     JSContext, JSValueRef,
 };
 
-pub enum JSExportAttribute {
-    Function {
-        call: &'static dyn for<'a> Fn(Vec<JSValueRef<'a>>) -> JSValueRef<'a>,
-    },
+pub enum JSExportAttribute<'a> {
+    Function (JSClassFunction<'a>),
 }
 
 pub struct JSClassFunction<'a> {
@@ -24,13 +22,13 @@ pub enum JSExportCall<T: 'static> {
     AsConstructor(&'static dyn for<'a> Fn(&Vec<JSValueRef<'a>>) -> EsperantoResult<T>),
 }
 
-pub struct JSExportMetadata<'a> {
-    pub class_name: &'a str,
+pub struct JSExportMetadata {
+    pub class_name: &'static str,
     // pub optional: JSExportMetadataOptional,
-    pub attributes: Option<phf::OrderedMap<&'static str, JSExportAttribute>>,
+    pub attributes: Option<phf::OrderedMap<&'static str, JSExportAttribute<'static>>>,
     // pub call: Option<JSExportCall<T>>,
-    pub call_as_constructor: Option<JSClassFunction<'a>>,
-    // pub call_as_function: Option<JSClassFunction<'a>>,
+    pub call_as_constructor: Option<JSClassFunction<'static>>,
+    pub call_as_function: Option<JSClassFunction<'static>>,
 }
 
 #[derive(Eq, PartialEq, Hash, Copy, Clone, Debug)]
@@ -54,7 +52,7 @@ pub enum JSExportClassCall {
 // }
 
 pub trait JSExportClass {
-    const METADATA: JSExportMetadata<'static>;
+    const METADATA: JSExportMetadata;
 }
 
 // #[macro_export]

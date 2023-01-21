@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test {
-    use std::convert::{TryFrom};
+    use std::convert::{TryFrom, TryInto};
 
     use esperanto::export::{
         JSClassFunction, JSExportMetadata,
@@ -13,10 +13,11 @@ mod test {
         struct TestStruct {}
 
         impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
+            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
                 class_name: "TestStruct",
                 attributes: None,
                 call_as_constructor: None,
+                call_as_function: None
             };
         }
 
@@ -33,7 +34,7 @@ mod test {
         struct TestStruct {}
 
         impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
+            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
                 class_name: "TestStruct",
                 attributes: None,
                 call_as_constructor: Some(JSClassFunction {
@@ -43,6 +44,7 @@ mod test {
                         return JSValueRef::wrap_native(item, ctx);
                     },
                 }),
+                call_as_function: None
             };
         }
 
@@ -63,10 +65,11 @@ mod test {
         struct TestStruct {}
 
         impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
+            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
                 class_name: "TestStruct",
                 attributes: None,
                 call_as_constructor: None,
+                call_as_function: None
             };
         }
 
@@ -76,8 +79,9 @@ mod test {
             .set_property("TestValue", &wrapped)
             .unwrap();
 
-        let result = ctx.evaluate("new TestValue()", None).unwrap_err();
-        match result {
+        let result = ctx.evaluate("new TestValue()", None);
+        let err_result = result.unwrap_err();
+        match err_result {
             esperanto::EsperantoError::JavaScriptError(err) => {
                 assert_eq!(err.message, "Class TestStruct does not have a constuctor");
             }
@@ -93,7 +97,7 @@ mod test {
         }
 
         impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
+            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
                 class_name: "TestStruct",
                 attributes: None,
                 call_as_constructor: Some(JSClassFunction {
@@ -109,6 +113,7 @@ mod test {
                         return JSValueRef::wrap_native(item, ctx);
                     },
                 }),
+                call_as_function: None
             };
         }
 
@@ -135,10 +140,14 @@ mod test {
         struct TestStruct {}
 
         impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
+            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
                 class_name: "TestStruct",
                 attributes: None,
-                call_as_constructor: None,
+                call_as_constructor: Some(JSClassFunction { num_args: 0, func:  &|_, ctx| {
+                    let item = TestStruct {};
+                    return JSValueRef::wrap_native(item, &ctx)
+                } }),
+                call_as_function: None
             };
         }
 
@@ -169,10 +178,14 @@ mod test {
         struct TestStruct {}
 
         impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
+            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
                 class_name: "TestStruct",
                 attributes: None,
-                call_as_constructor: None,
+                call_as_constructor: Some(JSClassFunction { num_args: 0, func:  &|_, ctx| {
+                    let item = TestStruct {};
+                    return JSValueRef::wrap_native(item, &ctx)
+                } }),
+                call_as_function: None
             };
         }
 
@@ -202,13 +215,20 @@ mod test {
 
     #[test]
     fn calls_as_function() {
-        struct TestStruct {}
+        struct TestStruct {
+            val: f64
+        }
 
         impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
+            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
                 class_name: "TestStruct",
                 attributes: None,
                 call_as_constructor: None,
+                call_as_function: Some(JSClassFunction { num_args: 1, func: &|args, ctx| {
+                    let from_arg:f64 = args.get(0).unwrap().try_into()?;
+                    let obj = TestStruct { val: from_arg};
+                    return JSValueRef::wrap_native(obj, &ctx);
+                } })
             };
         }
 
@@ -218,7 +238,38 @@ mod test {
             .set_property("TestStruct", &constructor)
             .unwrap();
 
-        let result = ctx.evaluate("TestStruct()", None).unwrap();
+        let result = ctx.evaluate("TestStruct(234)", None).unwrap();
+        let as_struct: &TestStruct = result.get_native(&ctx).unwrap();
+        assert_eq!(as_struct.val, 234.0);
         println!("{}", result.to_string())
+    }
+
+    #[test]
+    fn exports_safely_fails_with_no_function() {
+        struct TestStruct {}
+
+        impl JSExportClass for TestStruct {
+            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
+                class_name: "TestStruct",
+                attributes: None,
+                call_as_constructor: None,
+                call_as_function: None
+            };
+        }
+
+        let ctx = JSContext::new().unwrap();
+        let wrapped = JSValueRef::constructor_for::<TestStruct>(&ctx).unwrap();
+        ctx.global_object()
+            .set_property("TestValue", &wrapped)
+            .unwrap();
+
+        let result = ctx.evaluate("TestValue()", None);
+        let err_result = result.unwrap_err();
+        match err_result {
+            esperanto::EsperantoError::JavaScriptError(err) => {
+                assert_eq!(err.message, "Class TestStruct cannot be called as a function");
+            }
+            _ => panic!("Unexpected result"),
+        }
     }
 }

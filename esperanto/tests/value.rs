@@ -180,10 +180,11 @@ mod value_tests {
         }
 
         impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
+            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
                 class_name: "TestStruct",
                 attributes: None,
                 call_as_constructor: None,
+                call_as_function: None
             };
         }
 
@@ -209,10 +210,11 @@ mod value_tests {
         }
 
         impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata<'static> = JSExportMetadata {
+            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
                 class_name: "TestStruct",
                 attributes: None,
                 call_as_constructor: None,
+                call_as_function: None
             };
         }
 

@@ -7,6 +7,9 @@ pub enum JSExportError {
     #[error("Class {0} does not have a constuctor")]
     ConstructorCalledOnNonConstructableClass(String),
 
+    #[error("Class {0} cannot be called as a function")]
+    CalledNonFunctionClass(String),
+
     #[error("Could not process the argument number value provided by the runtime")]
     CouldNotConvertArgumentNumber(TryFromIntError),
 

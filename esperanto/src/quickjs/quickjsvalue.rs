@@ -4,7 +4,7 @@ use quickjs_android_suitable_sys::{
     JSValue as QuickJSValue, JS_Call, JS_CallConstructor, JS_DeleteProperty, JS_DupValue__,
     JS_FreeAtom, JS_FreeCString, JS_FreeValue__, JS_GetOpaque, JS_GetPropertyStr, JS_GetRuntime,
     JS_IsEqual__, JS_IsError, JS_IsInstanceOf, JS_IsObject__, JS_IsString__, JS_NewAtom,
-    JS_NewBool__, JS_NewError, JS_NewFloat64__, JS_NewObjectProtoClass,
+    JS_NewBool__,  JS_NewError, JS_NewFloat64__, JS_NewObjectProtoClass,
     JS_NewString, JS_SetOpaque, JS_SetPropertyStr, JS_ToBool, JS_ToCStringLen2, JS_ToFloat64,
     JS_UNDEFINED__,
 };
@@ -284,24 +284,24 @@ impl<'c> From<JSValueRef<'c>> for QuickJSValue {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use crate::JSContext;
-    use quickjs_android_suitable_sys::*;
-    #[test]
-    fn wtf() {
-        let ctx = JSContext::new().unwrap();
-        let ctxptr = ctx.internal;
+// #[cfg(test)]
+// mod test {
+//     use crate::JSContext;
+//     use quickjs_android_suitable_sys::*;
+//     #[test]
+//     fn wtf() {
+//         let ctx = JSContext::new().unwrap();
+//         let ctxptr = ctx.internal;
 
-        // let obj = unsafe { JS_AtomToValue(*ctxptr, JS_ATOM_object) };
+//         // let obj = unsafe { JS_AtomToValue(*ctxptr, JS_ATOM_object) };
 
-        let obj = ctx.evaluate("Object", None).unwrap().internal;
-        let prop =
-            unsafe { JS_GetPropertyInternal(*ctxptr, obj, JS_ATOM_Symbol_hasInstance, obj, 0) };
+//         let obj = ctx.evaluate("Object", None).unwrap().internal;
+//         let prop =
+//             unsafe { JS_GetPropertyInternal(*ctxptr, obj, JS_ATOM_Symbol_hasInstance, obj, 0) };
 
-        let tag = unsafe { JS_GetTag__(prop) };
+//         let tag = unsafe { JS_GetTag__(prop) };
 
-        unsafe { JS_FreeValue__(*ctxptr, prop) };
-        println!("{}", tag)
-    }
-}
+//         unsafe { JS_FreeValue__(*ctxptr, prop) };
+//         println!("{}", tag)
+//     }
+// }
