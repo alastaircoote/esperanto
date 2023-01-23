@@ -133,7 +133,6 @@ impl JSValueInternal for QuickJSValueInternal {
 
         let boxed = Box::new(instance);
         let ptr = Box::into_raw(boxed) as *mut c_void;
-        println!("ptr: {:?}", new_object);
         unsafe { JS_SetOpaque(new_object, ptr) };
         Ok(new_object)
     }
@@ -145,7 +144,6 @@ impl JSValueInternal for QuickJSValueInternal {
         let runtime = unsafe { JS_GetRuntime(*ctx) };
         let storage = get_classid_storage(runtime)?;
         let class_id = get_class_id::<T>(runtime, storage)?;
-        println!("ptr: {:?}", self);
         let instance = unsafe { JS_GetOpaque(self, class_id) as *mut T };
         unsafe { instance.as_ref() }.ok_or(JSExportError::CouldNotGetNativeObject.into())
     }

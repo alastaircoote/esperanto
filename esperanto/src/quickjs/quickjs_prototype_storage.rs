@@ -42,7 +42,6 @@ pub(super) fn get_classid_storage<'a>(
 }
 
 pub(super) fn attach_classid_storage(runtime: QuickJSRuntimeInternal) {
-    println!("ATTACHING CLASSID STORAGE ${:?}", runtime);
     // When we create a new runtime we make a new ID store for later use. We need to Box<>
     // it up in order to store it within QuickJS's opaque storage.
 
@@ -75,7 +74,6 @@ pub(super) fn get_class_id<T: JSExportClass>(
 
     if let Some(class_id) = storage.get(&addr) {
         // If yes just directly return it:
-        println!("Returning reference to existing class id {:?}", runtime);
         return Ok(*class_id);
     }
 
@@ -199,12 +197,17 @@ pub(super) fn get_class_prototype<T: JSExportClass>(
     let name_as_cstring = CString::new(T::METADATA.class_name)
         .map_err(|e| ConversionError::CouldNotConvertToJSString(e))?;
 
+    let proto_arg_length:i32 = match T::METADATA.call_as_function {
+        Some(f) => f.num_args,
+        _ => 0
+    };
+
     let proto = unsafe {
         JS_NewCFunction2(
             *ctx,
             Some(custom_class_call_extern::<T>),
             name_as_cstring.as_ptr(),
-            2,
+            proto_arg_length,
             JSCFunctionEnum_JS_CFUNC_generic,
             0,
         )
@@ -218,12 +221,17 @@ pub(super) fn get_class_prototype<T: JSExportClass>(
     // define one because the JS code is always able to call the class as a constructor.
     // the custom_class_call_extern code will check for the presence of a constructor.
 
+    let constructor_arg_length:i32 = match T::METADATA.call_as_constructor {
+        Some(f) => f.num_args,
+        _ => 0
+    };
+
     let constructor = unsafe {
         JS_NewCFunction2(
             *ctx,
             Some(custom_class_call_extern::<T>),
             name_as_cstring.as_ptr(),
-            2,
+            constructor_arg_length,
             JSCFunctionEnum_JS_CFUNC_constructor_or_func,
             0,
         )

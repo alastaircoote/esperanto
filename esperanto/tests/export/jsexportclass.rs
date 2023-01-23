@@ -1,12 +1,13 @@
 #[cfg(test)]
 mod test {
     use std::convert::{TryFrom, TryInto};
-
+    use esperanto::TryJSValueFrom;
     use esperanto::export::{
-        JSClassFunction, JSExportMetadata,
+        JSClassFunction, JSExportMetadata,JSExportAttribute
     };
     use esperanto::{JSContext, JSExportClass};
     use esperanto::{JSValueRef};
+    use phf::phf_ordered_map;
 
     #[test]
     fn exports_sets_constructor() {
@@ -224,9 +225,10 @@ mod test {
                 class_name: "TestStruct",
                 attributes: None,
                 call_as_constructor: None,
-                call_as_function: Some(JSClassFunction { num_args: 1, func: &|args, ctx| {
+                call_as_function: Some(JSClassFunction { num_args: 2, func: &|args, ctx| {
                     let from_arg:f64 = args.get(0).unwrap().try_into()?;
-                    let obj = TestStruct { val: from_arg};
+                    let from_arg_two: f64 = args.get(1).unwrap().try_into()?;
+                    let obj = TestStruct { val: from_arg * from_arg_two};
                     return JSValueRef::wrap_native(obj, &ctx);
                 } })
             };
@@ -238,10 +240,9 @@ mod test {
             .set_property("TestStruct", &constructor)
             .unwrap();
 
-        let result = ctx.evaluate("TestStruct(234)", None).unwrap();
+        let result = ctx.evaluate("TestStruct(10, 23)", None).unwrap();
         let as_struct: &TestStruct = result.get_native(&ctx).unwrap();
-        assert_eq!(as_struct.val, 234.0);
-        println!("{}", result.to_string())
+        assert_eq!(as_struct.val, 230.0);
     }
 
     #[test]
@@ -270,6 +271,27 @@ mod test {
                 assert_eq!(err.message, "Class TestStruct cannot be called as a function");
             }
             _ => panic!("Unexpected result"),
+        }
+    }
+
+    #[test]
+    fn export_attribute_property_getters_work(){
+        struct TestStruct {}
+
+        impl JSExportClass for TestStruct {
+            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
+                class_name: "TestStruct",
+                attributes: Some(phf_ordered_map!(
+                    "test_attribute" => JSExportAttribute::Property {
+                        getter: &| ctx, this_obj | {
+                            JSValueRef::try_new_value_from(123.0, &ctx)
+                        },
+                        setter: None
+                    }
+                )),
+                call_as_constructor: None,
+                call_as_function: None
+            };
         }
     }
 }

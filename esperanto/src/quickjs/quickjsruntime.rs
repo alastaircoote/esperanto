@@ -50,7 +50,6 @@ impl JSRuntimeInternal for QuickJSRuntimeInternal {
     }
 
     fn release(self) {
-        println!("FREE RUNTIME");
         drop_classid_storage(self);
         unsafe { JS_FreeRuntime(self) }
         

@@ -20,4 +20,4 @@ by_address = "1.0.4"
 [dependencies.quickjs_android_suitable_sys]
 features = ["dump_leaks"]
 optional = true
-version = "0.20201108.12"
+version = "0.20220306.0"

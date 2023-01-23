@@ -1,4 +1,4 @@
-use std::{ffi::NulError, str::Utf8Error};
+use std::{ffi::NulError, str::Utf8Error, num::TryFromIntError};
 
 use thiserror::Error;
 
@@ -12,4 +12,7 @@ pub enum ConversionError {
 
     #[error("Expected to receive an error but value is something else")]
     JSValueWasNotAnError,
+
+    #[error("Could not convert value into an integer")]
+    CouldNotConvertToInteger(#[from] TryFromIntError)
 }

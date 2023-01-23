@@ -7,11 +7,24 @@ use crate::{
 };
 
 pub enum JSExportAttribute<'a> {
-    Function (JSClassFunction<'a>),
+    Function(JSClassFunction<'a>),
+    Property {
+        getter: &'a dyn for<'c> Fn(
+            &'c JSContext<'c>,
+            &'c JSValueRef<'c>,
+        ) -> EsperantoResult<JSValueRef<'c>>,
+        setter: Option<
+            &'a dyn for<'c> Fn(
+                &'c JSValueRef<'c>,
+                &'c JSValueRef<'c>,
+                &'c JSContext<'c>,
+            ) -> EsperantoResult<JSValueRef<'c>>,
+        >,
+    },
 }
 
 pub struct JSClassFunction<'a> {
-    pub num_args: usize,
+    pub num_args: i32,
     pub func: &'a dyn for<'c> Fn(
         &'c Vec<JSValueRef<'c>>,
         &'c JSContext<'c>,

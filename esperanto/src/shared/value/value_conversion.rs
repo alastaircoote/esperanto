@@ -45,7 +45,6 @@ impl TryFrom<&JSValueRef<'_>> for String {
 
     fn try_from(value: &JSValueRef<'_>) -> Result<Self, Self::Error> {
         let cstring = value.internal.as_cstring(value.context.internal)?;
-        println!("GOT CSTRING");
         let str = cstring
             .to_str()
             .map_err(|e| ConversionError::CouldNotConvertFromJSString(e))?;
