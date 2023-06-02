@@ -7,11 +7,11 @@ use std::{
 
 use by_address::ByAddress;
 use quickjs_android_suitable_sys::{
-    JSCFunctionEnum_JS_CFUNC_generic,
+    JSCFunctionEnum_JS_CFUNC_constructor_or_func, JSCFunctionEnum_JS_CFUNC_generic,
     JSContext as QuickJSContext, JSRuntime, JSValue as QuickJSValue, JS_DupValue__,
     JS_GetClassProto, JS_GetOpaque, JS_GetRuntimeOpaque, JS_GetTag__, JS_IsEqual__,
     JS_NewCFunction2, JS_NewClass, JS_NewClassID, JS_SetClassProto, JS_SetConstructor,
-    JS_SetRuntimeOpaque, JS_NULL__, JS_TAG_OBJECT, JS_TAG_UNDEFINED, JS_UNDEFINED__, JSCFunctionEnum_JS_CFUNC_constructor_or_func,
+    JS_SetRuntimeOpaque, JS_NULL__, JS_TAG_OBJECT, JS_TAG_UNDEFINED, JS_UNDEFINED__,
 };
 
 use super::{
@@ -131,7 +131,11 @@ fn custom_class_call<T: JSExportClass>(
         })
         .collect();
 
-    let result = match (target_is_constructor, T::METADATA.call_as_constructor, T::METADATA.call_as_function) {
+    let result = match (
+        target_is_constructor,
+        T::METADATA.call_as_constructor,
+        T::METADATA.call_as_function,
+    ) {
         (true, Some(constructor), _) => {
             // This was called as a constructor and we have a constructor. Expected behaviour.
             (constructor.func)(&args, &ctx)
@@ -143,17 +147,11 @@ fn custom_class_call<T: JSExportClass>(
             )
             .into())
         }
-        (false, _ ,Some(call_as_function)) => {
-            (call_as_function.func)(&args, &ctx)
-        }
+        (false, _, Some(call_as_function)) => (call_as_function.func)(&args, &ctx),
         (false, _, None) => {
             // This called as a constructor but we don't have one. Unexpected behaviour.
-            Err(JSExportError::CalledNonFunctionClass(
-                T::METADATA.class_name.to_string(),
-            )
-            .into())
+            Err(JSExportError::CalledNonFunctionClass(T::METADATA.class_name.to_string()).into())
         }
-        
     };
 
     return result.map(|val| val.internal.retain(ctx.internal));
@@ -178,7 +176,64 @@ unsafe extern "C" fn custom_class_call_extern<T: JSExportClass>(
     })
 }
 
-pub(super) fn get_class_prototype<T: JSExportClass>(
+fn create_base_prototype_function<T: JSExportClass>(
+    name_as_cstring: &CString,
+    in_context: *mut QuickJSContext,
+) -> EsperantoResult<QuickJSValue> {
+    let proto_arg_length: i32 = match T::METADATA.call_as_function {
+        Some(f) => f.num_args,
+        _ => 0,
+    };
+
+    let proto = unsafe {
+        JS_NewCFunction2(
+            in_context,
+            Some(custom_class_call_extern::<T>),
+            name_as_cstring.as_ptr(),
+            proto_arg_length,
+            JSCFunctionEnum_JS_CFUNC_generic,
+            0,
+        )
+    };
+
+    // We need to retain this. Why? Not sure. But it fails if we don't.
+    unsafe { JS_DupValue__(in_context, proto) };
+    return Ok(proto);
+}
+
+/**
+ * no matter whether our JSExportClass has a constructor or not we still need to
+ * define one because the JS code is always able to call the class as a constructor.
+ * the custom_class_call_extern code will check for the presence of a constructor.
+ */
+fn create_constructor<T: JSExportClass>(
+    name_as_cstring: &CString,
+    prototype: QuickJSValue,
+    in_context: *mut QuickJSContext,
+) {
+    let constructor_arg_length: i32 = match T::METADATA.call_as_constructor {
+        Some(f) => f.num_args,
+        _ => 0,
+    };
+
+    let constructor = unsafe {
+        JS_NewCFunction2(
+            in_context,
+            Some(custom_class_call_extern::<T>),
+            name_as_cstring.as_ptr(),
+            constructor_arg_length,
+            JSCFunctionEnum_JS_CFUNC_constructor_or_func,
+            0,
+        )
+    };
+    unsafe { JS_SetConstructor(in_context, constructor, prototype) }
+
+    // since this constructor is now attached to the prototype we don't need to hold our
+    // own reference to it, so we release.
+    constructor.release(in_context.into());
+}
+
+pub(super) fn get_or_create_class_prototype<T: JSExportClass>(
     class_id: u32,
     in_context: *mut QuickJSContext,
 ) -> EsperantoResult<QuickJSValue> {
@@ -197,50 +252,9 @@ pub(super) fn get_class_prototype<T: JSExportClass>(
     let name_as_cstring = CString::new(T::METADATA.class_name)
         .map_err(|e| ConversionError::CouldNotConvertToJSString(e))?;
 
-    let proto_arg_length:i32 = match T::METADATA.call_as_function {
-        Some(f) => f.num_args,
-        _ => 0
-    };
+    let proto = create_base_prototype_function::<T>(&name_as_cstring, in_context)?;
 
-    let proto = unsafe {
-        JS_NewCFunction2(
-            *ctx,
-            Some(custom_class_call_extern::<T>),
-            name_as_cstring.as_ptr(),
-            proto_arg_length,
-            JSCFunctionEnum_JS_CFUNC_generic,
-            0,
-        )
-    };
-
-    // We need to retain this. Why? Not sure. But it fails if we don't.
-    unsafe { JS_DupValue__(*ctx, proto) };
-
-
-    // no matter whether our JSExportClass has a constructor or not we still need to
-    // define one because the JS code is always able to call the class as a constructor.
-    // the custom_class_call_extern code will check for the presence of a constructor.
-
-    let constructor_arg_length:i32 = match T::METADATA.call_as_constructor {
-        Some(f) => f.num_args,
-        _ => 0
-    };
-
-    let constructor = unsafe {
-        JS_NewCFunction2(
-            *ctx,
-            Some(custom_class_call_extern::<T>),
-            name_as_cstring.as_ptr(),
-            constructor_arg_length,
-            JSCFunctionEnum_JS_CFUNC_constructor_or_func,
-            0,
-        )
-    };
-    unsafe { JS_SetConstructor(*ctx, constructor, proto) }
-
-    // since this constructor is now attached to the prototype we don't need to hold our
-    // own reference to it, so we release.
-    constructor.release(ctx);
+    create_constructor::<T>(&name_as_cstring, proto, in_context);
 
     unsafe { JS_SetClassProto(*ctx, class_id, proto) };
 

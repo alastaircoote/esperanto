@@ -4,9 +4,8 @@ use quickjs_android_suitable_sys::{
     JSValue as QuickJSValue, JS_Call, JS_CallConstructor, JS_DeleteProperty, JS_DupValue__,
     JS_FreeAtom, JS_FreeCString, JS_FreeValue__, JS_GetOpaque, JS_GetPropertyStr, JS_GetRuntime,
     JS_IsEqual__, JS_IsError, JS_IsInstanceOf, JS_IsObject__, JS_IsString__, JS_NewAtom,
-    JS_NewBool__,  JS_NewError, JS_NewFloat64__, JS_NewObjectProtoClass,
-    JS_NewString, JS_SetOpaque, JS_SetPropertyStr, JS_ToBool, JS_ToCStringLen2, JS_ToFloat64,
-    JS_UNDEFINED__,
+    JS_NewBool__, JS_NewError, JS_NewFloat64__, JS_NewObjectProtoClass, JS_NewString, JS_SetOpaque,
+    JS_SetPropertyStr, JS_ToBool, JS_ToCStringLen2, JS_ToFloat64, JS_UNDEFINED__,
 };
 
 use crate::{
@@ -21,7 +20,7 @@ use crate::{
     JSExportClass, JSValueRef,
 };
 
-use super::quickjs_prototype_storage::{get_class_id, get_class_prototype};
+use super::quickjs_prototype_storage::{get_class_id, get_or_create_class_prototype};
 use super::quickjscontextpointer::QuickJSContextPointer;
 pub type QuickJSValueInternal = QuickJSValue;
 
@@ -114,7 +113,7 @@ impl JSValueInternal for QuickJSValueInternal {
         let runtime = unsafe { JS_GetRuntime(*ctx) };
         let storage = get_classid_storage(runtime)?;
         let class_id = get_class_id::<T>(runtime, storage)?;
-        get_class_prototype::<T>(class_id, *ctx)
+        get_or_create_class_prototype::<T>(class_id, *ctx)
     }
 
     fn from_native_class<T: JSExportClass>(
@@ -124,7 +123,7 @@ impl JSValueInternal for QuickJSValueInternal {
         let runtime = unsafe { JS_GetRuntime(*ctx) };
         let storage = get_classid_storage(runtime)?;
         let class_id = get_class_id::<T>(runtime, storage)?;
-        let proto = get_class_prototype::<T>(class_id, *ctx)?;
+        let proto = get_or_create_class_prototype::<T>(class_id, *ctx)?;
 
         // Then we create a new object with this prototype:
         let new_object = unsafe { JS_NewObjectProtoClass(*ctx, proto, class_id) };
