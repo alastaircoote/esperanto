@@ -4,7 +4,7 @@ use javascriptcore_sys::{JSValueIsObject, OpaqueJSValue};
 
 use crate::{
     shared::{errors::EsperantoResult, value::JSValueError},
-    JSValueRef,
+    JSValue,
 };
 
 use super::{jscorecontextpointer::JSCoreContextPointer, jscorevalue};
@@ -64,8 +64,8 @@ impl From<*const OpaqueJSValue> for JSCoreValuePointer {
     }
 }
 
-impl From<JSValueRef<'_>> for *const OpaqueJSValue {
-    fn from(val: JSValueRef<'_>) -> Self {
+impl From<JSValue<'_>> for *const OpaqueJSValue {
+    fn from(val: JSValue<'_>) -> Self {
         val.internal.as_value()
     }
 }

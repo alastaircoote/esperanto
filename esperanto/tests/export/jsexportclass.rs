@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test {
     use esperanto::export::{JSClassFunction, JSExportAttribute, JSExportMetadata};
-    use esperanto::JSValueRef;
+    use esperanto::JSValue;
     use esperanto::TryJSValueFrom;
     use esperanto::{JSContext, JSExportClass};
     use phf::phf_ordered_map;
@@ -22,8 +22,8 @@ mod test {
 
         let test = TestStruct {};
         let ctx = JSContext::new().unwrap();
-        let wrapped = JSValueRef::wrap_native(test, &ctx).unwrap();
-        let constructor = JSValueRef::constructor_for::<TestStruct>(&ctx).unwrap();
+        let wrapped = JSValue::wrap_native(test, &ctx).unwrap();
+        let constructor = JSValue::constructor_for::<TestStruct>(&ctx).unwrap();
 
         assert_eq!(wrapped.is_instance_of(&constructor).unwrap(), true);
     }
@@ -40,7 +40,7 @@ mod test {
                     num_args: 1,
                     func: &|_, ctx| {
                         let item = TestStruct {};
-                        return JSValueRef::wrap_native(item, ctx);
+                        return JSValue::wrap_native(item, ctx);
                     },
                 }),
                 call_as_function: None,
@@ -48,7 +48,7 @@ mod test {
         }
 
         let ctx = JSContext::new().unwrap();
-        let wrapped = JSValueRef::constructor_for::<TestStruct>(&ctx).unwrap();
+        let wrapped = JSValue::constructor_for::<TestStruct>(&ctx).unwrap();
         ctx.global_object()
             .set_property("TestValue", &wrapped)
             .unwrap();
@@ -73,7 +73,7 @@ mod test {
         }
 
         let ctx = JSContext::new().unwrap();
-        let wrapped = JSValueRef::constructor_for::<TestStruct>(&ctx).unwrap();
+        let wrapped = JSValue::constructor_for::<TestStruct>(&ctx).unwrap();
         ctx.global_object()
             .set_property("TestValue", &wrapped)
             .unwrap();
@@ -109,7 +109,7 @@ mod test {
                             value_one: num,
                             value_two: str,
                         };
-                        return JSValueRef::wrap_native(item, ctx);
+                        return JSValue::wrap_native(item, ctx);
                     },
                 }),
                 call_as_function: None,
@@ -118,9 +118,9 @@ mod test {
 
         let ctx = JSContext::new().unwrap();
 
-        let wrapped = JSValueRef::constructor_for::<TestStruct>(&ctx).unwrap();
+        let wrapped = JSValue::constructor_for::<TestStruct>(&ctx).unwrap();
 
-        let f = JSValueRef::new_function(
+        let f = JSValue::new_function(
             "return new TestStruct(123,'test')",
             vec!["TestStruct"],
             &ctx,
@@ -146,7 +146,7 @@ mod test {
                     num_args: 0,
                     func: &|_, ctx| {
                         let item = TestStruct {};
-                        return JSValueRef::wrap_native(item, &ctx);
+                        return JSValue::wrap_native(item, &ctx);
                     },
                 }),
                 call_as_function: None,
@@ -157,14 +157,14 @@ mod test {
         ctx.global_object()
             .set_property(
                 "TestValue",
-                &JSValueRef::constructor_for::<TestStruct>(&ctx).unwrap(),
+                &JSValue::constructor_for::<TestStruct>(&ctx).unwrap(),
             )
             .unwrap();
 
         ctx.global_object()
             .set_property(
                 "TestValue2",
-                &JSValueRef::constructor_for::<TestStruct>(&ctx).unwrap(),
+                &JSValue::constructor_for::<TestStruct>(&ctx).unwrap(),
             )
             .unwrap();
 
@@ -187,7 +187,7 @@ mod test {
                     num_args: 0,
                     func: &|_, ctx| {
                         let item = TestStruct {};
-                        return JSValueRef::wrap_native(item, &ctx);
+                        return JSValue::wrap_native(item, &ctx);
                     },
                 }),
                 call_as_function: None,
@@ -199,7 +199,7 @@ mod test {
             ctx.global_object()
                 .set_property(
                     "TestValue",
-                    &JSValueRef::constructor_for::<TestStruct>(&ctx).unwrap(),
+                    &JSValue::constructor_for::<TestStruct>(&ctx).unwrap(),
                 )
                 .unwrap();
 
@@ -211,7 +211,7 @@ mod test {
         ctx.global_object()
             .set_property(
                 "TestValue2",
-                &JSValueRef::constructor_for::<TestStruct>(&ctx).unwrap(),
+                &JSValue::constructor_for::<TestStruct>(&ctx).unwrap(),
             )
             .unwrap();
 
@@ -237,14 +237,14 @@ mod test {
                         let obj = TestStruct {
                             val: from_arg * from_arg_two,
                         };
-                        return JSValueRef::wrap_native(obj, &ctx);
+                        return JSValue::wrap_native(obj, &ctx);
                     },
                 }),
             };
         }
 
         let ctx = JSContext::new().unwrap();
-        let constructor = JSValueRef::prototype_for::<TestStruct>(&ctx).unwrap();
+        let constructor = JSValue::prototype_for::<TestStruct>(&ctx).unwrap();
         ctx.global_object()
             .set_property("TestStruct", &constructor)
             .unwrap();
@@ -268,7 +268,7 @@ mod test {
         }
 
         let ctx = JSContext::new().unwrap();
-        let wrapped = JSValueRef::constructor_for::<TestStruct>(&ctx).unwrap();
+        let wrapped = JSValue::constructor_for::<TestStruct>(&ctx).unwrap();
         ctx.global_object()
             .set_property("TestValue", &wrapped)
             .unwrap();
@@ -297,7 +297,7 @@ mod test {
                 attributes: Some(phf_ordered_map!(
                     "testAttribute" => JSExportAttribute::Property {
                         getter: &| ctx, this_obj | {
-                            JSValueRef::try_new_value_from(123.0, &ctx)
+                            JSValue::try_new_value_from(123.0, &ctx)
                         },
                         setter: None
                     }
@@ -308,13 +308,13 @@ mod test {
         }
 
         let ctx = JSContext::new().unwrap();
-        let wrapped = JSValueRef::constructor_for::<TestStruct>(&ctx).unwrap();
+        let wrapped = JSValue::constructor_for::<TestStruct>(&ctx).unwrap();
         ctx.global_object()
             .set_property("TestValue", &wrapped)
             .unwrap();
 
         let result = ctx.evaluate("TestValue.testAttribute", None).unwrap();
-        assert!(JSValueRef::undefined(&ctx) != result);
+        assert!(JSValue::undefined(&ctx) != result);
         let number: f64 = (&result).try_into().unwrap();
         assert_eq!(number, 123.0);
     }

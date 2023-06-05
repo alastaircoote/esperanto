@@ -17,11 +17,12 @@ use crate::{
         errors::{EsperantoError, JSExportError},
         value::{JSValueError, JSValueInternal},
     },
-    JSExportClass, JSValueRef,
+    JSExportClass, JSValue,
 };
 
 use super::quickjs_prototype_storage::{get_class_id, get_or_create_class_prototype};
 use super::quickjscontextpointer::QuickJSContextPointer;
+
 pub type QuickJSValueInternal = QuickJSValue;
 
 impl JSValueInternal for QuickJSValueInternal {
@@ -275,8 +276,8 @@ impl JSValueInternal for QuickJSValueInternal {
     }
 }
 
-impl<'c> From<JSValueRef<'c>> for QuickJSValue {
-    fn from(val: JSValueRef<'c>) -> Self {
+impl<'c> From<JSValue<'c>> for QuickJSValue {
+    fn from(val: JSValue<'c>) -> Self {
         val.internal
     }
 }

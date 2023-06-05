@@ -25,7 +25,7 @@ use crate::{
         runtime::JSRuntimeError,
         value::JSValueInternal,
     },
-    JSContext, JSExportClass, JSValueRef,
+    JSContext, JSExportClass, JSValue,
 };
 
 type JSClassIDStorage<'a> = HashMap<ByAddress<&'a JSExportMetadata>, u32>;
@@ -96,8 +96,8 @@ pub(super) fn get_class_id<T: JSExportClass>(
  * This gets called whenever a native class is invoked either as a function (e.g. myClass())
  * or as a constructor (e.g. new MyClass())
  */
-fn custom_class_call<T: JSExportClass>(
-    ctx: &JSContext,
+fn custom_class_call<'c, T: JSExportClass>(
+    ctx: &'c JSContext<'c>,
     new_target: QuickJSValue,
     argc: i32,
     argv: *mut QuickJSValue,
@@ -121,14 +121,9 @@ fn custom_class_call<T: JSExportClass>(
         .try_into()
         .map_err(|err| JSExportError::CouldNotConvertArgumentNumber(err))?;
 
-    let args: Vec<JSValueRef> = unsafe { slice::from_raw_parts(argv, argc_size) }
+    let args: Vec<JSValue<'c>> = unsafe { slice::from_raw_parts(argv, argc_size) }
         .iter()
-        .map(|raw| {
-            // We do an extra retain here because we'll perform a release when the JSValueRef gets dropped.
-            // If we don't retain we'll end up with too many releases and QuickJS will crash.
-            let extra_retain = raw.retain(ctx.internal);
-            JSValueRef::wrap_internal(extra_retain, &ctx)
-        })
+        .map(|raw| JSValue::wrap_internal(*raw, ctx))
         .collect();
 
     let result = match (
@@ -153,7 +148,6 @@ fn custom_class_call<T: JSExportClass>(
             Err(JSExportError::CalledNonFunctionClass(T::METADATA.class_name.to_string()).into())
         }
     };
-
     return result.map(|val| val.internal.retain(ctx.internal));
 }
 

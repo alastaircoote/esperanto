@@ -102,7 +102,7 @@ mod test {
 
     use javascriptcore_sys::{OpaqueJSContext, OpaqueJSValue};
 
-    use crate::{JSContext, JSValueRef};
+    use crate::{JSContext, JSValue};
 
     #[link(name = "JavaScriptCore", kind = "framework")]
     extern "C" {
@@ -114,7 +114,7 @@ mod test {
 
     fn get_protected_object_count(ctx: &JSContext) -> i32 {
         let hmm = unsafe { JSGetMemoryUsageStatistics(*ctx.internal) };
-        let val = JSValueRef::wrap_internal(hmm.into(), &ctx);
+        let val = JSValue::wrap_internal(hmm.into(), &ctx);
         let num_js = val.get_property("protectedObjectCount").unwrap();
         return (&num_js).try_into().unwrap();
     }
@@ -131,7 +131,7 @@ mod test {
     #[test]
     fn retains_and_releases_functions() {
         let ctx = JSContext::new().unwrap();
-        let func = JSValueRef::new_function("return {}", vec![], &ctx).unwrap();
+        let func = JSValue::new_function("return {}", vec![], &ctx).unwrap();
         let retained = get_protected_object_count(&ctx);
         drop(func);
         assert_eq!(get_protected_object_count(&ctx) - retained, -1);

@@ -4,12 +4,12 @@ mod value_tests {
 
     use esperanto::errors::JSValueError;
     use esperanto::export::JSExportMetadata;
-    use esperanto::{EsperantoError, JSContext, JSExportClass, JSValueRef, TryJSValueFrom};
+    use esperanto::{EsperantoError, JSContext, JSExportClass, JSValue, TryJSValueFrom};
 
     #[test]
     fn sets_properties() {
         let ctx = JSContext::new().unwrap();
-        let value_to_set = JSValueRef::try_new_value_from(123, &ctx).unwrap();
+        let value_to_set = JSValue::try_new_value_from(123, &ctx).unwrap();
 
         let obj = ctx
             .evaluate("var testObject = {}; testObject", None)
@@ -24,7 +24,7 @@ mod value_tests {
     #[test]
     fn errors_when_cannot_set_property() {
         let ctx = JSContext::new().unwrap();
-        let value_to_set = JSValueRef::try_new_value_from(123, &ctx).unwrap();
+        let value_to_set = JSValue::try_new_value_from(123, &ctx).unwrap();
 
         let obj = ctx
             .evaluate("var testObject = true; testObject", None)
@@ -58,8 +58,8 @@ mod value_tests {
         let func = ctx
             .evaluate("(function(one,two) { return one + two })", None)
             .unwrap();
-        let arg_one = JSValueRef::try_new_value_from(1200, &ctx).unwrap();
-        let arg_two = JSValueRef::try_new_value_from(34, &ctx).unwrap();
+        let arg_one = JSValue::try_new_value_from(1200, &ctx).unwrap();
+        let arg_two = JSValue::try_new_value_from(34, &ctx).unwrap();
         let result = func.call_as_function(vec![&arg_one, &arg_two]).unwrap();
         assert_eq!(i32::try_from(&result).unwrap(), 1234);
     }
@@ -67,7 +67,7 @@ mod value_tests {
     #[test]
     fn errors_when_calling_non_function() {
         let ctx = JSContext::new().unwrap();
-        let not_func = JSValueRef::undefined(&ctx);
+        let not_func = JSValue::undefined(&ctx);
         let result = not_func.call_as_function(vec![]).unwrap_err();
         match result {
             EsperantoError::JavaScriptError(err) => {
@@ -96,10 +96,10 @@ mod value_tests {
     fn creates_function() {
         let ctx = JSContext::new().unwrap();
         let body = "return one * two";
-        let func = JSValueRef::new_function(body, vec!["one", "two"], &ctx).unwrap();
+        let func = JSValue::new_function(body, vec!["one", "two"], &ctx).unwrap();
 
-        let arg_one = JSValueRef::try_new_value_from(5, &ctx).unwrap();
-        let arg_two = JSValueRef::try_new_value_from(25, &ctx).unwrap();
+        let arg_one = JSValue::try_new_value_from(5, &ctx).unwrap();
+        let arg_two = JSValue::try_new_value_from(25, &ctx).unwrap();
 
         let arguments = vec![&arg_one, &arg_two];
         let result = func.call_as_function(arguments).unwrap();
@@ -184,14 +184,14 @@ mod value_tests {
                 class_name: "TestStruct",
                 attributes: None,
                 call_as_constructor: None,
-                call_as_function: None
+                call_as_function: None,
             };
         }
 
         let str = TestStruct { num_value: 12345 };
         let ctx = JSContext::new().unwrap();
 
-        let wrapped = JSValueRef::wrap_native(str, &ctx).unwrap();
+        let wrapped = JSValue::wrap_native(str, &ctx).unwrap();
 
         let as_ref = wrapped.get_native::<TestStruct>(&ctx).unwrap();
         assert_eq!(as_ref.num_value, 12345);
@@ -214,14 +214,14 @@ mod value_tests {
                 class_name: "TestStruct",
                 attributes: None,
                 call_as_constructor: None,
-                call_as_function: None
+                call_as_function: None,
             };
         }
 
         let str = TestStruct {};
         let ctx = JSContext::new().unwrap();
 
-        let wrapped = JSValueRef::wrap_native(str, &ctx).unwrap();
+        let wrapped = JSValue::wrap_native(str, &ctx).unwrap();
         drop(wrapped);
         ctx.garbage_collect();
 

@@ -3,7 +3,7 @@ use std::ffi::CString;
 use super::{context_error::JSContextError, evaluate_metadata::EvaluateMetadata};
 use crate::shared::{context::JSContextInternal, errors::EsperantoResult};
 use crate::shared::{engine_impl::JSContextInternalImpl, errors::EsperantoError};
-use crate::shared::{runtime::JSRuntime, value::JSValueRef};
+use crate::shared::{runtime::JSRuntime, value::JSValue};
 
 #[derive(Debug)]
 pub struct JSContext<'c> {
@@ -41,7 +41,7 @@ impl<'c> JSContext<'c> {
         &'c self,
         script: &str,
         metadata: Option<&EvaluateMetadata>,
-    ) -> Result<JSValueRef<'new>, EsperantoError>
+    ) -> Result<JSValue<'new>, EsperantoError>
     where
         'c: 'new,
     {
@@ -49,7 +49,7 @@ impl<'c> JSContext<'c> {
         let cstr = CString::new(script).map_err(|_| JSContextError::CouldNotParseScript)?;
 
         self.internal.evaluate(cstr, len, metadata).map(|internal| {
-            let val = JSValueRef::wrap_internal(internal, self);
+            let val = JSValue::wrap_internal(internal, self);
             val
         })
     }
@@ -66,16 +66,16 @@ impl<'c> JSContext<'c> {
         self.internal.garbage_collect()
     }
 
-    pub fn global_object<'new>(&'c self) -> JSValueRef<'new>
+    pub fn global_object<'new>(&'c self) -> JSValue<'new>
     where
         'c: 'new,
     {
         let raw = self.internal.get_globalobject();
-        JSValueRef::wrap_internal(raw, self)
+        JSValue::wrap_internal(raw, self)
     }
 
     pub fn throw_error(&self, err: EsperantoError) -> EsperantoResult<()> {
-        let error = JSValueRef::new_error("EsperantoError", &err.to_string(), &self)?;
+        let error = JSValue::new_error("EsperantoError", &err.to_string(), &self)?;
         self.internal.throw_error(error.internal);
         Ok(())
     }

@@ -10,7 +10,7 @@ pub use shared::context::JSContext;
 pub use shared::errors::EsperantoError;
 pub use shared::export::JSExportClass;
 pub use shared::runtime::JSRuntime;
-pub use shared::value::{AsJSValueRef, JSValueFrom, JSValueRef, TryJSValueFrom};
+pub use shared::value::{AsJSValueRef, JSValue, JSValueFrom, TryJSValueFrom};
 
 pub mod errors {
     pub use super::shared::errors::CatchExceptionError;

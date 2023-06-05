@@ -1,7 +1,7 @@
-use crate::JSValueRef;
+use crate::JSValue;
 
 pub trait AsJSValueRef {
-    fn as_jsvalue(&self) -> &JSValueRef;
+    fn as_jsvalue(&self) -> &JSValue;
 }
 
 // impl<'a> AsJSValueRef for Retain<JSValueRef<'a>> {
