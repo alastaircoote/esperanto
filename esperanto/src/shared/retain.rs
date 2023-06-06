@@ -1,49 +1,59 @@
-// use std::ops::Deref;
+use std::ops::Deref;
 
-// use crate::JSValueRef;
+use crate::JSValue;
 
-// pub trait Retainable {
-//     fn retain(&self) -> Self;
-//     fn release(&mut self);
-// }
+use super::value::JSValueInternal;
 
-// #[derive(Debug)]
-// pub struct Retain<T: Retainable> {
-//     pub(crate) retained_value: T,
-// }
+pub trait Retainable {
+    fn retain(&self) -> Self;
+    fn release(&mut self);
+    fn deref(&self) -> Self;
+}
 
-// impl<T: Retainable> Drop for Retain<T> {
-//     fn drop(&mut self) {
-//         T::release(&mut self.retained_value)
-//     }
-// }
+#[derive(Debug)]
+pub struct Retain<T: Retainable> {
+    pub(crate) retained_value: T,
+}
 
-// impl<T: Retainable> Retain<T> {
-//     pub fn new(retaining: T) -> Self {
-//         let retained = T::retain(&retaining);
-//         Retain {
-//             retained_value: retained,
-//         }
-//     }
+impl<T: Retainable> Drop for Retain<T> {
+    fn drop(&mut self) {
+        T::release(&mut self.retained_value)
+    }
+}
 
-//     pub(crate) fn wrap_already_retained(retained: T) -> Self {
-//         Retain {
-//             retained_value: retained,
-//         }
-//     }
+impl<T: Retainable> Retain<T> {
+    pub fn new(retaining: &T, already_retained: bool) -> Self {
+        let retained = match already_retained {
+            false => T::retain(retaining),
+            true => T::deref(retaining),
+        };
+        Retain {
+            retained_value: retained,
+        }
+    }
+}
 
-//     // pub fn get<'a>(from_retainer: Self) -> &'a T {
-//     //     &from_retainer.inner_value
-//     // }
-// }
+impl<'c> Retainable for JSValue<'c> {
+    fn retain(&self) -> Self {
+        return JSValue::wrap_internal(self.internal.retain(self.context.internal), self.context);
+    }
 
-// impl<T: Retainable> Deref for Retain<T> {
-//     type Target = T;
+    fn release(&mut self) {
+        self.internal.release(self.context.internal);
+    }
 
-//     fn deref(&self) -> &Self::Target {
-//         &self.retained_value
-//     }
-// }
+    fn deref(&self) -> Self {
+        JSValue::wrap_internal(self.internal, self.context)
+    }
+}
+
+impl<T: Retainable> Deref for Retain<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.retained_value
+    }
+}
 
 // // impl<'a> From<Retain<JSValueRef<'a>>> for JSValueRef<'a> {
 // //     fn from(val: Retain<JSValueRef<'a>>) -> Self {

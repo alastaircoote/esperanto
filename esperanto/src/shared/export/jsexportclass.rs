@@ -3,11 +3,11 @@ use crate::{
         engine_impl::export::{JSCallAsConstructorImpl, JSCallAsFunctionImpl},
         errors::EsperantoResult,
     },
-    JSContext, JSValue,
+    JSContext, JSValue, Retain,
 };
 
 pub enum JSExportAttribute<'a> {
-    Function(JSClassFunction<'a>),
+    Function(JSClassFunction),
     Property {
         getter:
             &'a dyn for<'c> Fn(&'c JSContext<'c>, &'c JSValue<'c>) -> EsperantoResult<JSValue<'c>>,
@@ -21,10 +21,10 @@ pub enum JSExportAttribute<'a> {
     },
 }
 
-pub struct JSClassFunction<'a> {
+pub struct JSClassFunction {
     pub num_args: i32,
     pub func:
-        &'a dyn for<'c> Fn(&'c Vec<JSValue<'c>>, &'c JSContext<'c>) -> EsperantoResult<JSValue<'c>>,
+        for<'c> fn(&'c Vec<JSValue<'c>>, &'c JSContext<'c>) -> EsperantoResult<Retain<JSValue<'c>>>,
 }
 
 pub enum JSExportCall<T: 'static> {
@@ -36,8 +36,8 @@ pub struct JSExportMetadata {
     // pub optional: JSExportMetadataOptional,
     pub attributes: Option<phf::OrderedMap<&'static str, JSExportAttribute<'static>>>,
     // pub call: Option<JSExportCall<T>>,
-    pub call_as_constructor: Option<JSClassFunction<'static>>,
-    pub call_as_function: Option<JSClassFunction<'static>>,
+    pub call_as_constructor: Option<JSClassFunction>,
+    pub call_as_function: Option<JSClassFunction>,
 }
 
 #[derive(Eq, PartialEq, Hash, Copy, Clone, Debug)]

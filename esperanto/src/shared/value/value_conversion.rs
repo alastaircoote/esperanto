@@ -1,5 +1,6 @@
 use std::{convert::TryFrom, ffi::CString};
 
+use super::js_result;
 use super::JSValueInternal;
 use crate::shared::errors::JavaScriptError;
 use crate::shared::{engine_impl::JSValueInternalImpl, errors::EsperantoError};
@@ -7,6 +8,7 @@ use crate::{
     shared::errors::{ConversionError, EsperantoResult},
     JSContext, JSValue,
 };
+use std::convert::TryInto;
 
 pub trait TryJSValueFrom<'c, T>: Sized {
     fn try_new_value_from(value: T, in_context: &'c JSContext) -> EsperantoResult<Self>;
@@ -15,6 +17,14 @@ pub trait TryJSValueFrom<'c, T>: Sized {
 pub trait JSValueFrom<'c, T>: Sized {
     fn new_value_from(value: T, in_context: &'c JSContext) -> Self;
 }
+
+pub trait TryFromJSValue: Sized {
+    fn try_from(value: &JSValue) -> EsperantoResult<Self>;
+}
+
+// impl<T> TryFrom<&JSValue<'_>> for T {}
+
+// impl<T: TryFromJSValue> TryInto<T> for &JSValue {}
 
 impl<'c, Source, Target> TryJSValueFrom<'c, Source> for Target
 where
@@ -152,8 +162,8 @@ impl<'c> TryFrom<JSValue<'c>> for JavaScriptError {
             return Err(ConversionError::JSValueWasNotAnError.into());
         }
 
-        let name = value.get_property("name", |v| Ok(v.to_string()))?;
-        let msg = value.get_property("message", |v| v.to_string())?;
+        let name: String = value.get_property("name", js_result::convert)?;
+        let msg: String = value.get_property("message", js_result::convert)?;
 
         return Ok(JavaScriptError::new(name, msg));
     }

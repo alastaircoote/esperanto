@@ -9,7 +9,9 @@ mod quickjs;
 pub use shared::context::JSContext;
 pub use shared::errors::EsperantoError;
 pub use shared::export::JSExportClass;
+pub use shared::retain::Retain;
 pub use shared::runtime::JSRuntime;
+pub use shared::value::js_result;
 pub use shared::value::{AsJSValueRef, JSValue, JSValueFrom, TryJSValueFrom};
 
 pub mod errors {

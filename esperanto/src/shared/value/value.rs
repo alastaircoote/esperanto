@@ -1,16 +1,16 @@
-use std::{ffi::CString, fmt::Display};
+use std::{convert::TryFrom, ffi::CString, fmt::Display};
 
 use crate::{
     shared::{
         context::JSContext,
         errors::{ConversionError, EsperantoResult},
     },
-    JSExportClass,
+    EsperantoError, JSExportClass, Retain,
 };
 
 use crate::shared::engine_impl::JSValueInternalImpl;
 
-use super::value_internal::JSValueInternal;
+use super::{value_internal::JSValueInternal, JSResultProcessor};
 
 #[derive(Debug)]
 pub struct JSValue<'c> {
@@ -54,10 +54,10 @@ impl<'c> JSValue<'c> {
             value.internal,
         )
     }
-    pub fn get_property<T>(
+    pub fn get_property<'a, T>(
         &self,
         name: &str,
-        closure: fn(&JSValue) -> EsperantoResult<T>,
+        action: fn(&JSValue<'c>) -> EsperantoResult<T>,
     ) -> EsperantoResult<T> {
         let name_cstring =
             CString::new(name).map_err(|e| ConversionError::CouldNotConvertToJSString(e))?;
@@ -70,7 +70,7 @@ impl<'c> JSValue<'c> {
                 context: self.context,
             })?;
 
-        return closure(&val);
+        return action(&val);
     }
 
     pub fn delete_property(&self, name: &str) -> EsperantoResult<()> {
@@ -116,23 +116,26 @@ impl<'c> JSValue<'c> {
         Ok(val)
     }
 
-    pub fn constructor_for<T>(in_context: &'c JSContext<'c>) -> EsperantoResult<JSValue<'c>>
+    pub fn constructor_for<T, O>(
+        in_context: &'c JSContext<'c>,
+        action: JSResultProcessor<'c, O>,
+    ) -> EsperantoResult<O>
     where
         T: JSExportClass,
     {
-        return Self::prototype_for::<T>(in_context)?.get_property("constructor");
+        return Self::prototype_for::<T>(in_context)?.get_property("constructor", action);
     }
 
-    pub fn wrap_native<T>(
+    pub fn new_wrapped_native<T>(
         instance: T,
         in_context: &'c JSContext<'c>,
-    ) -> EsperantoResult<JSValue<'c>>
+    ) -> EsperantoResult<Retain<JSValue<'c>>>
     where
         T: JSExportClass,
     {
         let ptr = JSValueInternalImpl::from_native_class(instance, in_context.internal)?;
         let val = JSValue::wrap_internal(ptr, in_context);
-        Ok(val)
+        Ok(Retain::new(&val, true))
     }
 
     pub fn get_native<T: JSExportClass>(
