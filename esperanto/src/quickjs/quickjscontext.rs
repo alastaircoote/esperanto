@@ -1,7 +1,8 @@
 use std::ffi::CString;
 
 use quickjs_android_suitable_sys::{
-    JS_Eval, JS_FreeContext, JS_GetGlobalObject, JS_GetRuntime, JS_NewContext, JS_RunGC, JS_Throw, JS_EVAL_TYPE_GLOBAL,
+    JS_Eval, JS_FreeContext, JS_GetGlobalObject, JS_GetRuntime, JS_NewContext, JS_RunGC, JS_Throw,
+    JS_EVAL_TYPE_GLOBAL,
 };
 
 use super::quickjscontextpointer::QuickJSContextPointer;
@@ -27,7 +28,7 @@ impl JSContextInternal for QuickJSContextInternal {
         let raw = unsafe { JS_NewContext(runtime) };
         match raw.is_null() {
             true => Err(JSContextError::CouldNotCreateContext),
-            false => Ok(QuickJSContextPointer::wrap_retained(raw)),
+            false => Ok(QuickJSContextPointer::wrap(raw, true)),
         }
     }
 
@@ -56,7 +57,7 @@ impl JSContextInternal for QuickJSContextInternal {
     }
 
     fn release(self) {
-        if self.retained {
+        if self.free_on_drop {
             unsafe { JS_FreeContext(*self) }
         }
     }

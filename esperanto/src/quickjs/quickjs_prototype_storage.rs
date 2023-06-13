@@ -21,6 +21,7 @@ use super::{
 use crate::{
     export::JSExportMetadata,
     shared::{
+        context::JSContextInternal,
         errors::{ConversionError, EsperantoResult, JSExportError},
         runtime::JSRuntimeError,
         value::JSValueInternal,
@@ -161,9 +162,11 @@ unsafe extern "C" fn custom_class_call_extern<T: JSExportClass>(
     argc: i32,
     argv: *mut QuickJSValue,
 ) -> QuickJSValue {
-    let context: JSContext = ctx.into();
+    let context_ptr = QuickJSContextPointer::wrap(ctx, false);
+    let context = JSContext::from_raw(context_ptr, None);
     custom_class_call::<T>(&context, new_target, argc, argv).unwrap_or_else(|e| {
-        context.throw_error(e).unwrap();
+        let error = JSValue::new_error("EsperantoError", &e.to_string(), &context).unwrap();
+        context_ptr.throw_error(error.internal);
         // Once we've thrown an error the return value never actually gets used but we should still
         // return one anyway, so let's return undefined.
         JS_UNDEFINED__
@@ -205,6 +208,8 @@ fn create_constructor<T: JSExportClass>(
     prototype: QuickJSValue,
     in_context: *mut QuickJSContext,
 ) {
+    let ctx = QuickJSContextPointer::wrap(in_context, false);
+
     let constructor_arg_length: i32 = match T::METADATA.call_as_constructor {
         Some(f) => f.num_args,
         _ => 0,
@@ -224,14 +229,14 @@ fn create_constructor<T: JSExportClass>(
 
     // since this constructor is now attached to the prototype we don't need to hold our
     // own reference to it, so we release.
-    constructor.release(in_context.into());
+    constructor.release(ctx);
 }
 
 pub(super) fn get_or_create_class_prototype<T: JSExportClass>(
     class_id: u32,
     in_context: *mut QuickJSContext,
 ) -> EsperantoResult<QuickJSValue> {
-    let ctx: QuickJSContextPointer = in_context.into();
+    let ctx = QuickJSContextPointer::wrap(in_context, false);
 
     // Haven't been able to replicate it but in theory QuickJS could garbage collect the prototype
     // at some point, so let's check here whether it actually still exists. If not we'll just create

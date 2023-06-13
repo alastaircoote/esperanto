@@ -1,23 +1,21 @@
-use std::{convert::TryFrom, ffi::CString, fmt::Display};
+use std::{ffi::CString, fmt::Display};
 
 use crate::{
     shared::{
         context::JSContext,
         errors::{ConversionError, EsperantoResult},
     },
-    EsperantoError, JSExportClass, Retain,
+    JSExportClass, Retain, TryJSValueFrom,
 };
 
 use crate::shared::engine_impl::JSValueInternalImpl;
 
-use super::{value_internal::JSValueInternal, JSResultProcessor};
+use super::{value_internal::JSValueInternal, TryConvertJSValue};
 
 #[derive(Debug)]
 pub struct JSValue<'c> {
     pub(crate) internal: JSValueInternalImpl,
     pub(crate) context: &'c JSContext<'c>,
-    // _lifetime: PhantomData<&'v ()>,
-    // _ctx_lifetime: PhantomData<&'c ()>,
 }
 
 impl PartialEq for JSValue<'_> {
@@ -27,6 +25,8 @@ impl PartialEq for JSValue<'_> {
 }
 
 impl Eq for JSValue<'_> {}
+
+pub(crate) type ValueResult<'c> = EsperantoResult<Retain<JSValue<'c>>>;
 
 impl Display for JSValue<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -54,11 +54,7 @@ impl<'c> JSValue<'c> {
             value.internal,
         )
     }
-    pub fn get_property<'a, T>(
-        &self,
-        name: &str,
-        action: fn(&JSValue<'c>) -> EsperantoResult<T>,
-    ) -> EsperantoResult<T> {
+    pub fn get_property(&self, name: &str) -> ValueResult<'c> {
         let name_cstring =
             CString::new(name).map_err(|e| ConversionError::CouldNotConvertToJSString(e))?;
 
@@ -70,7 +66,7 @@ impl<'c> JSValue<'c> {
                 context: self.context,
             })?;
 
-        return action(&val);
+        return Ok(Retain::new(val, true));
     }
 
     pub fn delete_property(&self, name: &str) -> EsperantoResult<()> {
@@ -106,24 +102,23 @@ impl<'c> JSValue<'c> {
     //     })
     // }
 
-    pub fn prototype_for<T>(in_context: &'c JSContext<'c>) -> EsperantoResult<JSValue<'c>>
+    pub fn prototype_for<T>(in_context: &'c JSContext<'c>) -> ValueResult
     where
         T: JSExportClass,
     {
         let ptr = JSValueInternalImpl::native_prototype_for::<T>(in_context.internal)?;
         let val = JSValue::wrap_internal(ptr, in_context);
 
-        Ok(val)
+        Ok(Retain::new(val, true))
     }
 
-    pub fn constructor_for<T, O>(
-        in_context: &'c JSContext<'c>,
-        action: JSResultProcessor<'c, O>,
-    ) -> EsperantoResult<O>
+    pub fn constructor_for<T>(in_context: &'c JSContext<'c>) -> ValueResult
     where
         T: JSExportClass,
     {
-        return Self::prototype_for::<T>(in_context)?.get_property("constructor", action);
+        let prototype = Self::prototype_for::<T>(in_context)?;
+        // return Ok(prototype);
+        return prototype.get_property("constructor");
     }
 
     pub fn new_wrapped_native<T>(
@@ -135,7 +130,7 @@ impl<'c> JSValue<'c> {
     {
         let ptr = JSValueInternalImpl::from_native_class(instance, in_context.internal)?;
         let val = JSValue::wrap_internal(ptr, in_context);
-        Ok(Retain::new(&val, true))
+        Ok(Retain::new(val, true))
     }
 
     pub fn get_native<T: JSExportClass>(
@@ -149,7 +144,7 @@ impl<'c> JSValue<'c> {
         body: &str,
         arguments: Vec<&str>,
         in_context: &'c JSContext<'c>,
-    ) -> EsperantoResult<Self> {
+    ) -> ValueResult<'c> {
         let body_cstr =
             CString::new(body).map_err(|e| ConversionError::CouldNotConvertToJSString(e))?;
 
@@ -161,7 +156,7 @@ impl<'c> JSValue<'c> {
         let raw =
             JSValueInternalImpl::new_function(&body_cstr, &arguments_cstr, in_context.internal)?;
 
-        Ok(Self::wrap_internal(raw, in_context))
+        Ok(Retain::new(Self::wrap_internal(raw, in_context), true))
     }
 
     pub fn new_error(
@@ -198,20 +193,28 @@ impl<'c> JSValue<'c> {
         Ok(Self::wrap_internal(internal_result, self.context))
     }
 
-    pub fn call_as_constructor(&self, arguments: Vec<&Self>) -> EsperantoResult<Self> {
+    pub fn call_as_constructor(&self, arguments: Vec<&Self>) -> ValueResult {
         let internal_vec = arguments.iter().map(|a| a.internal).collect();
 
         let internal_result = self
             .internal
             .call_as_constructor(internal_vec, self.context.internal)?;
 
-        Ok(Self::wrap_internal(internal_result, self.context))
+        Ok(Retain::new(
+            Self::wrap_internal(internal_result, self.context),
+            true,
+        ))
     }
 
-    pub fn undefined(in_context: &'c JSContext) -> Self {
-        Self::wrap_internal(
-            JSValueInternalImpl::undefined(in_context.internal),
-            in_context,
+    // Seems kind of silly for undefined to be a retain since it never gets garbage collected
+    // but it's actually difficult for us to provide anything different. Will have to think on it.
+    pub fn undefined(in_context: &'c JSContext) -> Retain<Self> {
+        Retain::new(
+            Self::wrap_internal(
+                JSValueInternalImpl::undefined(in_context.internal),
+                in_context,
+            ),
+            true,
         )
     }
 
@@ -227,36 +230,22 @@ impl<'c> JSValue<'c> {
     pub fn is_error(&self) -> bool {
         self.internal.is_error(self.context.internal)
     }
+
+    pub fn try_convert<'a, T>(&self) -> EsperantoResult<T>
+    where
+        T: TryConvertJSValue,
+        'c: 'a,
+    {
+        T::try_from_jsvalue(&self)
+    }
+
+    pub fn try_new_from<T>(value: T, in_context: &'c JSContext<'c>) -> ValueResult
+    where
+        T: TryJSValueFrom<'c>,
+    {
+        return T::try_jsvalue_from(value, in_context);
+    }
 }
-
-// impl Drop for JSValue<'_> {
-//     fn drop(&mut self) {
-//         self.internal.release(self.context.internal)
-//     }
-// }
-
-// impl<'c> Clone for JSValueRef<'c> {
-//     fn clone(&self) -> Self {
-//         JSValueRef {
-//             context: &self.context,
-//             internal: self.internal.retain(&self.context.internal),
-//         }
-//     }
-// }
-
-// impl<'c> Retainable for JSValueRef<'c> {
-//     fn retain(&self) -> Self {
-//         JSValueRef {
-//             internal: self.internal.retain(&self.context.internal),
-//             context: self.context,
-//             // _ctx_lifetime: PhantomData,
-//         }
-//     }
-
-//     fn release(&mut self) {
-//         self.internal.release(&self.context.internal);
-//     }
-// }
 
 impl<'c, RawValueType> From<(RawValueType, &'c JSContext<'c>)> for JSValue<'c>
 where
@@ -269,3 +258,9 @@ where
         }
     }
 }
+
+// impl<'c> AsRef<JSValue<'c>> for JSValue<'c> {
+//     fn as_ref(&self) -> &JSValue<'c> {
+//         return &self;
+//     }
+// }

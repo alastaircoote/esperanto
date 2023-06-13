@@ -9,8 +9,10 @@ use crate::{
 pub enum JSExportAttribute<'a> {
     Function(JSClassFunction),
     Property {
-        getter:
-            &'a dyn for<'c> Fn(&'c JSContext<'c>, &'c JSValue<'c>) -> EsperantoResult<JSValue<'c>>,
+        getter: &'a dyn for<'c> Fn(
+            &'c JSContext<'c>,
+            &'c JSValue<'c>,
+        ) -> EsperantoResult<Retain<JSValue<'c>>>,
         setter: Option<
             &'a dyn for<'c> Fn(
                 &'c JSValue<'c>,

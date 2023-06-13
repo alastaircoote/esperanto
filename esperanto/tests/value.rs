@@ -1,15 +1,14 @@
 #[cfg(test)]
 mod value_tests {
-    use std::convert::TryFrom;
 
     use esperanto::errors::JSValueError;
     use esperanto::export::JSExportMetadata;
-    use esperanto::{EsperantoError, JSContext, JSExportClass, JSValue, TryJSValueFrom};
+    use esperanto::{EsperantoError, JSContext, JSExportClass, JSValue, TryConvertJSValue};
 
     #[test]
     fn sets_properties() {
         let ctx = JSContext::new().unwrap();
-        let value_to_set = JSValue::try_new_value_from(123, &ctx).unwrap();
+        let value_to_set = JSValue::try_new_from(123, &ctx).unwrap();
 
         let obj = ctx
             .evaluate("var testObject = {}; testObject", None)
@@ -18,13 +17,13 @@ mod value_tests {
         obj.set_property("testValue", &value_to_set).unwrap();
 
         let result = ctx.evaluate("testObject.testValue", None).unwrap();
-        assert_eq!(i32::try_from(&result).unwrap(), 123);
+        assert_eq!(i32::try_from_jsvalue(&result).unwrap(), 123);
     }
 
     #[test]
     fn errors_when_cannot_set_property() {
         let ctx = JSContext::new().unwrap();
-        let value_to_set = JSValue::try_new_value_from(123, &ctx).unwrap();
+        let value_to_set = JSValue::try_new_from(123, &ctx).unwrap();
 
         let obj = ctx
             .evaluate("var testObject = true; testObject", None)
@@ -49,7 +48,7 @@ mod value_tests {
 
         let value = obj.get_property("testValue").unwrap();
 
-        assert_eq!(i32::try_from(&value).unwrap(), 456);
+        assert_eq!(i32::try_from_jsvalue(&value).unwrap(), 456);
     }
 
     #[test]
@@ -58,10 +57,10 @@ mod value_tests {
         let func = ctx
             .evaluate("(function(one,two) { return one + two })", None)
             .unwrap();
-        let arg_one = JSValue::try_new_value_from(1200, &ctx).unwrap();
-        let arg_two = JSValue::try_new_value_from(34, &ctx).unwrap();
+        let arg_one = JSValue::try_new_from(1200, &ctx).unwrap();
+        let arg_two = JSValue::try_new_from(34, &ctx).unwrap();
         let result = func.call_as_function(vec![&arg_one, &arg_two]).unwrap();
-        assert_eq!(i32::try_from(&result).unwrap(), 1234);
+        assert_eq!(i32::try_from_jsvalue(&result).unwrap(), 1234);
     }
 
     #[test]
@@ -89,7 +88,7 @@ mod value_tests {
         let result = func
             .call_as_function_bound(vec![], Some(&bound_obj))
             .unwrap();
-        assert_eq!(i32::try_from(&result).unwrap(), 4567);
+        assert_eq!(i32::try_from_jsvalue(&result).unwrap(), 4567);
     }
 
     #[test]
@@ -98,12 +97,12 @@ mod value_tests {
         let body = "return one * two";
         let func = JSValue::new_function(body, vec!["one", "two"], &ctx).unwrap();
 
-        let arg_one = JSValue::try_new_value_from(5, &ctx).unwrap();
-        let arg_two = JSValue::try_new_value_from(25, &ctx).unwrap();
+        let arg_one = JSValue::try_new_from(5, &ctx).unwrap();
+        let arg_two = JSValue::try_new_from(25, &ctx).unwrap();
 
-        let arguments = vec![&arg_one, &arg_two];
+        let arguments = vec![arg_one.value(), arg_two.value()];
         let result = func.call_as_function(arguments).unwrap();
-        assert_eq!(i32::try_from(&result).unwrap(), 125);
+        assert_eq!(i32::try_from_jsvalue(&result).unwrap(), 125);
     }
 
     #[test]
@@ -122,6 +121,7 @@ mod value_tests {
         let first_num = ctx.evaluate("1234", None).unwrap();
         let second_num = ctx.evaluate("1234", None).unwrap();
         let third_num = ctx.evaluate("2345", None).unwrap();
+
         assert_eq!(first_num, second_num);
         assert_ne!(first_num, third_num);
     }
@@ -191,7 +191,7 @@ mod value_tests {
         let str = TestStruct { num_value: 12345 };
         let ctx = JSContext::new().unwrap();
 
-        let wrapped = JSValue::wrap_native(str, &ctx).unwrap();
+        let wrapped = JSValue::new_wrapped_native(str, &ctx).unwrap();
 
         let as_ref = wrapped.get_native::<TestStruct>(&ctx).unwrap();
         assert_eq!(as_ref.num_value, 12345);
@@ -221,7 +221,7 @@ mod value_tests {
         let str = TestStruct {};
         let ctx = JSContext::new().unwrap();
 
-        let wrapped = JSValue::wrap_native(str, &ctx).unwrap();
+        let wrapped = JSValue::new_wrapped_native(str, &ctx).unwrap();
         drop(wrapped);
         ctx.garbage_collect();
 
