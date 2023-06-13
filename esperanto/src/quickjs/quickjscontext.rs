@@ -15,9 +15,10 @@ use crate::shared::{
 
 use super::quickjsvalue::QuickJSValueInternal;
 
-// pub(crate) type QuickJSContextInternal = *mut QuickJSContext;
 pub(crate) type QuickJSContextInternal = QuickJSContextPointer;
 
+// QuickJS requires we provide a filename for every evaluation. If we haven't
+// been given one then we use this
 static PLACEHOLDER_FILENAME: &[u8] = b"<unknown>\0";
 
 impl JSContextInternal for QuickJSContextInternal {

@@ -14,7 +14,6 @@ pub(crate) trait JSContextInternal: Sized {
         script_size: usize,
         metadata: Option<&EvaluateMetadata>,
     ) -> Result<Self::ValueType, EsperantoError>;
-    // fn retain(&self) -> Self;
     fn release(self);
     fn get_runtime(self) -> Self::RuntimeType;
     fn get_globalobject(self) -> Self::ValueType;

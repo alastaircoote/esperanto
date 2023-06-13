@@ -1,5 +1,7 @@
 use std::ffi::{CString, NulError};
 
+/// File metadata to use when evaluating code. This will appear in stack traces,
+/// dev tools etc. if included
 pub struct EvaluateMetadata {
     pub filename: CString,
     pub line_number: i32,

@@ -22,7 +22,7 @@ use crate::{
     export::JSExportMetadata,
     shared::{
         context::JSContextInternal,
-        errors::{ConversionError, EsperantoResult, JSExportError},
+        errors::{EsperantoResult, JSExportError},
         runtime::JSRuntimeError,
         value::JSValueInternal,
     },
@@ -248,8 +248,7 @@ pub(super) fn get_or_create_class_prototype<T: JSExportClass>(
         return Ok(existing_proto);
     }
 
-    let name_as_cstring = CString::new(T::METADATA.class_name)
-        .map_err(|e| ConversionError::CouldNotConvertToJSString(e))?;
+    let name_as_cstring = CString::new(T::METADATA.class_name)?;
 
     let proto = create_base_prototype_function::<T>(&name_as_cstring, in_context)?;
 
@@ -260,7 +259,7 @@ pub(super) fn get_or_create_class_prototype<T: JSExportClass>(
     return Ok(proto);
 }
 
-fn delete_stored_prototype<T: JSExportClass>(
+fn finalize_class_instance<T: JSExportClass>(
     runtime: *mut JSRuntime,
     value: QuickJSValue,
 ) -> EsperantoResult<()> {
@@ -274,9 +273,9 @@ fn delete_stored_prototype<T: JSExportClass>(
     Ok(())
 }
 
-pub(super) unsafe extern "C" fn delete_stored_prototype_extern<T: JSExportClass>(
+pub(super) unsafe extern "C" fn finalize_class_instance_extern<T: JSExportClass>(
     runtime: *mut JSRuntime,
     value: QuickJSValue,
 ) {
-    delete_stored_prototype::<T>(runtime, value).unwrap();
+    finalize_class_instance::<T>(runtime, value).unwrap();
 }

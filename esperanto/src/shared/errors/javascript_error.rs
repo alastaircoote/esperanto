@@ -3,11 +3,12 @@ use std::fmt::{Display, Formatter};
 use thiserror::Error;
 
 /// JavaScriptError is just a small wrapper for JavaScript error objects. By extracting them
-/// from the JS runtime we avoid lifetime, retain issues which makes error handling easier.
+/// from the JS runtime we avoid lifetime and retain issues which makes error handling easier.
 #[derive(Debug, PartialEq, Eq, Error)]
 pub struct JavaScriptError {
     pub name: String,
     pub message: String,
+    // TODO: stack traces?
 }
 
 impl JavaScriptError {

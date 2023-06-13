@@ -25,7 +25,7 @@ pub struct JSContext<'c> {
 }
 
 impl<'c> JSContext<'c> {
-    // Convert our internal implementation into an Esperanto wrapper
+    /// Convert our internal implementation into an Esperanto wrapper
     pub(crate) fn from_raw(
         raw: JSContextInternalImpl,
         with_runtime: Option<JSRuntime<'c>>,
@@ -36,7 +36,7 @@ impl<'c> JSContext<'c> {
         };
     }
 
-    // Create a new JSContext in its own runtime
+    /// Create a new JSContext in its own runtime
     pub fn new() -> EsperantoResult<Self> {
         let runtime = JSRuntime::new()?;
         let raw = JSContextInternalImpl::new_in_runtime(runtime.internal)?;
@@ -44,8 +44,8 @@ impl<'c> JSContext<'c> {
         Ok(Self::from_raw(raw, Some(runtime)))
     }
 
-    // Create a JSContext in an existing runtime. Context lifetime is specified as being shorter
-    // or equivalent to runtime lifetime.
+    /// Create a JSContext in an existing runtime. Context lifetime is specified as being shorter
+    /// or equivalent to runtime lifetime.
     pub fn new_in_runtime<'r>(in_runtime: &'r JSRuntime<'r>) -> EsperantoResult<Self>
     where
         'r: 'c,
@@ -55,8 +55,8 @@ impl<'c> JSContext<'c> {
         Ok(Self::from_raw(raw, None))
     }
 
-    // Actually execute some code. Optionally you can provide file metadata for the script you're evaluating,
-    // this will appear in stack traces, dev tools and so on.
+    /// Actually execute some code. Optionally you can provide file metadata for the script you're evaluating,
+    /// this will appear in stack traces, dev tools and so on.
     pub fn evaluate(
         &'c self,
         script: &str,
@@ -79,9 +79,11 @@ impl<'c> JSContext<'c> {
     }
 
     /// Grab the global object of this JSContext. Useful when you want to add properties to it to make
-    /// globally accessible in user-run code. TBD: should we instead maybe use a closure here and name it
-    /// with_global_object or something like that? Retaining a reference to the global object doesn't feel
-    /// like something we actually want people to do.
+    /// globally accessible in user-run code.
+    //
+    // TBD: should we instead maybe use a closure here and name it
+    // with_global_object or something like that? Retaining a reference to the global object doesn't feel
+    // like something we actually want people to do.
     pub fn global_object(&'c self) -> Retain<JSValue<'c>> {
         let raw = self.internal.get_globalobject();
         Retain::new(JSValue::wrap_internal(raw, self), true)
@@ -111,16 +113,3 @@ impl Drop for JSContext<'_> {
         self.internal.release();
     }
 }
-
-// impl<'c, T> From<T> for JSContext<'c>
-// where
-//     JSContextInternalImpl: From<T>,
-// {
-//     fn from(val: T) -> Self {
-//         let internal = JSContextInternalImpl::from(val);
-//         JSContext {
-//             internal,
-//             stored_runtime: None,
-//         }
-//     }
-// }
