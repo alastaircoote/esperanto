@@ -37,7 +37,8 @@ impl<T: Retainable> Retain<T> {
 
 impl<'c> Retainable for JSValue<'c> {
     fn retain(&self) -> Self {
-        return JSValue::wrap_internal(self.internal.retain(self.context.internal), self.context);
+        let new_retained_value = self.internal.retain(self.context.internal);
+        return JSValue::wrap_internal(new_retained_value, self.context);
     }
 
     fn release(&mut self) {

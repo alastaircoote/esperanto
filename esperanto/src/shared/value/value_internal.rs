@@ -17,7 +17,7 @@ pub(crate) trait JSValueInternal: Sized + Copy {
     fn from_bool(bool: bool, ctx: Self::ContextType) -> EsperantoResult<Self>;
 
     fn new_error(name: CString, message: CString, ctx: Self::ContextType) -> Self;
-    fn is_error(self, ctx: Self::ContextType) -> bool;
+    fn is_error(self, ctx: Self::ContextType) -> EsperantoResult<bool>;
 
     fn to_js_error(self, ctx: Self::ContextType) -> EsperantoResult<JavaScriptError> {
         const NAME_PROP_STR: &[u8] = b"name\0";
@@ -67,7 +67,7 @@ pub(crate) trait JSValueInternal: Sized + Copy {
 
     fn get_property(self, ctx: Self::ContextType, name: &CStr) -> Result<Self, EsperantoError>;
 
-    fn delete_property(self, ctx: Self::ContextType, name: &CStr) -> EsperantoResult<()>;
+    fn delete_property(self, ctx: Self::ContextType, name: &CStr) -> EsperantoResult<bool>;
 
     fn new_function(
         function_text: &CString,
@@ -90,4 +90,5 @@ pub(crate) trait JSValueInternal: Sized + Copy {
 
     fn equals(self, other: Self, ctx: Self::ContextType) -> bool;
     fn is_instanceof(self, target: Self, ctx: Self::ContextType) -> EsperantoResult<bool>;
+    fn is_object(self, ctx: Self::ContextType) -> bool;
 }

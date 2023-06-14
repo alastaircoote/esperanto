@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod test {
+    use esperanto::errors::JavaScriptError;
     use esperanto::export::{JSClassFunction, JSExportAttribute, JSExportMetadata};
     use esperanto::JSValue;
     use esperanto::{JSContext, JSExportClass};
@@ -118,18 +119,61 @@ mod test {
 
         let wrapped = JSValue::constructor_for::<TestStruct>(&ctx).unwrap();
 
-        let f = JSValue::new_function(
-            "return new TestStruct(123,'test')",
-            vec!["TestStruct"],
-            &ctx,
-        )
-        .unwrap();
+        // let f = JSValue::new_function(
+        //     "return new TestStruct(123,'test')",
+        //     vec!["TestStruct"],
+        //     &ctx,
+        // )
+        // .unwrap();
 
-        let result = f.call_as_function(vec![&wrapped]).unwrap();
+        // let result = f.call_as_function(vec![&wrapped]).unwrap();
+
+        ctx.global_object()
+            .set_property("TestStruct", &wrapped)
+            .unwrap();
+
+        let result = ctx.evaluate("new TestStruct(123,'test')", None).unwrap();
         let as_ref: &TestStruct = result.get_native(&ctx).unwrap();
 
         assert_eq!(as_ref.value_one, 123 as f64);
         assert_eq!(as_ref.value_two, "test");
+    }
+
+    #[test]
+    fn throws_error_when_constructor_fails() {
+        struct TestStruct {}
+
+        impl JSExportClass for TestStruct {
+            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
+                class_name: "TestStruct",
+                attributes: None,
+                call_as_constructor: Some(JSClassFunction {
+                    num_args: 0,
+                    func: |_, _| {
+                        let js_err = JavaScriptError::new(
+                            "CustomError".into(),
+                            "This function failed".into(),
+                        );
+                        return Err(esperanto::EsperantoError::JavaScriptError(js_err));
+                    },
+                }),
+                call_as_function: None,
+            };
+        }
+
+        let ctx = JSContext::new().unwrap();
+
+        let wrapped = JSValue::constructor_for::<TestStruct>(&ctx).unwrap();
+        let result = wrapped.call_as_constructor(vec![]);
+
+        let err = result.unwrap_err();
+        match err {
+            esperanto::EsperantoError::JavaScriptError(jserr) => {
+                assert_eq!(jserr.name, "CustomError");
+                assert_eq!(jserr.message, "This function failed")
+            }
+            _ => panic!("Unexpected error type returned"),
+        }
     }
 
     #[test]
@@ -282,6 +326,61 @@ mod test {
             }
             _ => panic!("Unexpected result"),
         }
+    }
+
+    #[test]
+    fn wraps_native_objects() {
+        struct TestStruct {
+            num_value: u32,
+        }
+
+        impl JSExportClass for TestStruct {
+            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
+                class_name: "TestStruct",
+                attributes: None,
+                call_as_constructor: None,
+                call_as_function: None,
+            };
+        }
+
+        let str = TestStruct { num_value: 12345 };
+        let ctx = JSContext::new().unwrap();
+
+        let wrapped = JSValue::new_wrapped_native(str, &ctx).unwrap();
+
+        let as_ref = wrapped.get_native::<TestStruct>(&ctx).unwrap();
+        assert_eq!(as_ref.num_value, 12345);
+    }
+
+    #[test]
+    fn destroys_native_objects() {
+        static mut IS_DESTROYED: bool = false;
+
+        struct TestStruct {}
+
+        impl Drop for TestStruct {
+            fn drop(&mut self) {
+                unsafe { IS_DESTROYED = true };
+            }
+        }
+
+        impl JSExportClass for TestStruct {
+            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
+                class_name: "TestStruct",
+                attributes: None,
+                call_as_constructor: None,
+                call_as_function: None,
+            };
+        }
+
+        let str = TestStruct {};
+        let ctx = JSContext::new().unwrap();
+
+        let wrapped = JSValue::new_wrapped_native(str, &ctx).unwrap();
+        drop(wrapped);
+        ctx.garbage_collect();
+
+        unsafe { assert_eq!(IS_DESTROYED, true) };
     }
 
     #[ignore]

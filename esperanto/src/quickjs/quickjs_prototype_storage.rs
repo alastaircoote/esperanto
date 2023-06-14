@@ -21,7 +21,6 @@ use super::{
 use crate::{
     export::JSExportMetadata,
     shared::{
-        context::JSContextInternal,
         errors::{EsperantoResult, JSExportError},
         runtime::JSRuntimeError,
         value::JSValueInternal,
@@ -165,8 +164,25 @@ unsafe extern "C" fn custom_class_call_extern<T: JSExportClass>(
     let context_ptr = QuickJSContextPointer::wrap(ctx, false);
     let context = JSContext::from_raw(context_ptr, None);
     custom_class_call::<T>(&context, new_target, argc, argv).unwrap_or_else(|e| {
-        let error = JSValue::new_error("EsperantoError", &e.to_string(), &context).unwrap();
-        context_ptr.throw_error(error.internal);
+        let err_val = JSValue::try_new_from(e, &context).unwrap();
+
+        // We need to do an extra retain here as QuickJS releases the error when passed in. If we don't
+        // have an extra retain it'll immediately free the value then there will be no error and the
+        // JS_UNDEFINED__ value below will actually be returned
+        let retained = err_val.retain();
+
+        // let error = match e {
+        //     // If it's already a JavaScriptError then let's pass it through directly
+        //     crate::EsperantoError::JavaScriptError(jserr) => {
+        //         JSValue::new_error(&jserr.name, &jserr.message, &context)
+        //     }
+        //     // Otherwise we wrap the whole thing. Might want to revisit this to see how useful
+        //     // the string output of deeply nested errors actually are.
+        //     _ => JSValue::new_error("EsperantoError", &e.to_string(), &context),
+        // }
+        // .unwrap();
+
+        context_ptr.throw_error(retained.internal);
         // Once we've thrown an error the return value never actually gets used but we should still
         // return one anyway, so let's return undefined.
         JS_UNDEFINED__

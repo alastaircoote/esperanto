@@ -44,8 +44,9 @@ impl<'c> JSContext<'c> {
         Ok(Self::from_raw(raw, Some(runtime)))
     }
 
-    /// Create a JSContext in an existing runtime. Context lifetime is specified as being shorter
-    /// or equivalent to runtime lifetime.
+    /// Create a JSContext in an existing runtime.
+    /// # Arguments
+    /// * `in_runtime`: A reference to the runtime we want to create a JSContext in.
     pub fn new_in_runtime<'r>(in_runtime: &'r JSRuntime<'r>) -> EsperantoResult<Self>
     where
         'r: 'c,
@@ -55,8 +56,12 @@ impl<'c> JSContext<'c> {
         Ok(Self::from_raw(raw, None))
     }
 
-    /// Actually execute some code. Optionally you can provide file metadata for the script you're evaluating,
-    /// this will appear in stack traces, dev tools and so on.
+    /// Take a string, convert it into executable JavaScript, then execute it.
+    ///
+    /// # Arguments
+    /// * `script`: The script you want to evaluate
+    /// * `metadata`: Optional file metadata to be used during evaluation (used in stack traces
+    ///               dev tools, etc)
     pub fn evaluate(
         &'c self,
         script: &str,
@@ -71,7 +76,7 @@ impl<'c> JSContext<'c> {
         })
     }
 
-    /// Manually run garbage collection. Isn't public because not all implementations expose a public way
+    /// Manually run garbage collection. Is hidden because not all implementations expose a public way
     /// to force garbage collection, but it is useful when testing
     #[doc(hidden)]
     pub fn garbage_collect(&self) {
@@ -88,14 +93,6 @@ impl<'c> JSContext<'c> {
         let raw = self.internal.get_globalobject();
         Retain::new(JSValue::wrap_internal(raw, self), true)
     }
-
-    // Commenting out ability to throw an error because JSCore doesn't actually allow us to do this:
-
-    // pub fn throw_error(&self, err: EsperantoError) -> EsperantoResult<()> {
-    //     let error = JSValue::new_error("EsperantoError", &err.to_string(), &self)?;
-    //     self.internal.throw_error(error.internal);
-    //     Ok(())
-    // }
 }
 
 impl Drop for JSContext<'_> {

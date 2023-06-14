@@ -1,11 +1,3 @@
-use std::ffi::CString;
-
-use javascriptcore_sys::{OpaqueJSContext, OpaqueJSValue};
-
-use super::{jscorecontextpointer::JSCoreContextPointer, jscorevalue::JSCoreValueInternal};
-use crate::shared::errors::{CatchExceptionError, EsperantoError};
-use crate::shared::value::JSValueInternal;
-
 /// Converts a JSValue error into our Rust equivalent. Note that this function assumes that the
 /// value exists and that it's an error. You probably don't want to invoke this function directly,
 /// you want to use the [check_jscore_exception!](check_jscore_exception) macro instead.

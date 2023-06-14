@@ -1,17 +1,19 @@
 use std::{
     convert::TryInto,
-    ffi::{c_void, CStr, CString},
+    ffi::{CStr, CString},
+    ops::DerefMut,
 };
 
 use javascriptcore_sys::{
-    JSClassCreate, JSObjectCallAsConstructor, JSObjectCallAsFunction, JSObjectGetProperty,
-    JSObjectMake, JSObjectMakeError, JSObjectMakeFunction, JSObjectSetProperty, JSValueIsString,
-    JSValueMakeBoolean, JSValueMakeNumber, JSValueMakeString, JSValueProtect, JSValueToBoolean,
-    JSValueToNumber, JSValueToStringCopy, JSValueUnprotect, OpaqueJSValue,
+    JSObjectCallAsConstructor, JSObjectCallAsFunction, JSObjectDeleteProperty, JSObjectGetProperty,
+    JSObjectMakeError, JSObjectMakeFunction, JSObjectSetProperty, JSValueIsInstanceOfConstructor,
+    JSValueIsObject, JSValueIsStrictEqual, JSValueIsString, JSValueMakeBoolean, JSValueMakeNumber,
+    JSValueMakeString, JSValueMakeUndefined, JSValueProtect, JSValueToBoolean, JSValueToNumber,
+    JSValueToStringCopy, JSValueUnprotect, OpaqueJSString, OpaqueJSValue,
 };
 
 use crate::{
-    shared::{errors::EsperantoResult, value::JSValueInternal},
+    shared::{context::JSContextInternal, errors::EsperantoResult, value::JSValueInternal},
     JSExportClass,
 };
 
@@ -146,10 +148,10 @@ impl JSValueInternal for JSCoreValueInternal {
             .map(|cstr| JSCoreString::from(cstr))
             .collect();
 
-        // let argument_names_ptrs: Vec<&mut OpaqueJSString> = argument_names_jsstring
-        //     .iter()
-        //     .map(|jsc| &mut *jsc)
-        //     .collect();
+        let argument_names_ptrs: Vec<&mut OpaqueJSString> = argument_names_jsstring
+            .iter_mut()
+            .map(|jsc| jsc.deref_mut())
+            .collect();
 
         let func = check_jscore_exception!(ctx, exception => {
             unsafe {
@@ -159,7 +161,7 @@ impl JSValueInternal for JSCoreValueInternal {
                     // work (I get a SyntaxError), so just skipping over it entirely for now.
                     std::ptr::null_mut(),
                     argc as u32,
-                    argument_names_jsstring.as_mut_raw_ptr(),
+                    argument_names_ptrs.as_ptr() as *const *mut OpaqueJSString,
                     body_jsstring.as_mut_raw_ptr(),
                     // we don't add source URL info for functions because there isn't really
                     // a situation where that's going to make sense (unlike eval)
@@ -231,12 +233,8 @@ impl JSValueInternal for JSCoreValueInternal {
         unsafe { JSValueIsString(*ctx, self.as_value()) }
     }
 
-    fn is_error(self, ctx: Self::ContextType) -> bool {
-        todo!()
-    }
-
     fn undefined(ctx: Self::ContextType) -> Self {
-        todo!()
+        unsafe { JSValueMakeUndefined(*ctx) }.into()
     }
 
     fn native_prototype_for<T: JSExportClass>(ctx: Self::ContextType) -> EsperantoResult<Self> {
@@ -244,11 +242,13 @@ impl JSValueInternal for JSCoreValueInternal {
     }
 
     fn equals(self, other: Self, ctx: Self::ContextType) -> bool {
-        todo!()
+        unsafe { JSValueIsStrictEqual(*ctx, self.as_value(), other.as_value()) }
     }
 
     fn is_instanceof(self, target: Self, ctx: Self::ContextType) -> EsperantoResult<bool> {
-        todo!()
+        check_jscore_exception!(ctx, exception => {
+            unsafe { JSValueIsInstanceOfConstructor(*ctx, self.as_value(), target.try_as_object(ctx)?, exception) }
+        })
     }
 
     fn get_native_ref<'a, T: JSExportClass>(
@@ -258,8 +258,21 @@ impl JSValueInternal for JSCoreValueInternal {
         todo!()
     }
 
-    fn delete_property(self, ctx: Self::ContextType, name: &CStr) -> EsperantoResult<()> {
-        todo!()
+    fn delete_property(self, ctx: Self::ContextType, name: &CStr) -> EsperantoResult<bool> {
+        let mut name_jsstring = JSCoreString::from(name);
+        check_jscore_exception!(ctx, exception => {
+            unsafe { JSObjectDeleteProperty(*ctx, self.try_as_object(ctx)?, name_jsstring.as_mut(), exception)}
+        })
+    }
+
+    fn is_object(self, ctx: Self::ContextType) -> bool {
+        unsafe { JSValueIsObject(*ctx, self.as_value()) }
+    }
+
+    fn is_error(self, ctx: Self::ContextType) -> EsperantoResult<bool> {
+        let error_name = CString::new("Error")?;
+        let error_type = ctx.get_globalobject().get_property(ctx, &error_name)?;
+        self.is_instanceof(error_type, ctx)
     }
 }
 

@@ -10,7 +10,6 @@ use super::quickjsruntime::QuickJSRuntimeInternal;
 use crate::shared::{
     context::{EvaluateMetadata, JSContextError, JSContextInternal},
     errors::EsperantoResult,
-    value::JSValueInternal,
 };
 
 use super::quickjsvalue::QuickJSValueInternal;
@@ -20,6 +19,15 @@ pub(crate) type QuickJSContextInternal = QuickJSContextPointer;
 // QuickJS requires we provide a filename for every evaluation. If we haven't
 // been given one then we use this
 static PLACEHOLDER_FILENAME: &[u8] = b"<unknown>\0";
+
+impl QuickJSContextInternal {
+    pub(crate) fn throw_error(self, err: QuickJSValueInternal) {
+        // quickjs.c shows that JS_Throw frees the value. Why? No clue but if we don't
+        // do a retain here it disappears and there is no exception to look at.
+        // let retained = err.retain(self);
+        unsafe { JS_Throw(*self, err) };
+    }
+}
 
 impl JSContextInternal for QuickJSContextInternal {
     type RuntimeType = QuickJSRuntimeInternal;
@@ -74,12 +82,5 @@ impl JSContextInternal for QuickJSContextInternal {
     fn get_globalobject(self) -> Self::ValueType {
         let obj = unsafe { JS_GetGlobalObject(*self) };
         obj.into()
-    }
-
-    fn throw_error(self, err: Self::ValueType) {
-        // quickjs.c states that JS_Throw frees the value. Why? No clue but if we don't
-        // do a retain here it disappears and there is no exception to look at.
-        let retained = err.retain(self);
-        unsafe { JS_Throw(*self, retained) };
     }
 }

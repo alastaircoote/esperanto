@@ -1,8 +1,8 @@
 use std::{
     convert::TryFrom,
     ffi::{CStr, CString},
-    marker::PhantomData,
-    ops::{Deref, DerefMut},
+    ops::Deref,
+    ops::DerefMut,
     os::raw::c_char,
 };
 
@@ -25,6 +25,32 @@ impl<'a> JSCoreString<'a> {
         JSCoreString {
             raw: unsafe { ptr.as_mut().unwrap() },
         }
+    }
+}
+
+impl<'a> Deref for JSCoreString<'a> {
+    type Target = OpaqueJSString;
+
+    fn deref(&self) -> &Self::Target {
+        self.raw
+    }
+}
+
+impl<'a> DerefMut for JSCoreString<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.raw
+    }
+}
+
+impl<'a> AsRef<OpaqueJSString> for JSCoreString<'a> {
+    fn as_ref(&self) -> &OpaqueJSString {
+        self.deref()
+    }
+}
+
+impl<'a> AsMut<OpaqueJSString> for JSCoreString<'a> {
+    fn as_mut(&mut self) -> &mut OpaqueJSString {
+        self.deref_mut()
     }
 }
 

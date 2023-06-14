@@ -111,34 +111,28 @@ impl TryConvertJSValue for bool {
 
 // Error
 
-impl<'c> JSValueFrom<'c> for EsperantoError {
-    fn jsvalue_from(value: EsperantoError, context: &'c JSContext<'c>) -> Retain<JSValue<'c>> {
-        let internal = match value {
-            // Is this error already a JavaScriptError? If so we can recreate the original name and
-            // message properties.
-            EsperantoError::JavaScriptError(err) => {
-                let error_name =
-                    CString::new(err.name).unwrap_or(CString::new("NativeError").unwrap());
-                let error_message = CString::new(err.message)
-                    .unwrap_or(CString::new("[could not decode message").unwrap());
-                JSValueInternalImpl::new_error(error_name, error_message, context.internal)
-            }
-            // If not then we'll make up "NativeError" as the name and pass through the message:
-            _ => {
-                let error_name = CString::new("NativeError").unwrap();
-                let error_message = CString::new(value.to_string())
-                    .unwrap_or(CString::new("[could not decode message").unwrap());
-                JSValueInternalImpl::new_error(error_name, error_message, context.internal)
-            }
+impl<'c> TryJSValueFrom<'c> for EsperantoError {
+    fn try_jsvalue_from(value: Self, in_context: &'c crate::JSContext<'c>) -> ValueResult {
+        let (name, message): (&str, String) = match &value {
+            Self::RuntimeError(err) => ("RuntimeError", err.to_string()),
+            Self::CatchExceptionError(err) => ("CatchExceptionError", err.to_string()),
+            Self::ContextError(err) => ("ContextError", err.to_string()),
+            Self::ConversionError(err) => ("ConversionError", err.to_string()),
+            Self::ExportError(err) => ("ExportError", err.to_string()),
+            Self::ValueError(err) => ("ValueError", err.to_string()),
+            Self::JavaScriptError(err) => (&err.name, err.message.to_string()),
         };
-        let val = JSValue::wrap_internal(internal, context);
-        Retain::new(val, true)
+
+        return Ok(Retain::new(
+            JSValue::new_error(name, &message, in_context)?,
+            true,
+        ));
     }
 }
 
 impl TryConvertJSValue for JavaScriptError {
     fn try_from_jsvalue(value: &JSValue<'_>) -> EsperantoResult<Self> {
-        if value.is_error() == false {
+        if value.is_error()? == false {
             return Err(ConversionError::JSValueWasNotAnError.into());
         }
 
@@ -286,7 +280,7 @@ mod test {
 
         let err = JavaScriptError::try_from_jsvalue(&converted).unwrap();
 
-        assert_eq!(err.name, "NativeError");
+        assert_eq!(err.name, "ContextError");
         assert_eq!(err.message, expected_string);
     }
 }

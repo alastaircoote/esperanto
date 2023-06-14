@@ -12,7 +12,7 @@ pub struct JavaScriptError {
 }
 
 impl JavaScriptError {
-    pub(crate) fn new(name: String, message: String) -> Self {
+    pub fn new(name: String, message: String) -> Self {
         JavaScriptError { name, message }
     }
 }

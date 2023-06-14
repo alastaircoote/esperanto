@@ -28,7 +28,7 @@ pub enum EsperantoError {
     ConversionError(#[from] ConversionError),
 
     // This has to be a Box<> because a CatchExceptionError can wrap an EsperantoError,
-    // i.e. this
+    // without a box we get a recursion error
     #[error(transparent)]
     CatchExceptionError(#[from] Box<CatchExceptionError>),
 

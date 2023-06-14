@@ -4,6 +4,7 @@ use crate::{
     shared::{
         context::JSContext,
         errors::{ConversionError, EsperantoResult},
+        retain::Retainable,
     },
     JSExportClass, Retain, TryJSValueFrom,
 };
@@ -69,7 +70,7 @@ impl<'c> JSValue<'c> {
         return Ok(Retain::new(val, true));
     }
 
-    pub fn delete_property(&self, name: &str) -> EsperantoResult<()> {
+    pub fn delete_property(&self, name: &str) -> EsperantoResult<bool> {
         let name_cstring =
             CString::new(name).map_err(|e| ConversionError::CouldNotConvertToJSString(e))?;
 
@@ -87,20 +88,6 @@ impl<'c> JSValue<'c> {
             // _ctx_lifetime: PhantomData,
         }
     }
-
-    // pub(crate) fn extend_lifetime<'new>(
-    //     &self,
-    //     new_context: &'new JSContext<'new>,
-    // ) -> Result<JSValueRef<'new>, JSValueError> {
-    //     if new_context.internal != self.context.internal {
-    //         return Err(JSValueError::CannotUpgradeWithDifferentContext);
-    //     }
-    //     Ok(JSValueRef {
-    //         internal: self.internal,
-    //         context: new_context,
-    //         // _ctx_lifetime: PhantomData,
-    //     })
-    // }
 
     pub fn prototype_for<T>(in_context: &'c JSContext<'c>) -> ValueResult
     where
@@ -173,7 +160,7 @@ impl<'c> JSValue<'c> {
         Ok(Self::wrap_internal(created, in_context))
     }
 
-    pub fn call_as_function(&self, arguments: Vec<&Self>) -> EsperantoResult<Self> {
+    pub fn call_as_function(&self, arguments: Vec<&Self>) -> ValueResult {
         return self.call_as_function_bound(arguments, None);
     }
 
@@ -181,7 +168,7 @@ impl<'c> JSValue<'c> {
         &self,
         arguments: Vec<&Self>,
         bind_to: Option<&Self>,
-    ) -> EsperantoResult<Self> {
+    ) -> ValueResult {
         let internal_vec = arguments.iter().map(|a| a.internal).collect();
 
         let internal_result = self.internal.call_as_function(
@@ -190,7 +177,10 @@ impl<'c> JSValue<'c> {
             self.context.internal,
         )?;
 
-        Ok(Self::wrap_internal(internal_result, self.context))
+        Ok(Retain::new(
+            Self::wrap_internal(internal_result, self.context),
+            true,
+        ))
     }
 
     pub fn call_as_constructor(&self, arguments: Vec<&Self>) -> ValueResult {
@@ -227,7 +217,7 @@ impl<'c> JSValue<'c> {
         self.internal.is_string(self.context.internal)
     }
 
-    pub fn is_error(&self) -> bool {
+    pub fn is_error(&self) -> EsperantoResult<bool> {
         self.internal.is_error(self.context.internal)
     }
 
@@ -244,6 +234,12 @@ impl<'c> JSValue<'c> {
         T: TryJSValueFrom<'c>,
     {
         return T::try_jsvalue_from(value, in_context);
+    }
+
+    pub fn retain(&self) -> Retain<Self> {
+        // This line feels a little weird but we need to specifically get the Retainable version of
+        // retain() rather than the retain() we're in right now. This could probably be made clearer.
+        return Retain::new(<Self as Retainable>::retain(self), false);
     }
 }
 

@@ -2,8 +2,7 @@
 mod value_tests {
 
     use esperanto::errors::JSValueError;
-    use esperanto::export::JSExportMetadata;
-    use esperanto::{EsperantoError, JSContext, JSExportClass, JSValue, TryConvertJSValue};
+    use esperanto::{EsperantoError, JSContext, JSValue, TryConvertJSValue};
 
     #[test]
     fn sets_properties() {
@@ -52,6 +51,26 @@ mod value_tests {
     }
 
     #[test]
+    fn deletes_properties() {
+        let ctx = JSContext::new().unwrap();
+
+        let obj = ctx
+            .evaluate("var obj = {testValue: 456, otherTestValue: 123}; obj", None)
+            .unwrap();
+
+        assert_eq!(obj.delete_property("testValue").unwrap(), true);
+        let result = ctx.evaluate("Object.keys(obj)", None).unwrap();
+        assert_eq!(
+            i32::try_from_jsvalue(&result.get_property("length").unwrap()).unwrap(),
+            1
+        );
+        assert_eq!(
+            result.get_property("0").unwrap().to_string(),
+            "otherTestValue"
+        );
+    }
+
+    #[test]
     fn calls_function() {
         let ctx = JSContext::new().unwrap();
         let func = ctx
@@ -69,8 +88,8 @@ mod value_tests {
         let not_func = JSValue::undefined(&ctx);
         let result = not_func.call_as_function(vec![]).unwrap_err();
         match result {
-            EsperantoError::JavaScriptError(err) => {
-                assert_eq!(err.name, "TypeError")
+            EsperantoError::ValueError(err) => {
+                assert_eq!(err, JSValueError::IsNotAnObject)
             }
             _ => {
                 panic!("Unexpected error: {}", result)
@@ -94,15 +113,22 @@ mod value_tests {
     #[test]
     fn creates_function() {
         let ctx = JSContext::new().unwrap();
-        let body = "return one * two";
+
+        // returning an object rather than a value to make sure we're releasing values correctly
+        let body = "return {value: one * two.value }";
+
         let func = JSValue::new_function(body, vec!["one", "two"], &ctx).unwrap();
 
         let arg_one = JSValue::try_new_from(5, &ctx).unwrap();
-        let arg_two = JSValue::try_new_from(25, &ctx).unwrap();
+        // same as above, passing an object arg to check for memory leaks
+        let arg_two = ctx.evaluate("({value: 25})", None).unwrap();
 
-        let arguments = vec![arg_one.value(), arg_two.value()];
+        let arguments: Vec<&JSValue> = vec![&arg_one, &arg_two];
         let result = func.call_as_function(arguments).unwrap();
-        assert_eq!(i32::try_from_jsvalue(&result).unwrap(), 125);
+        assert_eq!(
+            i32::try_from_jsvalue(&result.get_property("value").unwrap()).unwrap(),
+            125
+        );
     }
 
     #[test]
@@ -113,6 +139,12 @@ mod value_tests {
         let checked_value = instance.get_property("constructor").unwrap();
 
         assert_eq!(checked_value, class);
+    }
+    #[test]
+    fn identifies_error_type() {
+        let ctx = JSContext::new().unwrap();
+        let error = JSValue::new_error("TestError", "TestMessage", &ctx).unwrap();
+        assert_eq!(error.is_error().unwrap(), true)
     }
 
     #[test]
@@ -171,60 +203,5 @@ mod value_tests {
         let other_instance = ctx.evaluate("new NotThisClass()", None).unwrap();
         let other_is_instance = other_instance.is_instance_of(&class).unwrap();
         assert_eq!(other_is_instance, false)
-    }
-
-    #[test]
-    fn wraps_native_objects() {
-        struct TestStruct {
-            num_value: u32,
-        }
-
-        impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
-                class_name: "TestStruct",
-                attributes: None,
-                call_as_constructor: None,
-                call_as_function: None,
-            };
-        }
-
-        let str = TestStruct { num_value: 12345 };
-        let ctx = JSContext::new().unwrap();
-
-        let wrapped = JSValue::new_wrapped_native(str, &ctx).unwrap();
-
-        let as_ref = wrapped.get_native::<TestStruct>(&ctx).unwrap();
-        assert_eq!(as_ref.num_value, 12345);
-    }
-
-    #[test]
-    fn destroys_native_objects() {
-        static mut IS_DESTROYED: bool = false;
-
-        struct TestStruct {}
-
-        impl Drop for TestStruct {
-            fn drop(&mut self) {
-                unsafe { IS_DESTROYED = true };
-            }
-        }
-
-        impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
-                class_name: "TestStruct",
-                attributes: None,
-                call_as_constructor: None,
-                call_as_function: None,
-            };
-        }
-
-        let str = TestStruct {};
-        let ctx = JSContext::new().unwrap();
-
-        let wrapped = JSValue::new_wrapped_native(str, &ctx).unwrap();
-        drop(wrapped);
-        ctx.garbage_collect();
-
-        unsafe { assert_eq!(IS_DESTROYED, true) };
     }
 }

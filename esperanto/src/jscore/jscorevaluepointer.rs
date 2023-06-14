@@ -9,6 +9,9 @@ use crate::{
 
 use super::{jscorecontextpointer::JSCoreContextPointer, jscorevalue};
 
+/// JavaScriptCore has different pointer types depending on whether the value is a value or
+/// an object (which makes sense: objects are mutable, values are not). We keep track of that,
+/// maybe unnecessarily?
 #[derive(Debug, Clone, Copy)]
 pub enum JSCoreValuePointer {
     Object(*mut OpaqueJSValue),

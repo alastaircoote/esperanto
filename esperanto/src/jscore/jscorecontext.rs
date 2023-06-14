@@ -98,7 +98,6 @@ impl JSContextInternal for JSCoreContextInternal {
 
 #[cfg(test)]
 mod test {
-    use std::convert::TryInto;
 
     use javascriptcore_sys::{OpaqueJSContext, OpaqueJSValue};
 
@@ -116,7 +115,7 @@ mod test {
         let hmm = unsafe { JSGetMemoryUsageStatistics(*ctx.internal) };
         let val = JSValue::wrap_internal(hmm.into(), &ctx);
         let num_js = val.get_property("protectedObjectCount").unwrap();
-        return (&num_js).try_into().unwrap();
+        return num_js.try_convert().unwrap();
     }
 
     #[test]

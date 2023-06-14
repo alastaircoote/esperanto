@@ -220,6 +220,9 @@ impl JSValueInternal for QuickJSValueInternal {
         bound_to: Option<Self>,
         ctx: Self::ContextType,
     ) -> EsperantoResult<Self> {
+        if self.is_object(ctx) == false {
+            return Err(JSValueError::IsNotAnObject.into());
+        }
         let argc = arguments.len() as i32;
         let mut argv: Vec<QuickJSValue> = arguments.iter().map(|a| *a).collect();
         // for arg in &argv {
@@ -273,6 +276,10 @@ impl JSValueInternal for QuickJSValueInternal {
 
     fn is_error(self, ctx: Self::ContextType) -> bool {
         unsafe { JS_IsError(*ctx, self) == 1 }
+    }
+
+    fn is_object(self, _: Self::ContextType) -> bool {
+        unsafe { JS_IsObject__(self) == 1 }
     }
 }
 
