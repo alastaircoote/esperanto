@@ -10,7 +10,7 @@ use crate::{
 
 pub(super) trait QuickJSExportExtensions: JSExportClass + Sized {
     fn class_def() -> EsperantoResult<JSClassDef> {
-        let name_cstring = CString::new(Self::METADATA.class_name)
+        let name_cstring = CString::new(Self::CLASS_NAME)
             .map_err(|e| ConversionError::CouldNotConvertToJSString(e))?;
         Ok(JSClassDef {
             class_name: name_cstring.as_ptr(),

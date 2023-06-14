@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test {
     use esperanto::errors::JavaScriptError;
-    use esperanto::export::{JSClassFunction, JSExportAttribute, JSExportMetadata};
+    use esperanto::export::{JSClassFunction, JSExportAttribute, JSExportName};
     use esperanto::JSValue;
     use esperanto::{JSContext, JSExportClass};
     use phf::phf_ordered_map;
@@ -12,12 +12,7 @@ mod test {
         struct TestStruct {}
 
         impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
-                class_name: "TestStruct",
-                attributes: None,
-                call_as_constructor: None,
-                call_as_function: None,
-            };
+            const CLASS_NAME: JSExportName = "TestStruct";
         }
 
         let test = TestStruct {};
@@ -32,18 +27,14 @@ mod test {
         struct TestStruct {}
 
         impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
-                class_name: "TestStruct",
-                attributes: None,
-                call_as_constructor: Some(JSClassFunction {
-                    num_args: 1,
-                    func: |_, ctx| {
-                        let item = TestStruct {};
-                        return JSValue::new_wrapped_native(item, ctx);
-                    },
-                }),
-                call_as_function: None,
-            };
+            const CLASS_NAME: JSExportName = "TestStruct";
+            const CALL_AS_CONSTRUCTOR: Option<JSClassFunction> = Some(JSClassFunction {
+                num_args: 1,
+                func: |_, ctx| {
+                    let item = TestStruct {};
+                    return JSValue::new_wrapped_native(item, ctx);
+                },
+            });
         }
 
         let ctx = JSContext::new().unwrap();
@@ -63,12 +54,7 @@ mod test {
         struct TestStruct {}
 
         impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
-                class_name: "TestStruct",
-                attributes: None,
-                call_as_constructor: None,
-                call_as_function: None,
-            };
+            const CLASS_NAME: &'static str = "TestStruct";
         }
 
         let ctx = JSContext::new().unwrap();
@@ -95,44 +81,40 @@ mod test {
         }
 
         impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
-                class_name: "TestStruct",
-                attributes: None,
-                call_as_constructor: Some(JSClassFunction {
-                    num_args: 1,
-                    func: |args, ctx| {
-                        let num: f64 = args[0].try_convert()?;
-                        let str: String = args[1].try_convert()?;
+            const CLASS_NAME: &'static str = "TestStruct";
+            const CALL_AS_CONSTRUCTOR: Option<JSClassFunction> = Some(JSClassFunction {
+                num_args: 1,
+                func: |args, ctx| {
+                    let num: f64 = args[0].try_convert()?;
+                    let str: String = args[1].try_convert()?;
 
-                        let item = TestStruct {
-                            value_one: num,
-                            value_two: str,
-                        };
-                        return JSValue::new_wrapped_native(item, ctx);
-                    },
-                }),
-                call_as_function: None,
-            };
+                    let item = TestStruct {
+                        value_one: num,
+                        value_two: str,
+                    };
+                    return JSValue::new_wrapped_native(item, ctx);
+                },
+            });
         }
 
         let ctx = JSContext::new().unwrap();
 
         let wrapped = JSValue::constructor_for::<TestStruct>(&ctx).unwrap();
 
-        // let f = JSValue::new_function(
-        //     "return new TestStruct(123,'test')",
-        //     vec!["TestStruct"],
-        //     &ctx,
-        // )
-        // .unwrap();
+        let f = JSValue::new_function(
+            "return new TestStruct(123,'test')",
+            vec!["TestStruct"],
+            &ctx,
+        )
+        .unwrap();
 
-        // let result = f.call_as_function(vec![&wrapped]).unwrap();
+        let result = f.call_as_function(vec![&wrapped]).unwrap();
 
-        ctx.global_object()
-            .set_property("TestStruct", &wrapped)
-            .unwrap();
+        // ctx.global_object()
+        //     .set_property("TestStruct", &wrapped)
+        //     .unwrap();
 
-        let result = ctx.evaluate("new TestStruct(123,'test')", None).unwrap();
+        // let result = ctx.evaluate("new TestStruct(123,'test')", None).unwrap();
         let as_ref: &TestStruct = result.get_native(&ctx).unwrap();
 
         assert_eq!(as_ref.value_one, 123 as f64);
@@ -144,21 +126,15 @@ mod test {
         struct TestStruct {}
 
         impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
-                class_name: "TestStruct",
-                attributes: None,
-                call_as_constructor: Some(JSClassFunction {
-                    num_args: 0,
-                    func: |_, _| {
-                        let js_err = JavaScriptError::new(
-                            "CustomError".into(),
-                            "This function failed".into(),
-                        );
-                        return Err(esperanto::EsperantoError::JavaScriptError(js_err));
-                    },
-                }),
-                call_as_function: None,
-            };
+            const CLASS_NAME: &'static str = "TestStruct";
+            const CALL_AS_CONSTRUCTOR: Option<JSClassFunction> = Some(JSClassFunction {
+                num_args: 0,
+                func: |_, _| {
+                    let js_err =
+                        JavaScriptError::new("CustomError".into(), "This function failed".into());
+                    return Err(esperanto::EsperantoError::JavaScriptError(js_err));
+                },
+            });
         }
 
         let ctx = JSContext::new().unwrap();
@@ -181,18 +157,14 @@ mod test {
         struct TestStruct {}
 
         impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
-                class_name: "TestStruct",
-                attributes: None,
-                call_as_constructor: Some(JSClassFunction {
-                    num_args: 0,
-                    func: |_, ctx| {
-                        let item = TestStruct {};
-                        return JSValue::new_wrapped_native(item, &ctx);
-                    },
-                }),
-                call_as_function: None,
-            };
+            const CLASS_NAME: &'static str = "TestStruct";
+            const CALL_AS_CONSTRUCTOR: Option<JSClassFunction> = Some(JSClassFunction {
+                num_args: 0,
+                func: |_, ctx| {
+                    let item = TestStruct {};
+                    return JSValue::new_wrapped_native(item, &ctx);
+                },
+            });
         }
 
         let ctx = JSContext::new().unwrap();
@@ -222,18 +194,14 @@ mod test {
         struct TestStruct {}
 
         impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
-                class_name: "TestStruct",
-                attributes: None,
-                call_as_constructor: Some(JSClassFunction {
-                    num_args: 0,
-                    func: |_, ctx| {
-                        let item = TestStruct {};
-                        return JSValue::new_wrapped_native(item, &ctx);
-                    },
-                }),
-                call_as_function: None,
-            };
+            const CLASS_NAME: &'static str = "TestStruct";
+            const CALL_AS_CONSTRUCTOR: Option<JSClassFunction> = Some(JSClassFunction {
+                num_args: 0,
+                func: |_, ctx| {
+                    let item = TestStruct {};
+                    return JSValue::new_wrapped_native(item, &ctx);
+                },
+            });
         }
 
         let ctx = JSContext::new().unwrap();
@@ -267,22 +235,18 @@ mod test {
         }
 
         impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
-                class_name: "TestStruct",
-                attributes: None,
-                call_as_constructor: None,
-                call_as_function: Some(JSClassFunction {
-                    num_args: 2,
-                    func: |args, ctx| {
-                        let from_arg: f64 = args[0].try_convert()?;
-                        let from_arg_two: f64 = args[1].try_convert()?;
-                        let obj = TestStruct {
-                            val: from_arg * from_arg_two,
-                        };
-                        return JSValue::new_wrapped_native(obj, &ctx);
-                    },
-                }),
-            };
+            const CLASS_NAME: &'static str = "TestStruct";
+            const CALL_AS_FUNCTION: Option<JSClassFunction> = Some(JSClassFunction {
+                num_args: 2,
+                func: |args, ctx| {
+                    let from_arg: f64 = args[0].try_convert()?;
+                    let from_arg_two: f64 = args[1].try_convert()?;
+                    let obj = TestStruct {
+                        val: from_arg * from_arg_two,
+                    };
+                    return JSValue::new_wrapped_native(obj, &ctx);
+                },
+            });
         }
 
         let ctx = JSContext::new().unwrap();
@@ -301,12 +265,7 @@ mod test {
         struct TestStruct {}
 
         impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
-                class_name: "TestStruct",
-                attributes: None,
-                call_as_constructor: None,
-                call_as_function: None,
-            };
+            const CLASS_NAME: &'static str = "TestStruct";
         }
 
         let ctx = JSContext::new().unwrap();
@@ -335,12 +294,7 @@ mod test {
         }
 
         impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
-                class_name: "TestStruct",
-                attributes: None,
-                call_as_constructor: None,
-                call_as_function: None,
-            };
+            const CLASS_NAME: &'static str = "TestStruct";
         }
 
         let str = TestStruct { num_value: 12345 };
@@ -365,12 +319,7 @@ mod test {
         }
 
         impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
-                class_name: "TestStruct",
-                attributes: None,
-                call_as_constructor: None,
-                call_as_function: None,
-            };
+            const CLASS_NAME: &'static str = "TestStruct";
         }
 
         let str = TestStruct {};
@@ -389,19 +338,15 @@ mod test {
         struct TestStruct {}
 
         impl JSExportClass for TestStruct {
-            const METADATA: esperanto::export::JSExportMetadata = JSExportMetadata {
-                class_name: "TestStruct",
-                attributes: Some(phf_ordered_map!(
-                    "testAttribute" => JSExportAttribute::Property {
-                        getter: &| ctx, this_obj | {
-                            JSValue::try_new_from(123.0, &ctx)
-                        },
-                        setter: None
-                    }
-                )),
-                call_as_constructor: None,
-                call_as_function: None,
-            };
+            const CLASS_NAME: &'static str = "TestStruct";
+            const ATTRIBUTES: esperanto::export::JSExportAttributes = Some(phf_ordered_map!(
+                "testAttribute" => JSExportAttribute::Property {
+                    getter: &| ctx, this_obj | {
+                        JSValue::try_new_from(123.0, &ctx)
+                    },
+                    setter: None
+                }
+            ));
         }
 
         let ctx = JSContext::new().unwrap();

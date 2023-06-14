@@ -5,8 +5,8 @@ name = "esperanto"
 version = "0.1.0"
 
 [features]
-# default = ["quickjs"]
-default = ["javascriptcore"]
+default = ["quickjs"]
+# default = ["javascriptcore"]
 javascriptcore = ["javascriptcore-sys"]
 quickjs = ["quickjs_android_suitable_sys"]
 

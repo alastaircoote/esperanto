@@ -1,11 +1,11 @@
 use std::{
+    any::TypeId,
     collections::HashMap,
     convert::TryInto,
     ffi::{c_void, CString},
     slice,
 };
 
-use by_address::ByAddress;
 use quickjs_android_suitable_sys::{
     JSCFunctionEnum_JS_CFUNC_constructor_or_func, JSCFunctionEnum_JS_CFUNC_generic,
     JSContext as QuickJSContext, JSRuntime, JSValue as QuickJSValue, JS_DupValue__,
@@ -19,7 +19,6 @@ use super::{
     quickjsruntime::QuickJSRuntimeInternal,
 };
 use crate::{
-    export::JSExportMetadata,
     shared::{
         errors::{EsperantoResult, JSExportError},
         runtime::JSRuntimeError,
@@ -28,7 +27,7 @@ use crate::{
     JSContext, JSExportClass, JSValue,
 };
 
-type JSClassIDStorage<'a> = HashMap<ByAddress<&'a JSExportMetadata>, u32>;
+type JSClassIDStorage<'a> = HashMap<TypeId, u32>;
 
 pub(super) fn get_classid_storage<'a>(
     runtime: QuickJSRuntimeInternal,
@@ -62,11 +61,11 @@ pub(super) fn drop_classid_storage(runtime: QuickJSRuntimeInternal) {
     drop(boxed);
 }
 
-pub(super) fn get_class_id<T: JSExportClass>(
+pub(super) fn get_class_id<T: JSExportClass + 'static>(
     runtime: *mut JSRuntime,
     storage: &mut JSClassIDStorage,
 ) -> EsperantoResult<u32> {
-    let addr = ByAddress(&T::METADATA);
+    let addr = TypeId::of::<T>();
 
     // QuickJS uses u32 class "IDs" to ensure there aren't ever any
     // collisions between two different classes. First check: do we
@@ -128,8 +127,8 @@ fn custom_class_call<'c, T: JSExportClass>(
 
     let result = match (
         target_is_constructor,
-        T::METADATA.call_as_constructor,
-        T::METADATA.call_as_function,
+        T::CALL_AS_CONSTRUCTOR,
+        T::CALL_AS_FUNCTION,
     ) {
         (true, Some(constructor), _) => {
             // This was called as a constructor and we have a constructor. Expected behaviour.
@@ -137,15 +136,15 @@ fn custom_class_call<'c, T: JSExportClass>(
         }
         (true, None, _) => {
             // This called as a constructor but we don't have one. Unexpected behaviour.
-            Err(JSExportError::ConstructorCalledOnNonConstructableClass(
-                T::METADATA.class_name.to_string(),
+            Err(
+                JSExportError::ConstructorCalledOnNonConstructableClass(T::CLASS_NAME.to_string())
+                    .into(),
             )
-            .into())
         }
         (false, _, Some(call_as_function)) => (call_as_function.func)(&args, &ctx),
         (false, _, None) => {
             // This called as a constructor but we don't have one. Unexpected behaviour.
-            Err(JSExportError::CalledNonFunctionClass(T::METADATA.class_name.to_string()).into())
+            Err(JSExportError::CalledNonFunctionClass(T::CLASS_NAME.to_string()).into())
         }
     };
     return result.map(|val| val.internal.retain(ctx.internal));
@@ -193,7 +192,7 @@ fn create_base_prototype_function<T: JSExportClass>(
     name_as_cstring: &CString,
     in_context: *mut QuickJSContext,
 ) -> EsperantoResult<QuickJSValue> {
-    let proto_arg_length: i32 = match T::METADATA.call_as_function {
+    let proto_arg_length: i32 = match T::CALL_AS_FUNCTION {
         Some(f) => f.num_args,
         _ => 0,
     };
@@ -226,7 +225,7 @@ fn create_constructor<T: JSExportClass>(
 ) {
     let ctx = QuickJSContextPointer::wrap(in_context, false);
 
-    let constructor_arg_length: i32 = match T::METADATA.call_as_constructor {
+    let constructor_arg_length: i32 = match T::CALL_AS_CONSTRUCTOR {
         Some(f) => f.num_args,
         _ => 0,
     };
@@ -264,7 +263,7 @@ pub(super) fn get_or_create_class_prototype<T: JSExportClass>(
         return Ok(existing_proto);
     }
 
-    let name_as_cstring = CString::new(T::METADATA.class_name)?;
+    let name_as_cstring = CString::new(T::CLASS_NAME)?;
 
     let proto = create_base_prototype_function::<T>(&name_as_cstring, in_context)?;
 

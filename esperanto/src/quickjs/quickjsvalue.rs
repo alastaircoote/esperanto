@@ -179,14 +179,14 @@ impl JSValueInternal for QuickJSValueInternal {
         Ok(unsafe { JS_GetPropertyStr(*ctx, self, name.as_ptr()) }.into())
     }
 
-    fn delete_property(self, ctx: Self::ContextType, name: &CStr) -> EsperantoResult<()> {
+    fn delete_property(self, ctx: Self::ContextType, name: &CStr) -> EsperantoResult<bool> {
         let name = unsafe { JS_NewAtom(*ctx, name.as_ptr()) };
-        check_quickjs_exception!(ctx => {
+        let result = check_quickjs_exception!(ctx => {
             unsafe {JS_DeleteProperty(*ctx, self, name, 0) }
         })?;
         unsafe { JS_FreeAtom(*ctx, name) };
 
-        Ok(())
+        Ok(result == 1)
     }
 
     fn new_function(
@@ -274,8 +274,8 @@ impl JSValueInternal for QuickJSValueInternal {
         Ok(result == 1)
     }
 
-    fn is_error(self, ctx: Self::ContextType) -> bool {
-        unsafe { JS_IsError(*ctx, self) == 1 }
+    fn is_error(self, ctx: Self::ContextType) -> EsperantoResult<bool> {
+        Ok(unsafe { JS_IsError(*ctx, self) == 1 })
     }
 
     fn is_object(self, _: Self::ContextType) -> bool {

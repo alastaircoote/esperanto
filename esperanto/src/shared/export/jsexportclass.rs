@@ -23,17 +23,13 @@ pub struct JSClassFunction {
         for<'c> fn(&'c Vec<JSValue<'c>>, &'c JSContext<'c>) -> EsperantoResult<Retain<JSValue<'c>>>,
 }
 
-// pub enum JSExportCall<T: 'static> {
-//     AsConstructor(&'static dyn for<'a> Fn(&Vec<JSValue<'a>>) -> EsperantoResult<T>),
-// }
-
-pub struct JSExportMetadata {
-    pub class_name: &'static str,
-    pub attributes: Option<phf::OrderedMap<&'static str, JSExportAttribute<'static>>>,
-    pub call_as_constructor: Option<JSClassFunction>,
-    pub call_as_function: Option<JSClassFunction>,
+pub trait JSExportClass: 'static {
+    const CLASS_NAME: &'static str;
+    const ATTRIBUTES: JSExportAttributes = None;
+    const CALL_AS_CONSTRUCTOR: Option<JSClassFunction> = None;
+    const CALL_AS_FUNCTION: Option<JSClassFunction> = None;
+    // const METADATA: JSExportMetadata;
 }
 
-pub trait JSExportClass {
-    const METADATA: JSExportMetadata;
-}
+pub type JSExportAttributes = Option<phf::OrderedMap<&'static str, JSExportAttribute<'static>>>;
+pub type JSExportName = &'static str;
