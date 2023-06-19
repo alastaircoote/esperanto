@@ -1,10 +1,11 @@
 use std::ffi::{CStr, CString};
 
+use crate::shared::context::JSContextInternal;
 use crate::shared::errors::{EsperantoError, EsperantoResult, JavaScriptError};
 use crate::JSExportClass;
 
 pub(crate) trait JSValueInternal: Sized + Copy {
-    type ContextType: Copy;
+    type ContextType: JSContextInternal + Copy;
 
     fn as_cstring(self, ctx: Self::ContextType) -> EsperantoResult<CString>;
     fn from_cstring(value: &CString, ctx: Self::ContextType) -> Self;
@@ -43,11 +44,20 @@ pub(crate) trait JSValueInternal: Sized + Copy {
 
     fn undefined(ctx: Self::ContextType) -> Self;
 
-    fn native_prototype_for<T: JSExportClass>(ctx: Self::ContextType) -> EsperantoResult<Self>;
+    fn native_prototype_for<T: JSExportClass>(
+        ctx: Self::ContextType,
+        runtime: <Self::ContextType as JSContextInternal>::RuntimeType,
+    ) -> EsperantoResult<Self>;
+
+    fn constructor_for<T: JSExportClass>(
+        ctx: Self::ContextType,
+        runtime: <Self::ContextType as JSContextInternal>::RuntimeType,
+    ) -> EsperantoResult<Self>;
 
     fn from_native_class<T: JSExportClass>(
         instance: T,
         ctx: Self::ContextType,
+        runtime: <Self::ContextType as JSContextInternal>::RuntimeType,
     ) -> EsperantoResult<Self>;
 
     fn get_native_ref<'a, T: JSExportClass>(self, ctx: Self::ContextType)

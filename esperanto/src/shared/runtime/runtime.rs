@@ -20,6 +20,13 @@ impl<'r> JSRuntime<'r> {
             _lifetime: PhantomData,
         })
     }
+
+    pub(crate) fn from_raw(raw: JSRuntimeInternalImpl) -> Self {
+        JSRuntime {
+            internal: raw,
+            _lifetime: PhantomData,
+        }
+    }
 }
 
 impl Drop for JSRuntime<'_> {

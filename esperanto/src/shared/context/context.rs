@@ -1,4 +1,5 @@
 use std::ffi::CString;
+use std::marker::PhantomData;
 
 use super::{context_error::JSContextError, evaluate_metadata::EvaluateMetadata};
 use crate::shared::engine_impl::JSContextInternalImpl;
@@ -6,6 +7,12 @@ use crate::shared::value::ValueResult;
 use crate::shared::{context::JSContextInternal, errors::EsperantoResult};
 use crate::shared::{runtime::JSRuntime, value::JSValue};
 use crate::Retain;
+
+#[derive(Debug)]
+enum JSRuntimeStore<'r> {
+    StoredInternally(JSRuntime<'r>),
+    Referenced(&'r JSRuntime<'r>),
+}
 
 /**
  * This is the environment in which we actually evaluate JavaScript. It can belong to a
@@ -17,22 +24,26 @@ pub struct JSContext<'c> {
     // The engine-specific implementation of JSContext
     pub(crate) internal: JSContextInternalImpl,
 
+    runtime: JSRuntimeStore<'c>,
     // It's very common to want to spin up a JSContext without caring about the JSRuntime
     // it lives inside (e.g. using JSContext::new()). In that instance we do still have to
     // create a runtime but rather than having the user be concerned about it we store it
     // alongside the context with the same lifetime as the context.
-    stored_runtime: Option<JSRuntime<'c>>,
+    // stored_runtime: Option<JSRuntime<'c>>,
 }
 
-impl<'c> JSContext<'c> {
+impl<'r, 'c> JSContext<'c>
+where
+    'r: 'c,
+{
     /// Convert our internal implementation into an Esperanto wrapper
     pub(crate) fn from_raw(
         raw: JSContextInternalImpl,
-        with_runtime: Option<JSRuntime<'c>>,
-    ) -> Self {
+        with_runtime: &'r JSRuntime<'r>,
+    ) -> JSContext<'c> {
         return JSContext {
             internal: raw,
-            stored_runtime: with_runtime,
+            runtime: JSRuntimeStore::Referenced(with_runtime),
         };
     }
 
@@ -40,20 +51,24 @@ impl<'c> JSContext<'c> {
     pub fn new() -> EsperantoResult<Self> {
         let runtime = JSRuntime::new()?;
         let raw = JSContextInternalImpl::new_in_runtime(runtime.internal)?;
-
-        Ok(Self::from_raw(raw, Some(runtime)))
+        Ok(JSContext {
+            internal: raw,
+            runtime: JSRuntimeStore::StoredInternally(runtime),
+        })
     }
 
     /// Create a JSContext in an existing runtime.
     /// # Arguments
     /// * `in_runtime`: A reference to the runtime we want to create a JSContext in.
-    pub fn new_in_runtime<'r>(in_runtime: &'r JSRuntime<'r>) -> EsperantoResult<Self>
+    pub fn new_in_runtime(in_runtime: &'r JSRuntime<'r>) -> EsperantoResult<Self>
     where
         'r: 'c,
     {
         let raw = JSContextInternalImpl::new_in_runtime(in_runtime.internal)?;
-
-        Ok(Self::from_raw(raw, None))
+        Ok(JSContext {
+            internal: raw,
+            runtime: JSRuntimeStore::Referenced(in_runtime),
+        })
     }
 
     /// Take a string, convert it into executable JavaScript, then execute it.
@@ -72,7 +87,7 @@ impl<'c> JSContext<'c> {
 
         self.internal.evaluate(cstr, len, metadata).map(|internal| {
             let val = JSValue::wrap_internal(internal, self);
-            Retain::new(val, true)
+            Retain::wrap(val)
         })
     }
 
@@ -91,19 +106,19 @@ impl<'c> JSContext<'c> {
     // like something we actually want people to do.
     pub fn global_object(&'c self) -> Retain<JSValue<'c>> {
         let raw = self.internal.get_globalobject();
-        Retain::new(JSValue::wrap_internal(raw, self), true)
+        Retain::wrap(JSValue::wrap_internal(raw, self))
+    }
+
+    pub fn get_runtime(&'c self) -> &JSRuntime {
+        match &self.runtime {
+            JSRuntimeStore::StoredInternally(stored) => stored,
+            JSRuntimeStore::Referenced(reference) => reference,
+        }
     }
 }
 
 impl Drop for JSContext<'_> {
     fn drop(&mut self) {
-        if let Some(runtime) = &self.stored_runtime {
-            // this is really just here to stop a compiler error about stored_runtime
-            // never being used, it would be automatically dropped when the context
-            // is dropped anyway.
-            drop(runtime)
-        }
-
         // The context is retained when created. We don't mess around with Retain<JSContext> as our
         // lifetimes cover the necessity for that. We still need to drop the retain when the context
         // itself is dropped though:

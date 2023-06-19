@@ -1,11 +1,11 @@
-use super::value::JSValueInternal;
+use super::value::{HasJSValue, JSValueInternal};
 use crate::JSValue;
 use std::ops::Deref;
 
 pub trait Retainable {
-    fn retain(&self) -> Self;
+    // fn retain(&self) -> Self;
     fn release(&mut self);
-    fn deref(&self) -> Self;
+    // fn deref(&self) -> Self;
 }
 
 #[derive(Debug)]
@@ -20,14 +20,8 @@ impl<T: Retainable> Drop for Retain<T> {
 }
 
 impl<T: Retainable> Retain<T> {
-    pub fn new(retaining: T, already_retained: bool) -> Self {
-        let retained = match already_retained {
-            false => T::retain(&retaining),
-            true => retaining,
-        };
-        Retain {
-            retained_value: retained,
-        }
+    pub fn wrap(retained_value: T) -> Self {
+        Retain { retained_value }
     }
 
     pub fn value(&self) -> &T {
@@ -36,18 +30,18 @@ impl<T: Retainable> Retain<T> {
 }
 
 impl<'c> Retainable for JSValue<'c> {
-    fn retain(&self) -> Self {
-        let new_retained_value = self.internal.retain(self.context.internal);
-        return JSValue::wrap_internal(new_retained_value, self.context);
-    }
+    // fn retain(&self) -> Self {
+    //     let new_retained_value = self.internal.retain(self.context.internal);
+    //     return JSValue::wrap_internal(new_retained_value, self.context);
+    // }
 
     fn release(&mut self) {
         self.internal.release(self.context.internal);
     }
 
-    fn deref(&self) -> Self {
-        JSValue::wrap_internal(self.internal, self.context)
-    }
+    // fn deref(&self) -> Self {
+    //     JSValue::wrap_internal(self.internal, self.context)
+    // }
 }
 
 impl<T: Retainable> Deref for Retain<T> {
@@ -84,37 +78,8 @@ where
     }
 }
 
-// impl<'c, T: Retainable> TryInto<T> for Retain<JSValue<'c>>
-// where
-//     T: TryFrom<JSValue<'c>>,
-// {
-//     type Error = EsperantoError;
-
-//     fn try_into(self) -> Result<Retain<T>, Self::Error> {
-//         todo!()
-//     }
-// }
-
-// impl<'c, T> TryFromJSValue for Retain<JSValue<'c>>
-// where
-//     T: Retainable,
-//     T: TryFromJSValue,
-// {
-//     fn try_from(value: &JSValue<'c>) -> EsperantoResult<Self> {
-//         todo!()
-//     }
-// }
-
-// impl<'a> From<Retain<JSValue<'a>>> for JSValue<'a> {
-//     fn from(val: Retain<JSValue<'a>>) -> Self {
-//         val.retained_value
-//     }
-// }
-
-// impl<'c, T> TryInto<T> for Retain<JSValue<'c>> {
-//     type Error;
-
-//     fn try_into(self) -> Result<T, Self::Error> {
-//         todo!()
-//     }
-// }
+impl<'c> HasJSValue for Retain<JSValue<'c>> {
+    fn get_value<'a>(&'a self) -> &'a JSValue<'c> {
+        &self.retained_value
+    }
+}

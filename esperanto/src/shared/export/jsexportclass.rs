@@ -28,7 +28,6 @@ pub trait JSExportClass: 'static {
     const ATTRIBUTES: JSExportAttributes = None;
     const CALL_AS_CONSTRUCTOR: Option<JSClassFunction> = None;
     const CALL_AS_FUNCTION: Option<JSClassFunction> = None;
-    // const METADATA: JSExportMetadata;
 }
 
 pub type JSExportAttributes = Option<phf::OrderedMap<&'static str, JSExportAttribute<'static>>>;

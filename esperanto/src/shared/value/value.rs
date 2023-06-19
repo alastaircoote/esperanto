@@ -1,6 +1,7 @@
 use std::{ffi::CString, fmt::Display};
 
 use crate::{
+    export::Js,
     shared::{
         context::JSContext,
         errors::{ConversionError, EsperantoResult},
@@ -67,7 +68,7 @@ impl<'c> JSValue<'c> {
                 context: self.context,
             })?;
 
-        return Ok(Retain::new(val, true));
+        return Ok(Retain::wrap(val));
     }
 
     pub fn delete_property(&self, name: &str) -> EsperantoResult<bool> {
@@ -93,19 +94,26 @@ impl<'c> JSValue<'c> {
     where
         T: JSExportClass,
     {
-        let ptr = JSValueInternalImpl::native_prototype_for::<T>(in_context.internal)?;
+        let ptr = JSValueInternalImpl::native_prototype_for::<T>(
+            in_context.internal,
+            in_context.get_runtime().internal,
+        )?;
         let val = JSValue::wrap_internal(ptr, in_context);
 
-        Ok(Retain::new(val, true))
+        Ok(Retain::wrap(val))
     }
 
     pub fn constructor_for<T>(in_context: &'c JSContext<'c>) -> ValueResult
     where
         T: JSExportClass,
     {
-        let prototype = Self::prototype_for::<T>(in_context)?;
-        // return Ok(prototype);
-        return prototype.get_property("constructor");
+        let ptr = JSValueInternalImpl::constructor_for::<T>(
+            in_context.internal,
+            in_context.get_runtime().internal,
+        )?;
+        let val = JSValue::wrap_internal(ptr, in_context);
+
+        Ok(Retain::wrap(val))
     }
 
     pub fn new_wrapped_native<T>(
@@ -115,16 +123,19 @@ impl<'c> JSValue<'c> {
     where
         T: JSExportClass,
     {
-        let ptr = JSValueInternalImpl::from_native_class(instance, in_context.internal)?;
+        let ptr = JSValueInternalImpl::from_native_class(
+            instance,
+            in_context.internal,
+            in_context.get_runtime().internal,
+        )?;
         let val = JSValue::wrap_internal(ptr, in_context);
-        Ok(Retain::new(val, true))
+        Ok(Retain::wrap(val))
     }
 
-    pub fn get_native<T: JSExportClass>(
-        &self,
-        in_context: &'c JSContext<'c>,
-    ) -> EsperantoResult<&T> {
-        self.internal.get_native_ref(in_context.internal)
+    pub fn as_native<T: JSExportClass>(&self) -> EsperantoResult<Js<'c, T>> {
+        // self.internal.get_native_ref(self.context.internal)
+        let retained = self.retain();
+        Js::new(retained)
     }
 
     pub fn new_function(
@@ -143,7 +154,7 @@ impl<'c> JSValue<'c> {
         let raw =
             JSValueInternalImpl::new_function(&body_cstr, &arguments_cstr, in_context.internal)?;
 
-        Ok(Retain::new(Self::wrap_internal(raw, in_context), true))
+        Ok(Retain::wrap(Self::wrap_internal(raw, in_context)))
     }
 
     pub fn new_error(
@@ -177,10 +188,10 @@ impl<'c> JSValue<'c> {
             self.context.internal,
         )?;
 
-        Ok(Retain::new(
-            Self::wrap_internal(internal_result, self.context),
-            true,
-        ))
+        Ok(Retain::wrap(Self::wrap_internal(
+            internal_result,
+            self.context,
+        )))
     }
 
     pub fn call_as_constructor(&self, arguments: Vec<&Self>) -> ValueResult {
@@ -190,22 +201,19 @@ impl<'c> JSValue<'c> {
             .internal
             .call_as_constructor(internal_vec, self.context.internal)?;
 
-        Ok(Retain::new(
-            Self::wrap_internal(internal_result, self.context),
-            true,
-        ))
+        Ok(Retain::wrap(Self::wrap_internal(
+            internal_result,
+            self.context,
+        )))
     }
 
     // Seems kind of silly for undefined to be a retain since it never gets garbage collected
     // but it's actually difficult for us to provide anything different. Will have to think on it.
     pub fn undefined(in_context: &'c JSContext) -> Retain<Self> {
-        Retain::new(
-            Self::wrap_internal(
-                JSValueInternalImpl::undefined(in_context.internal),
-                in_context,
-            ),
-            true,
-        )
+        Retain::wrap(Self::wrap_internal(
+            JSValueInternalImpl::undefined(in_context.internal),
+            in_context,
+        ))
     }
 
     pub fn is_instance_of(&self, other: &Self) -> EsperantoResult<bool> {
@@ -223,7 +231,7 @@ impl<'c> JSValue<'c> {
 
     pub fn try_convert<'a, T>(&self) -> EsperantoResult<T>
     where
-        T: TryConvertJSValue,
+        T: TryConvertJSValue<'c>,
         'c: 'a,
     {
         T::try_from_jsvalue(&self)
@@ -237,9 +245,8 @@ impl<'c> JSValue<'c> {
     }
 
     pub fn retain(&self) -> Retain<Self> {
-        // This line feels a little weird but we need to specifically get the Retainable version of
-        // retain() rather than the retain() we're in right now. This could probably be made clearer.
-        return Retain::new(<Self as Retainable>::retain(self), false);
+        let new_retained = self.internal.retain(self.context.internal);
+        return Retain::wrap(Self::wrap_internal(new_retained, self.context));
     }
 }
 

@@ -1,27 +1,33 @@
 use std::{
     convert::TryInto,
-    ffi::{CStr, CString},
+    ffi::{c_void, CStr, CString},
     ops::DerefMut,
 };
 
 use javascriptcore_sys::{
-    JSObjectCallAsConstructor, JSObjectCallAsFunction, JSObjectDeleteProperty, JSObjectGetProperty,
-    JSObjectMakeError, JSObjectMakeFunction, JSObjectSetProperty, JSValueIsInstanceOfConstructor,
-    JSValueIsObject, JSValueIsStrictEqual, JSValueIsString, JSValueMakeBoolean, JSValueMakeNumber,
+    JSObjectCallAsConstructor, JSObjectCallAsFunction, JSObjectDeleteProperty, JSObjectGetPrivate,
+    JSObjectGetProperty, JSObjectMake, JSObjectMakeConstructor, JSObjectMakeError,
+    JSObjectMakeFunction, JSObjectSetProperty, JSValueIsInstanceOfConstructor, JSValueIsObject,
+    JSValueIsStrictEqual, JSValueIsString, JSValueMakeBoolean, JSValueMakeNumber,
     JSValueMakeString, JSValueMakeUndefined, JSValueProtect, JSValueToBoolean, JSValueToNumber,
     JSValueToStringCopy, JSValueUnprotect, OpaqueJSString, OpaqueJSValue,
 };
 
 use crate::{
-    shared::{context::JSContextInternal, errors::EsperantoResult, value::JSValueInternal},
+    jscore::jscoreexport::get_jsclass_for,
+    shared::{
+        context::JSContextInternal,
+        errors::{EsperantoResult, JSExportError},
+        value::JSValueInternal,
+    },
     JSExportClass,
 };
 
 use crate::shared::as_ptr::AsRawMutPtr;
 
 use super::{
-    jscorecontextpointer::JSCoreContextPointer, jscorestring::JSCoreString,
-    jscorevaluepointer::JSCoreValuePointer,
+    jscorecontextpointer::JSCoreContextPointer, jscoreexport::constructor_extern,
+    jscorestring::JSCoreString, jscorevaluepointer::JSCoreValuePointer,
 };
 
 pub(crate) type JSCoreValueInternal = JSCoreValuePointer;
@@ -104,13 +110,15 @@ impl JSValueInternal for JSCoreValueInternal {
     fn from_native_class<T: JSExportClass>(
         instance: T,
         ctx: Self::ContextType,
+        runtime: <Self::ContextType as JSContextInternal>::RuntimeType,
     ) -> EsperantoResult<Self> {
-        // let definition = T::CLASS_DEFINITION;
-        // let class_def = unsafe { JSClassCreate(&definition) };
-        // let boxed = Box::new(instance);
-        // let obj = unsafe { JSObjectMake(*ctx, class_def, Box::into_raw(boxed) as *mut c_void) };
-        // Ok(obj.into())
-        todo!();
+        let boxed = Box::new(instance);
+        let boxed_ptr = Box::into_raw(boxed);
+
+        let class = get_jsclass_for::<T>(runtime)?;
+        let raw = unsafe { JSObjectMake(*ctx, class, boxed_ptr as *mut c_void) };
+
+        return Ok(JSCoreValuePointer::Object(raw));
     }
 
     fn new_error(name: CString, message: CString, ctx: Self::ContextType) -> Self {
@@ -237,8 +245,24 @@ impl JSValueInternal for JSCoreValueInternal {
         unsafe { JSValueMakeUndefined(*ctx) }.into()
     }
 
-    fn native_prototype_for<T: JSExportClass>(ctx: Self::ContextType) -> EsperantoResult<Self> {
-        todo!()
+    fn native_prototype_for<T: JSExportClass>(
+        ctx: Self::ContextType,
+        runtime: <Self::ContextType as JSContextInternal>::RuntimeType,
+    ) -> EsperantoResult<Self> {
+        let class = get_jsclass_for::<T>(runtime)?;
+        let constructor = unsafe { JSObjectMakeConstructor(*ctx, class, None) };
+        Ok(JSCoreValuePointer::Object(constructor))
+    }
+
+    fn constructor_for<T: JSExportClass>(
+        ctx: Self::ContextType,
+        runtime: <Self::ContextType as JSContextInternal>::RuntimeType,
+    ) -> EsperantoResult<Self> {
+        let class = get_jsclass_for::<T>(runtime)?;
+        // let constructor =
+        unsafe { JSObjectMakeConstructor(*ctx, class, Some(constructor_extern::<T>)) };
+        let obj = unsafe { JSObjectMake(*ctx, class, std::ptr::null_mut()) };
+        Ok(JSCoreValuePointer::Object(obj))
     }
 
     fn equals(self, other: Self, ctx: Self::ContextType) -> bool {
@@ -255,7 +279,8 @@ impl JSValueInternal for JSCoreValueInternal {
         self,
         ctx: Self::ContextType,
     ) -> EsperantoResult<&'a T> {
-        todo!()
+        let instance = unsafe { JSObjectGetPrivate(self.try_as_object(ctx)?) } as *mut T;
+        unsafe { instance.as_ref() }.ok_or(JSExportError::CouldNotGetNativeObject.into())
     }
 
     fn delete_property(self, ctx: Self::ContextType, name: &CStr) -> EsperantoResult<bool> {

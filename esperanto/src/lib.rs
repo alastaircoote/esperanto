@@ -14,7 +14,7 @@ pub use shared::runtime::JSRuntime;
 pub use shared::value::{AsJSValueRef, JSValue, JSValueFrom, TryConvertJSValue, TryJSValueFrom};
 
 pub mod errors {
-    pub use super::shared::errors::{CatchExceptionError, JavaScriptError};
+    pub use super::shared::errors::*;
     pub use super::shared::value::JSValueError;
 }
 
