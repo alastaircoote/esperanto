@@ -15,6 +15,7 @@ use javascriptcore_sys::{
 };
 
 use crate::{
+    export::JSExportPrivateData,
     jscore::jscoreexport::get_class_for,
     shared::{
         context::JSContextInternal,
@@ -115,12 +116,10 @@ impl JSValueInternal for JSCoreValueInternal {
         ctx: Self::ContextType,
         runtime: <Self::ContextType as JSContextInternal>::RuntimeType,
     ) -> EsperantoResult<Self> {
-        let boxed = Box::new(instance);
-        let boxed_ptr = Box::into_raw(boxed);
-
+        let private_data = JSExportPrivateData::from_instance(instance);
         let class = get_class_for::<T>(ctx)?;
 
-        let raw = unsafe { JSObjectMake(ctx, class.instance_class, boxed_ptr as *mut c_void) };
+        let raw = unsafe { JSObjectMake(ctx, class.instance_class, private_data as _) };
         // let raw = unsafe { JSObjectMake(ctx, overall_class, std::ptr::null_mut()) };
         unsafe { JSValueProtect(ctx, raw) }
         unsafe { JSObjectSetPrototype(ctx, raw, class.prototype) }
@@ -287,8 +286,8 @@ impl JSValueInternal for JSCoreValueInternal {
         self,
         ctx: Self::ContextType,
     ) -> EsperantoResult<&'a T> {
-        let instance = unsafe { JSObjectGetPrivate(self.try_as_object(ctx)?) } as *mut T;
-        unsafe { instance.as_ref() }.ok_or(JSExportError::CouldNotGetNativeObject.into())
+        let ptr = unsafe { JSObjectGetPrivate(self.try_as_object(ctx)?) };
+        JSExportPrivateData::data_from_ptr(ptr)
     }
 
     fn delete_property(self, ctx: Self::ContextType, name: &CStr) -> EsperantoResult<bool> {

@@ -2,13 +2,13 @@
 mod test {
     use esperanto::errors::{JSExportError, JavaScriptError};
     use esperanto::export::{JSClassFunction, JSExportAttribute, JSExportName, Js};
-    use esperanto::{EsperantoError, JSValue};
+    use esperanto::{EsperantoError, JSRuntime, JSValue};
     use esperanto::{JSContext, JSExportClass};
     use phf::phf_ordered_map;
     use std::ops::Deref;
 
     #[test]
-    fn exports_sets_constructor() {
+    fn exports_sets_prototype() {
         struct TestStruct {}
 
         impl JSExportClass for TestStruct {
@@ -18,7 +18,7 @@ mod test {
         let test = TestStruct {};
         let ctx = JSContext::new().unwrap();
         let wrapped = JSValue::new_wrapped_native(test, &ctx).unwrap();
-        let constructor = JSValue::constructor_for::<TestStruct>(&ctx).unwrap();
+        let constructor = JSValue::prototype_for::<TestStruct>(&ctx).unwrap();
         assert_eq!(wrapped.is_instance_of(&constructor).unwrap(), true);
     }
 
@@ -138,7 +138,7 @@ mod test {
 
         let ctx = JSContext::new().unwrap();
 
-        let wrapped = JSValue::constructor_for::<TestStruct>(&ctx).unwrap();
+        let wrapped = JSValue::prototype_for::<TestStruct>(&ctx).unwrap();
         let result = wrapped.call_as_constructor(vec![]);
 
         let err = result.unwrap_err();
@@ -358,7 +358,10 @@ mod test {
         let err = wrapped.as_native::<TestStruct2>().unwrap_err();
         assert_eq!(
             err,
-            EsperantoError::ExportError(JSExportError::CouldNotGetNativeObject)
+            EsperantoError::ExportError(JSExportError::IncorrectNativeType {
+                expected: "TestStruct2",
+                actual: "TestStruct"
+            })
         )
     }
 
@@ -378,14 +381,15 @@ mod test {
             const CLASS_NAME: &'static str = "TestStruct";
         }
 
-        let str = TestStruct {};
-        let ctx = JSContext::new().unwrap();
+        // want this test to manually call the garbage collector but for whatever reason
+        // manually calling GC on JSC doesn't seem to actually do anything. So instead
+        // we rely on destroying the context to trigger the drop
 
-        let wrapped = JSValue::new_wrapped_native(str, &ctx).unwrap();
-        drop(wrapped);
-        ctx.garbage_collect();
-        // drop(ctx);
-
+        {
+            let str = TestStruct {};
+            let ctx = JSContext::new().unwrap();
+            JSValue::new_wrapped_native(str, &ctx).unwrap();
+        }
         unsafe { assert_eq!(IS_DESTROYED, true) };
     }
 

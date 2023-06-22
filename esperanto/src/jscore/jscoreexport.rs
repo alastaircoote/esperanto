@@ -1,23 +1,18 @@
-use std::{
-    any::TypeId, collections::HashMap, convert::TryInto, ffi::CString, hash::Hash, slice,
-    sync::RwLock,
-};
+use std::{any::TypeId, collections::HashMap, ffi::CString, hash::Hash, slice, sync::RwLock};
 
 use javascriptcore_sys::{
-    JSClassCreate, JSClassDefinition, JSClassRelease, JSContextGetGlobalContext,
-    JSContextGetGlobalObject, JSContextGetGroup, JSContextGroupRetain, JSGlobalContextRetain,
-    JSObjectGetPrivate, JSObjectMake, JSObjectSetPrivate, JSValueMakeNull, JSValueMakeUndefined,
-    JSValueProtect, JSValueUnprotect, OpaqueJSClass, OpaqueJSContext, OpaqueJSContextGroup,
-    OpaqueJSValue,
+    JSClassCreate, JSClassDefinition, JSClassRelease, JSContextGetGlobalContext, JSContextGetGroup,
+    JSContextGroupRetain, JSGlobalContextRetain, JSObjectGetPrivate, JSObjectMake,
+    JSValueMakeUndefined, OpaqueJSClass, OpaqueJSContext, OpaqueJSValue,
 };
 // use javascriptcore_sys::JSClassDefinition;
 use lazy_static::lazy_static;
 
 use crate::{
-    export::JSClassFunction,
+    export::{JSClassFunction, JSExportPrivateData},
     jscore::jscorevaluepointer::JSCoreValuePointer,
-    shared::{errors::JSExportError, value::JSValueInternal},
-    EsperantoError, EsperantoResult, JSContext, JSExportClass, JSRuntime, JSValue, Retain,
+    shared::errors::JSExportError,
+    EsperantoResult, JSContext, JSExportClass, JSRuntime, JSValue, Retain,
 };
 
 /// We can't implement sync for OpaqueJSClass because it's foreign.
@@ -32,8 +27,7 @@ pub(crate) struct JSClassStorage {
 
 /// JavaScriptCore docs state that the API is thread-safe:
 /// https://developer.apple.com/documentation/javascriptcore/jsvirtualmachine#
-/// so we're OK to impl Sync and Send here. That said we're not using any
-/// multi-threading right now anyway so this is kind of moot.
+/// so we're OK to impl Sync and Send here.
 unsafe impl Sync for JSContextWrapper {}
 unsafe impl Send for JSContextWrapper {}
 unsafe impl Sync for JSClassStorage {}
@@ -46,14 +40,20 @@ lazy_static! {
 }
 
 unsafe extern "C" fn finalize_instance<T: JSExportClass>(val: *mut OpaqueJSValue) {
-    let ptr = JSObjectGetPrivate(val) as *mut T;
-    let boxed = Box::from_raw(ptr);
-    println!("DID YOU FINALIIIIZEEEE")
-    // gets dropped here.
+    let ptr = JSObjectGetPrivate(val);
+    JSExportPrivateData::<T>::drop(ptr);
 }
 
 unsafe extern "C" fn finalize_prototype<T: JSExportClass>(val: *mut OpaqueJSValue) {
-    println!("finalize proto!")
+    // The prototype is no longer in use so we should remove it from our class
+    // storage.
+
+    let context = JSObjectGetPrivate(val) as *mut OpaqueJSContext;
+
+    JS_CLASSES
+        .write()
+        .unwrap()
+        .remove(&(TypeId::of::<T>(), JSContextWrapper(context)));
 }
 
 pub(super) fn get_class_for<T: JSExportClass>(
@@ -63,13 +63,24 @@ pub(super) fn get_class_for<T: JSExportClass>(
     let wrapped_context = JSContextWrapper(in_context);
 
     if let Some(already_created) = JS_CLASSES
-        .try_read()
+        .read()
         .map_err(|_| JSExportError::UnexpectedBehaviour)?
         .get(&(type_id, wrapped_context))
     {
+        // We've already created the class definition for this JSExportClass so let's
+        // just return it:
         return Ok(*already_created);
     }
 
+    // Otherwise we need to make a new definition. We actually need to create *two* definitions
+    //
+    // - the prototype definition
+    // - the instance definition
+    //
+    // The prototype actually contains most of what we want: the functions that get called, the
+    // properties, etc etc. The instance definition is really only needed to a) get the name right
+    // and b) allow us to attach private data. JSC only lets you attach private data to objects
+    // that use a custom class.
     let name_as_c_string = CString::new(T::CLASS_NAME)?;
 
     let mut prototype_def = JSClassDefinition::default();
@@ -90,10 +101,12 @@ pub(super) fn get_class_for<T: JSExportClass>(
     let prototype_class = unsafe { JSClassCreate(&prototype_def) };
     let instance_class = unsafe { JSClassCreate(&instance_def) };
 
-    let prototype = unsafe { JSObjectMake(in_context, prototype_class, std::ptr::null_mut()) };
+    // We store the pointer to the context in the prototype private data because we need it
+    // in the finalizer.
+    let prototype = unsafe { JSObjectMake(in_context, prototype_class, in_context as _) };
+
+    // Now that we've created our prototype we can release the class: we only ever need one prototype per class
     unsafe { JSClassRelease(prototype_class) };
-    // hmm
-    // unsafe { JSValueProtect(in_context, prototype) }
 
     let storage = JSClassStorage {
         prototype,
@@ -101,7 +114,7 @@ pub(super) fn get_class_for<T: JSExportClass>(
     };
 
     let mut writable = JS_CLASSES
-        .try_write()
+        .write()
         .map_err(|_| JSExportError::UnexpectedBehaviour)?;
 
     writable.insert((type_id, wrapped_context), storage.clone());
@@ -142,23 +155,19 @@ unsafe fn execute_function<T: JSExportClass, ReturnType>(
         .into())
     }
 
-    let into_raw = result.and_then(|val| transform(&val, ctx));
-    match into_raw {
-        Ok(result) => result,
-        Err(error) => {
+    result
+        .and_then(|val| transform(&val, ctx))
+        .unwrap_or_else(|error| {
             let error_val = JSValue::try_new_from(error, &context).unwrap();
             exception.write(error_val.internal.as_value());
-            // return an empty object? never gets used because we're storing an exception, not sure what else to
-            // return really
             return empty_result(ctx);
-        }
-    }
+        })
 }
 
 unsafe extern "C" fn call_as_func_extern<T: JSExportClass>(
     ctx: *const OpaqueJSContext,
-    function: *mut OpaqueJSValue,
-    this_object: *mut OpaqueJSValue,
+    _function: *mut OpaqueJSValue,
+    _this_object: *mut OpaqueJSValue,
     argc: usize,
     argv: *const *const OpaqueJSValue,
     exception: *mut *const OpaqueJSValue,
@@ -176,7 +185,7 @@ unsafe extern "C" fn call_as_func_extern<T: JSExportClass>(
 
 pub(super) unsafe extern "C" fn constructor_extern<T: JSExportClass>(
     ctx: *const OpaqueJSContext,
-    constructor_val: *mut OpaqueJSValue,
+    _constructor_val: *mut OpaqueJSValue,
     argc: usize,
     argv: *const *const OpaqueJSValue,
     exception: *mut *const OpaqueJSValue,
@@ -190,38 +199,8 @@ pub(super) unsafe extern "C" fn constructor_extern<T: JSExportClass>(
         |val, ctx| val.internal.try_as_object(ctx),
         |ctx| {
             // return an empty object? never gets used because we're storing an exception, not sure what else to
-            // return really
+            // return really. Can't return undefined as it's a value, not an object
             return JSObjectMake(ctx, std::ptr::null_mut(), std::ptr::null_mut());
         },
     )
-    // let context = get_wrapped_context(&ctx);
-    // let constructor_result: EsperantoResult<Retain<JSValue>>;
-
-    // if let Some(constructor) = T::CALL_AS_CONSTRUCTOR {
-    //     let args: Vec<JSValue> = slice::from_raw_parts(argv, argc)
-    //         .iter()
-    //         .map(|raw| JSValue::wrap_internal(JSCoreValuePointer::Value(*raw), &context))
-    //         .collect();
-    //     let func_result = (constructor.func)(&args, &context);
-    //     constructor_result = func_result
-    // } else {
-    //     constructor_result = Err(JSExportError::ConstructorCalledOnNonConstructableClass(
-    //         T::CLASS_NAME.to_string(),
-    //     )
-    //     .into())
-    // }
-
-    // let into_raw = constructor_result.and_then(|val| val.internal.try_as_object(context.internal));
-    // let raw = match into_raw {
-    //     Ok(result) => result,
-    //     Err(error) => {
-    //         let error_val = JSValue::try_new_from(error, &context).unwrap();
-    //         exception.write(error_val.internal.as_value());
-    //         // return an empty object? never gets used because we're storing an exception, not sure what else to
-    //         // return really
-    //         return JSObjectMake(ctx, std::ptr::null_mut(), std::ptr::null_mut());
-    //     }
-    // };
-
-    // raw
 }

@@ -18,4 +18,10 @@ pub enum JSExportError {
 
     #[error("Something happened that we're not expecting at all")]
     UnexpectedBehaviour,
+
+    #[error("Expected native object to be {expected} but it was {actual}")]
+    IncorrectNativeType {
+        expected: &'static str,
+        actual: &'static str,
+    },
 }

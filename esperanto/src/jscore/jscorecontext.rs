@@ -78,10 +78,10 @@ impl JSContextInternal for JSCoreContextInternal {
 
     fn garbage_collect(self) {
         unsafe {
+            // JSSynchronousGarbageCollectForDebugging(JSContextGetGroup(self) as _);
+            // JSSynchronousEdenCollectForDebugging(self);
+            // JSReportExtraMemoryCost(self, 9999999999);
             JSGarbageCollect(self);
-            JSSynchronousGarbageCollectForDebugging(self);
-            JSSynchronousEdenCollectForDebugging(self);
-            JSReportExtraMemoryCost(self, 9999999999);
         }
     }
 
@@ -90,12 +90,12 @@ impl JSContextInternal for JSCoreContextInternal {
     }
 }
 
-#[link(name = "JavaScriptCore", kind = "framework")]
-extern "C" {
-    fn JSSynchronousGarbageCollectForDebugging(ctx: JSContextRef) -> ();
-    fn JSSynchronousEdenCollectForDebugging(ctx: JSContextRef) -> ();
-    fn JSReportExtraMemoryCost(ctx: JSContextRef, size: usize) -> ();
-}
+// #[link(name = "JavaScriptCore", kind = "framework")]
+// extern "C" {
+//     fn JSSynchronousGarbageCollectForDebugging(ctx: JSContextRef) -> ();
+//     fn JSSynchronousEdenCollectForDebugging(ctx: JSContextRef) -> ();
+//     fn JSReportExtraMemoryCost(ctx: JSContextRef, size: usize) -> ();
+// }
 
 #[cfg(test)]
 mod test {
@@ -128,7 +128,7 @@ mod test {
             ])
             .unwrap();
 
-        // println!("{}", json.to_string());
+        println!("{}", json.to_string());
         let num_js = val.get_property("protectedObjectCount").unwrap();
         return num_js.try_convert().unwrap();
     }
@@ -160,11 +160,9 @@ mod test {
         }
 
         let ctx = JSContext::new().unwrap();
-        println!("{}", get_protected_object_count(&ctx));
+        let start = get_protected_object_count(&ctx);
         let object = JSValue::new_wrapped_native(TestStruct {}, &ctx).unwrap();
-        println!("{}", get_protected_object_count(&ctx));
-        let retained = get_protected_object_count(&ctx);
         drop(object);
-        assert_eq!(get_protected_object_count(&ctx) - retained, -1);
+        assert_eq!(get_protected_object_count(&ctx), start);
     }
 }
