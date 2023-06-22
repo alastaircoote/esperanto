@@ -5,16 +5,17 @@ use std::{
 };
 
 use javascriptcore_sys::{
-    JSObjectCallAsConstructor, JSObjectCallAsFunction, JSObjectDeleteProperty, JSObjectGetPrivate,
-    JSObjectGetProperty, JSObjectMake, JSObjectMakeConstructor, JSObjectMakeError,
-    JSObjectMakeFunction, JSObjectSetProperty, JSValueIsInstanceOfConstructor, JSValueIsObject,
-    JSValueIsStrictEqual, JSValueIsString, JSValueMakeBoolean, JSValueMakeNumber,
-    JSValueMakeString, JSValueMakeUndefined, JSValueProtect, JSValueToBoolean, JSValueToNumber,
-    JSValueToStringCopy, JSValueUnprotect, OpaqueJSString, OpaqueJSValue,
+    JSClassCreate, JSClassDefinition, JSObjectCallAsConstructor, JSObjectCallAsFunction,
+    JSObjectDeleteProperty, JSObjectGetPrivate, JSObjectGetProperty, JSObjectMake,
+    JSObjectMakeConstructor, JSObjectMakeError, JSObjectMakeFunction, JSObjectSetProperty,
+    JSObjectSetPrototype, JSValueIsInstanceOfConstructor, JSValueIsObject, JSValueIsStrictEqual,
+    JSValueIsString, JSValueMakeBoolean, JSValueMakeNumber, JSValueMakeString,
+    JSValueMakeUndefined, JSValueProtect, JSValueToBoolean, JSValueToNumber, JSValueToStringCopy,
+    JSValueUnprotect, OpaqueJSContext, OpaqueJSString, OpaqueJSValue,
 };
 
 use crate::{
-    jscore::jscoreexport::get_jsclass_for,
+    jscore::jscoreexport::get_class_for,
     shared::{
         context::JSContextInternal,
         errors::{EsperantoResult, JSExportError},
@@ -32,21 +33,23 @@ use super::{
 
 pub(crate) type JSCoreValueInternal = JSCoreValuePointer;
 
+static CONSTRUCTOR_STRING: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"constructor\0") };
+
 impl JSValueInternal for JSCoreValueInternal {
-    type ContextType = JSCoreContextPointer;
+    type ContextType = *mut OpaqueJSContext;
 
     fn retain(self, ctx: Self::ContextType) -> Self {
-        unsafe { JSValueProtect(*ctx, self.as_value()) }
+        unsafe { JSValueProtect(ctx, self.as_value()) }
         self.clone()
     }
 
     fn release(self, ctx: Self::ContextType) {
-        unsafe { JSValueUnprotect(*ctx, self.as_value()) };
+        unsafe { JSValueUnprotect(ctx, self.as_value()) };
     }
 
     fn as_cstring(self, ctx: Self::ContextType) -> EsperantoResult<CString> {
         let ptr = check_jscore_exception!(ctx, exception => {
-            unsafe { JSValueToStringCopy(*ctx, self.as_value(), exception) }
+            unsafe { JSValueToStringCopy(ctx, self.as_value(), exception) }
         })?;
 
         let jsc_string = JSCoreString::from_retained_ptr(ptr);
@@ -55,28 +58,28 @@ impl JSValueInternal for JSCoreValueInternal {
 
     fn from_cstring(value: &CString, ctx: Self::ContextType) -> Self {
         let mut js_string = JSCoreString::from(value);
-        let ptr = unsafe { JSValueMakeString(*ctx, js_string.as_mut_raw_ptr()) };
+        let ptr = unsafe { JSValueMakeString(ctx, js_string.as_mut_raw_ptr()) };
         ptr.into()
     }
 
     fn as_number(self, ctx: Self::ContextType) -> EsperantoResult<f64> {
         check_jscore_exception!(ctx, exception => {
-            unsafe { JSValueToNumber(*ctx, self.as_value(), exception) }
+            unsafe { JSValueToNumber(ctx, self.as_value(), exception) }
         })
     }
 
     fn from_number(number: f64, ctx: Self::ContextType) -> EsperantoResult<Self> {
-        let ptr = unsafe { JSValueMakeNumber(*ctx, number) };
+        let ptr = unsafe { JSValueMakeNumber(ctx, number) };
         Ok(ptr.into())
     }
 
     fn from_bool(bool: bool, ctx: Self::ContextType) -> EsperantoResult<Self> {
-        let ptr = unsafe { JSValueMakeBoolean(*ctx, bool) };
+        let ptr = unsafe { JSValueMakeBoolean(ctx, bool) };
         Ok(ptr.into())
     }
 
     fn as_bool(self, ctx: Self::ContextType) -> EsperantoResult<bool> {
-        Ok(unsafe { JSValueToBoolean(*ctx, self.as_value()) })
+        Ok(unsafe { JSValueToBoolean(ctx, self.as_value()) })
     }
 
     fn set_property(
@@ -87,7 +90,7 @@ impl JSValueInternal for JSCoreValueInternal {
     ) -> EsperantoResult<()> {
         let mut name_jsstring = JSCoreString::from(name);
         check_jscore_exception!(ctx, exception => {
-            unsafe {JSObjectSetProperty(*ctx, self.try_as_object(ctx)?, name_jsstring.as_mut_raw_ptr(), new_value.as_value(), 0, exception)}
+            unsafe {JSObjectSetProperty(ctx, self.try_as_object(ctx)?, name_jsstring.as_mut_raw_ptr(), new_value.as_value(), 0, exception)}
         })
     }
 
@@ -96,7 +99,7 @@ impl JSValueInternal for JSCoreValueInternal {
         let result = check_jscore_exception!(ctx, exception => {
             unsafe {
                 JSObjectGetProperty(
-                    *ctx,
+                    ctx,
                     self.try_as_object(ctx)?,
                     name_jsstring.as_mut_raw_ptr(),
                     exception,
@@ -115,8 +118,12 @@ impl JSValueInternal for JSCoreValueInternal {
         let boxed = Box::new(instance);
         let boxed_ptr = Box::into_raw(boxed);
 
-        let class = get_jsclass_for::<T>(runtime)?;
-        let raw = unsafe { JSObjectMake(*ctx, class, boxed_ptr as *mut c_void) };
+        let class = get_class_for::<T>(ctx)?;
+
+        let raw = unsafe { JSObjectMake(ctx, class.instance_class, boxed_ptr as *mut c_void) };
+        // let raw = unsafe { JSObjectMake(ctx, overall_class, std::ptr::null_mut()) };
+        unsafe { JSValueProtect(ctx, raw) }
+        unsafe { JSObjectSetPrototype(ctx, raw, class.prototype) }
 
         return Ok(JSCoreValuePointer::Object(raw));
     }
@@ -125,7 +132,7 @@ impl JSValueInternal for JSCoreValueInternal {
         let message_val = JSCoreValuePointer::from_cstring(&message, ctx);
         let args = [message_val.as_value()];
         let create_result: Result<*mut OpaqueJSValue, _> = check_jscore_exception!(ctx, exception => {
-            unsafe { JSObjectMakeError(*ctx, 1, args.as_ptr(), exception) }
+            unsafe { JSObjectMakeError(ctx, 1, args.as_ptr(), exception) }
         });
         let ptr: JSCoreValuePointer = create_result
             .expect("Could not create a JavaScript error")
@@ -164,7 +171,7 @@ impl JSValueInternal for JSCoreValueInternal {
         let func = check_jscore_exception!(ctx, exception => {
             unsafe {
                 JSObjectMakeFunction(
-                    *ctx,
+                    ctx,
                     // JSC does let you make named functions but it doesn't appear to actually
                     // work (I get a SyntaxError), so just skipping over it entirely for now.
                     std::ptr::null_mut(),
@@ -201,7 +208,7 @@ impl JSValueInternal for JSCoreValueInternal {
         let raw = check_jscore_exception!(ctx, exception => {
             unsafe {
                 JSObjectCallAsFunction(
-                    *ctx,
+                    ctx,
                     self.try_as_object(ctx)?,
                     bound_to_ptr,
                     argc,
@@ -225,7 +232,7 @@ impl JSValueInternal for JSCoreValueInternal {
         let raw = check_jscore_exception!(ctx, exception => {
             unsafe {
                 JSObjectCallAsConstructor(
-                    *ctx,
+                    ctx,
                     self.try_as_object(ctx)?,
                     argc,
                     arg_ptrs.as_ptr(),
@@ -238,40 +245,41 @@ impl JSValueInternal for JSCoreValueInternal {
     }
 
     fn is_string(self, ctx: Self::ContextType) -> bool {
-        unsafe { JSValueIsString(*ctx, self.as_value()) }
+        unsafe { JSValueIsString(ctx, self.as_value()) }
     }
 
     fn undefined(ctx: Self::ContextType) -> Self {
-        unsafe { JSValueMakeUndefined(*ctx) }.into()
+        unsafe { JSValueMakeUndefined(ctx) }.into()
     }
 
     fn native_prototype_for<T: JSExportClass>(
         ctx: Self::ContextType,
         runtime: <Self::ContextType as JSContextInternal>::RuntimeType,
     ) -> EsperantoResult<Self> {
-        let class = get_jsclass_for::<T>(runtime)?;
-        let constructor = unsafe { JSObjectMakeConstructor(*ctx, class, None) };
-        Ok(JSCoreValuePointer::Object(constructor))
+        let class = get_class_for::<T>(ctx)?;
+        Ok(JSCoreValuePointer::Object(class.prototype))
     }
 
     fn constructor_for<T: JSExportClass>(
         ctx: Self::ContextType,
         runtime: <Self::ContextType as JSContextInternal>::RuntimeType,
     ) -> EsperantoResult<Self> {
-        let class = get_jsclass_for::<T>(runtime)?;
-        // let constructor =
-        unsafe { JSObjectMakeConstructor(*ctx, class, Some(constructor_extern::<T>)) };
-        let obj = unsafe { JSObjectMake(*ctx, class, std::ptr::null_mut()) };
-        Ok(JSCoreValuePointer::Object(obj))
+        let prototype = Self::native_prototype_for::<T>(ctx, runtime)?;
+        let constructor = prototype.get_property(ctx, CONSTRUCTOR_STRING)?;
+        Ok(constructor)
     }
 
     fn equals(self, other: Self, ctx: Self::ContextType) -> bool {
-        unsafe { JSValueIsStrictEqual(*ctx, self.as_value(), other.as_value()) }
+        unsafe { JSValueIsStrictEqual(ctx, self.as_value(), other.as_value()) }
     }
 
     fn is_instanceof(self, target: Self, ctx: Self::ContextType) -> EsperantoResult<bool> {
         check_jscore_exception!(ctx, exception => {
-            unsafe { JSValueIsInstanceOfConstructor(*ctx, self.as_value(), target.try_as_object(ctx)?, exception) }
+            // seems kind of weird that JSC exposes instanceof constructor when in JS we actually
+            // check against the prototype. For consistency let's assume the user is passing a
+            // prototype here and grab the constructor:
+            let constructor = target.get_property(ctx, CONSTRUCTOR_STRING)?;
+            unsafe { JSValueIsInstanceOfConstructor(ctx, self.as_value(), constructor.try_as_object(ctx)?, exception) }
         })
     }
 
@@ -286,12 +294,12 @@ impl JSValueInternal for JSCoreValueInternal {
     fn delete_property(self, ctx: Self::ContextType, name: &CStr) -> EsperantoResult<bool> {
         let mut name_jsstring = JSCoreString::from(name);
         check_jscore_exception!(ctx, exception => {
-            unsafe { JSObjectDeleteProperty(*ctx, self.try_as_object(ctx)?, name_jsstring.as_mut(), exception)}
+            unsafe { JSObjectDeleteProperty(ctx, self.try_as_object(ctx)?, name_jsstring.as_mut(), exception)}
         })
     }
 
     fn is_object(self, ctx: Self::ContextType) -> bool {
-        unsafe { JSValueIsObject(*ctx, self.as_value()) }
+        unsafe { JSValueIsObject(ctx, self.as_value()) }
     }
 
     fn is_error(self, ctx: Self::ContextType) -> EsperantoResult<bool> {

@@ -171,7 +171,7 @@ impl<'c> JSValue<'c> {
         Ok(Self::wrap_internal(created, in_context))
     }
 
-    pub fn call_as_function(&self, arguments: Vec<&Self>) -> ValueResult {
+    pub fn call_as_function(&self, arguments: Vec<&Self>) -> ValueResult<'c> {
         return self.call_as_function_bound(arguments, None);
     }
 
@@ -179,7 +179,7 @@ impl<'c> JSValue<'c> {
         &self,
         arguments: Vec<&Self>,
         bind_to: Option<&Self>,
-    ) -> ValueResult {
+    ) -> ValueResult<'c> {
         let internal_vec = arguments.iter().map(|a| a.internal).collect();
 
         let internal_result = self.internal.call_as_function(

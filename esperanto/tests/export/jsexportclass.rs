@@ -32,20 +32,20 @@ mod test {
                 num_args: 1,
                 func: |_, ctx| {
                     let item = TestStruct {};
+                    // return JSValue::new_function("return hi", vec![], &ctx);
                     return JSValue::new_wrapped_native(item, ctx);
                 },
             });
         }
 
         let ctx = JSContext::new().unwrap();
-        let wrapped = JSValue::constructor_for::<TestStruct>(&ctx).unwrap();
+        let prototype = JSValue::prototype_for::<TestStruct>(&ctx).unwrap();
         ctx.global_object()
-            .set_property("TestValue", &wrapped)
+            .set_property("TestValue", &prototype)
             .unwrap();
 
         let result = ctx.evaluate("new TestValue()", None).unwrap();
-        println!("{}", result.to_string());
-        let is_instance = result.is_instance_of(&wrapped).unwrap();
+        let is_instance = result.is_instance_of(&prototype).unwrap();
         assert_eq!(is_instance, true)
     }
 
@@ -58,23 +58,24 @@ mod test {
         }
 
         let ctx = JSContext::new().unwrap();
-        let wrapped = JSValue::constructor_for::<TestStruct>(&ctx).unwrap();
+        let wrapped = JSValue::prototype_for::<TestStruct>(&ctx).unwrap();
         ctx.global_object()
             .set_property("TestValue", &wrapped)
             .unwrap();
 
         let result = ctx.evaluate("new TestValue()", None);
 
-        let obj = result.unwrap();
-        println!("{}", obj.to_string());
+        // assert_eq(result.is_err(), true);
 
-        // let err_result = result.unwrap_err();
-        // match err_result {
-        //     esperanto::EsperantoError::JavaScriptError(err) => {
-        //         assert_eq!(err.message, "Class TestStruct does not have a constructor");
-        //     }
-        //     _ => panic!("Unexpected result"),
-        // }
+        let err_result = result.unwrap_err();
+        match err_result {
+            esperanto::EsperantoError::JavaScriptError(err) => {
+                // Can't easily inspect more than this because the JS engine implementation defines the specific
+                // error message.
+                assert_eq!(err.name, "TypeError");
+            }
+            _ => panic!("Unexpected result"),
+        }
     }
 
     #[test]
@@ -103,22 +104,16 @@ mod test {
 
         let ctx = JSContext::new().unwrap();
 
-        let wrapped = JSValue::constructor_for::<TestStruct>(&ctx).unwrap();
+        let wrapped = JSValue::prototype_for::<TestStruct>(&ctx).unwrap();
 
-        let f = JSValue::new_function(
+        let function = JSValue::new_function(
             "return new TestStruct(123,'test')",
             vec!["TestStruct"],
             &ctx,
         )
         .unwrap();
 
-        let result = f.call_as_function(vec![&wrapped]).unwrap();
-
-        // ctx.global_object()
-        //     .set_property("TestStruct", &wrapped)
-        //     .unwrap();
-
-        // let result = ctx.evaluate("new TestStruct(123,'test')", None).unwrap();
+        let result = function.call_as_function(vec![&wrapped]).unwrap();
         let as_ref: Js<TestStruct> = result.as_native().unwrap();
 
         assert_eq!(as_ref.value_one, 123 as f64);
@@ -175,22 +170,29 @@ mod test {
         ctx.global_object()
             .set_property(
                 "TestValue",
-                &JSValue::constructor_for::<TestStruct>(&ctx).unwrap(),
+                &JSValue::prototype_for::<TestStruct>(&ctx).unwrap(),
             )
             .unwrap();
 
         ctx.global_object()
             .set_property(
                 "TestValue2",
-                &JSValue::constructor_for::<TestStruct>(&ctx).unwrap(),
+                &JSValue::prototype_for::<TestStruct>(&ctx).unwrap(),
             )
             .unwrap();
 
-        let first = ctx.evaluate("new TestValue()", None).unwrap();
-        let second = ctx.evaluate("new TestValue2()", None).unwrap();
-        let first_constructor = first.get_property("constructor").unwrap();
-        let second_constructor = second.get_property("constructor").unwrap();
-        assert_eq!(first_constructor.deref(), second_constructor.deref())
+        let script = r#"
+            const one = new TestValue();
+            const two = new TestValue2();
+
+            const one_prototype = Object.getPrototypeOf(one);
+            const two_prototype = Object.getPrototypeOf(two);
+
+            one_prototype === two_prototype;
+        "#;
+
+        let result = ctx.evaluate(script, None).unwrap();
+        assert_eq!(result.try_convert::<bool>().unwrap(), true);
     }
 
     #[test]
@@ -234,6 +236,32 @@ mod test {
 
     #[test]
     fn calls_as_function() {
+        struct TestStruct {}
+
+        impl JSExportClass for TestStruct {
+            const CLASS_NAME: &'static str = "TestStruct";
+            const CALL_AS_FUNCTION: Option<JSClassFunction> = Some(JSClassFunction {
+                num_args: 2,
+                func: |args, ctx| {
+                    let obj = TestStruct {};
+                    // return JSValue::try_new_from(123.0, &ctx);
+                    return JSValue::new_wrapped_native(obj, &ctx);
+                },
+            });
+        }
+
+        let ctx = JSContext::new().unwrap();
+        let constructor = JSValue::prototype_for::<TestStruct>(&ctx).unwrap();
+        ctx.global_object()
+            .set_property("TestStruct", &constructor)
+            .unwrap();
+
+        let result = ctx.evaluate("TestStruct(10, 23)", None).unwrap();
+        result.as_native::<TestStruct>().unwrap();
+    }
+
+    #[test]
+    fn function_args_are_passed() {
         struct TestStruct {
             val: f64,
         }
@@ -263,7 +291,6 @@ mod test {
         let as_struct: Js<TestStruct> = result.as_native().unwrap();
         assert_eq!(as_struct.val, 230.0);
     }
-
     #[test]
     fn exports_safely_fails_with_no_function() {
         struct TestStruct {}
@@ -273,19 +300,17 @@ mod test {
         }
 
         let ctx = JSContext::new().unwrap();
-        let wrapped = JSValue::constructor_for::<TestStruct>(&ctx).unwrap();
+        let wrapped = JSValue::prototype_for::<TestStruct>(&ctx).unwrap();
         ctx.global_object()
             .set_property("TestValue", &wrapped)
             .unwrap();
 
         let result = ctx.evaluate("TestValue()", None);
+
         let err_result = result.unwrap_err();
         match err_result {
             esperanto::EsperantoError::JavaScriptError(err) => {
-                assert_eq!(
-                    err.message,
-                    "Class TestStruct cannot be called as a function"
-                );
+                assert_eq!(err.name, "TypeError");
             }
             _ => panic!("Unexpected result"),
         }
@@ -359,6 +384,7 @@ mod test {
         let wrapped = JSValue::new_wrapped_native(str, &ctx).unwrap();
         drop(wrapped);
         ctx.garbage_collect();
+        // drop(ctx);
 
         unsafe { assert_eq!(IS_DESTROYED, true) };
     }

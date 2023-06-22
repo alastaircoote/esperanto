@@ -19,8 +19,10 @@ pub enum JSExportAttribute<'a> {
 
 pub struct JSClassFunction {
     pub num_args: i32,
-    pub func:
-        for<'c> fn(&'c Vec<JSValue<'c>>, &'c JSContext<'c>) -> EsperantoResult<Retain<JSValue<'c>>>,
+    pub func: for<'c, 'v> fn(
+        &'v Vec<JSValue<'c>>,
+        &'c JSContext<'c>,
+    ) -> EsperantoResult<Retain<JSValue<'c>>>,
 }
 
 pub trait JSExportClass: 'static {

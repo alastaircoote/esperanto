@@ -47,6 +47,15 @@ where
         };
     }
 
+    pub(crate) fn from_raw_storing_runtime(
+        raw: JSContextInternalImpl,
+        with_runtime: JSRuntime<'c>,
+    ) -> JSContext<'c> {
+        JSContext {
+            internal: raw,
+            runtime: JSRuntimeStore::StoredInternally(with_runtime),
+        }
+    }
     /// Create a new JSContext in its own runtime
     pub fn new() -> EsperantoResult<Self> {
         let runtime = JSRuntime::new()?;

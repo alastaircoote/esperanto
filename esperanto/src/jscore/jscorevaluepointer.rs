@@ -1,6 +1,6 @@
 use std::{convert::TryFrom, ops::Deref};
 
-use javascriptcore_sys::{JSValueIsObject, OpaqueJSValue};
+use javascriptcore_sys::{JSValueIsObject, OpaqueJSContext, OpaqueJSValue};
 
 use crate::{
     shared::{errors::EsperantoResult, value::JSValueError},
@@ -21,14 +21,14 @@ pub enum JSCoreValuePointer {
 impl JSCoreValuePointer {
     pub fn try_as_object(
         self,
-        in_context: JSCoreContextPointer,
+        in_context: *const OpaqueJSContext,
     ) -> EsperantoResult<*mut OpaqueJSValue> {
         match self {
             // This is messy but seems to be the only way to get Rust to allow us to (effectively) copy a mutable
             // reference.
             JSCoreValuePointer::Object(o) => Ok(o),
             JSCoreValuePointer::Value(v) => {
-                let is_obj = unsafe { JSValueIsObject(*in_context, v) };
+                let is_obj = unsafe { JSValueIsObject(in_context, v) };
                 if is_obj {
                     // This is gross but it works. Maybe worth revisiting what we're doing here
                     // at some point.

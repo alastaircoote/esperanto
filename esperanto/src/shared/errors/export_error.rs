@@ -4,7 +4,7 @@ use thiserror::Error;
 
 #[derive(Debug, Error, Eq, PartialEq)]
 pub enum JSExportError {
-    #[error("Class {0} does not have a constuctor")]
+    #[error("Class {0} does not have a constructor")]
     ConstructorCalledOnNonConstructableClass(String),
 
     #[error("Class {0} cannot be called as a function")]
