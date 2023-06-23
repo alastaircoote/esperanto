@@ -3,13 +3,14 @@ use std::ffi::{c_void, CStr, CString};
 use quickjs_android_suitable_sys::{
     JSValue as QuickJSValue, JS_Call, JS_CallConstructor, JS_DeleteProperty, JS_DupValue__,
     JS_FreeAtom, JS_FreeCString, JS_FreeValue__, JS_GetOpaque, JS_GetPropertyStr, JS_GetRuntime,
-    JS_IsEqual__, JS_IsError, JS_IsInstanceOf, JS_IsObject__, JS_IsString__, JS_NewAtom,
-    JS_NewBool__, JS_NewError, JS_NewFloat64__, JS_NewObjectProtoClass, JS_NewString, JS_SetOpaque,
-    JS_SetPropertyStr, JS_ToBool, JS_ToCStringLen2, JS_ToFloat64, JS_UNDEFINED__,
+    JS_IsConstructor, JS_IsEqual__, JS_IsError, JS_IsInstanceOf, JS_IsObject__, JS_IsString__,
+    JS_NewAtom, JS_NewBool__, JS_NewError, JS_NewFloat64__, JS_NewObject, JS_NewObjectClass,
+    JS_NewObjectProtoClass, JS_NewString, JS_SetOpaque, JS_SetPropertyStr, JS_ToBool,
+    JS_ToCStringLen2, JS_ToFloat64, JS_UNDEFINED__,
 };
 
 use crate::{
-    quickjs::quickjs_prototype_storage::get_classid_storage,
+    export::{get_stored_prototype_info, JSExportPrivateData},
     shared::{
         context::JSContextInternal,
         errors::CatchExceptionError,
@@ -20,10 +21,12 @@ use crate::{
     JSExportClass, JSValue,
 };
 
-use super::quickjs_prototype_storage::{get_class_id, get_or_create_class_prototype};
 use super::quickjscontextpointer::QuickJSContextPointer;
+use super::quickjsexport::QuickJSExportExtensions;
 
 pub type QuickJSValueInternal = QuickJSValue;
+
+static CONSTRUCTOR_STRING: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"constructor\0") };
 
 impl JSValueInternal for QuickJSValueInternal {
     type ContextType = QuickJSContextPointer;
@@ -110,42 +113,53 @@ impl JSValueInternal for QuickJSValueInternal {
 
     fn native_prototype_for<T: crate::JSExportClass>(
         ctx: Self::ContextType,
+        runtime: <Self::ContextType as JSContextInternal>::RuntimeType,
     ) -> EsperantoResult<Self> {
-        let runtime = unsafe { JS_GetRuntime(*ctx) };
-        let storage = get_classid_storage(runtime)?;
-        let class_id = get_class_id::<T>(runtime, storage)?;
-        get_or_create_class_prototype::<T>(class_id, *ctx)
+        let info = <T as QuickJSExportExtensions>::get_or_create_class_prototype(*ctx, runtime)?;
+
+        Ok(info.prototype)
+        // let storage = get_classid_storage(runtime)?;
+        // let class_id = get_class_id::<T>(runtime, storage)?;
+        // get_or_create_class_prototype::<T>(class_id, *ctx)
     }
 
     fn from_native_class<T: JSExportClass>(
         instance: T,
         ctx: Self::ContextType,
+        runtime: <Self::ContextType as JSContextInternal>::RuntimeType,
     ) -> EsperantoResult<Self> {
-        let runtime = unsafe { JS_GetRuntime(*ctx) };
-        let storage = get_classid_storage(runtime)?;
-        let class_id = get_class_id::<T>(runtime, storage)?;
-        let proto = get_or_create_class_prototype::<T>(class_id, *ctx)?;
+        let info = <T as QuickJSExportExtensions>::get_or_create_class_prototype(*ctx, runtime)?;
+        // let obj = unsafe { JS_NewObjectClass(*ctx, info.instance_class as _) };
+        let obj = unsafe { JS_NewObjectProtoClass(*ctx, info.prototype, info.instance_class) };
+        let ptr = JSExportPrivateData::from_instance(instance);
+        unsafe { JS_SetOpaque(obj, ptr) };
 
-        // Then we create a new object with this prototype:
-        let new_object = unsafe { JS_NewObjectProtoClass(*ctx, proto, class_id) };
+        Ok(obj)
+        // let storage = get_classid_storage(runtime)?;
+        // let class_id = get_class_id::<T>(runtime, storage)?;
+        // let proto = get_or_create_class_prototype::<T>(class_id, *ctx)?;
 
-        proto.release(ctx);
+        // // Then we create a new object with this prototype:
+        // let new_object = unsafe { JS_NewObjectProtoClass(*ctx, proto, class_id) };
 
-        let boxed = Box::new(instance);
-        let ptr = Box::into_raw(boxed) as *mut c_void;
-        unsafe { JS_SetOpaque(new_object, ptr) };
-        Ok(new_object)
+        // proto.release(ctx);
+
+        // let boxed = Box::new(instance);
+        // let ptr = Box::into_raw(boxed) as *mut c_void;
+        // unsafe { JS_SetOpaque(new_object, ptr) };
+        // Ok(new_object)
     }
 
     fn get_native_ref<'a, T: JSExportClass>(
         self,
         ctx: Self::ContextType,
     ) -> EsperantoResult<&'a T> {
-        let runtime = unsafe { JS_GetRuntime(*ctx) };
-        let storage = get_classid_storage(runtime)?;
-        let class_id = get_class_id::<T>(runtime, storage)?;
-        let instance = unsafe { JS_GetOpaque(self, class_id) as *mut T };
-        unsafe { instance.as_ref() }.ok_or(JSExportError::CouldNotGetNativeObject.into())
+        let info =
+            <T as QuickJSExportExtensions>::get_or_create_class_prototype(*ctx, ctx.get_runtime())?;
+
+        let ptr = unsafe { JS_GetOpaque(self, info.instance_class) };
+
+        JSExportPrivateData::<T>::data_from_ptr(ptr)
     }
 
     fn set_property(
@@ -244,6 +258,9 @@ impl JSValueInternal for QuickJSValueInternal {
     ) -> EsperantoResult<Self> {
         let argc = arguments.len() as i32;
         let mut argv: Vec<QuickJSValue> = arguments.iter().map(|a| *a).collect();
+        if unsafe { JS_IsConstructor(*ctx, self) } == 0 {
+            panic!("not constructor?")
+        }
         check_quickjs_exception!(ctx => {
             unsafe {JS_CallConstructor(*ctx, self, argc, argv.as_mut_ptr())}
         })
@@ -262,9 +279,11 @@ impl JSValueInternal for QuickJSValueInternal {
     }
 
     fn is_instanceof(self, target: Self, ctx: Self::ContextType) -> EsperantoResult<bool> {
+        let constructor = target.get_property(ctx, CONSTRUCTOR_STRING)?;
         let result = check_quickjs_exception!(ctx => {
-            unsafe {JS_IsInstanceOf(*ctx,self, target)}
+            unsafe {JS_IsInstanceOf(*ctx,self, constructor)}
         })?;
+        unsafe { JS_FreeValue__(*ctx, constructor) };
         if result != 0 && result != 1 {
             // we got a result we aren't expecting but no exception was thrown
             return Err(EsperantoError::CatchExceptionError(Box::new(
@@ -280,6 +299,14 @@ impl JSValueInternal for QuickJSValueInternal {
 
     fn is_object(self, _: Self::ContextType) -> bool {
         unsafe { JS_IsObject__(self) == 1 }
+    }
+
+    fn constructor_for<T: JSExportClass>(
+        ctx: Self::ContextType,
+        runtime: <Self::ContextType as JSContextInternal>::RuntimeType,
+    ) -> EsperantoResult<Self> {
+        let prototype = Self::native_prototype_for::<T>(ctx, runtime)?;
+        return prototype.get_property(ctx, CONSTRUCTOR_STRING);
     }
 }
 

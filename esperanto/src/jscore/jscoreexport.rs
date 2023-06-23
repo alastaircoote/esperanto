@@ -79,8 +79,8 @@ pub(super) fn get_class_for<T: JSExportClass>(
     //
     // The prototype actually contains most of what we want: the functions that get called, the
     // properties, etc etc. The instance definition is really only needed to a) get the name right
-    // and b) allow us to attach private data. JSC only lets you attach private data to objects
-    // that use a custom class.
+    // and b) allow us to attach private data (JSC only lets you attach private data to objects
+    // that use a custom class) and c) to finalize (and drop) instances
     let name_as_c_string = CString::new(T::CLASS_NAME)?;
 
     let mut prototype_def = JSClassDefinition::default();

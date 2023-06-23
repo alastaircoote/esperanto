@@ -10,6 +10,7 @@ use super::quickjsruntime::QuickJSRuntimeInternal;
 use crate::shared::{
     context::{EvaluateMetadata, JSContextError, JSContextInternal},
     errors::EsperantoResult,
+    value::JSValueInternal,
 };
 
 use super::quickjsvalue::QuickJSValueInternal;
@@ -24,8 +25,8 @@ impl QuickJSContextInternal {
     pub(crate) fn throw_error(self, err: QuickJSValueInternal) {
         // quickjs.c shows that JS_Throw frees the value. Why? No clue but if we don't
         // do a retain here it disappears and there is no exception to look at.
-        // let retained = err.retain(self);
-        unsafe { JS_Throw(*self, err) };
+        let retained = err.retain(self);
+        unsafe { JS_Throw(*self, retained) };
     }
 }
 

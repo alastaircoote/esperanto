@@ -18,8 +18,8 @@ mod test {
         let test = TestStruct {};
         let ctx = JSContext::new().unwrap();
         let wrapped = JSValue::new_wrapped_native(test, &ctx).unwrap();
-        let constructor = JSValue::prototype_for::<TestStruct>(&ctx).unwrap();
-        assert_eq!(wrapped.is_instance_of(&constructor).unwrap(), true);
+        let prototype = JSValue::prototype_for::<TestStruct>(&ctx).unwrap();
+        assert_eq!(wrapped.is_instance_of(&prototype).unwrap(), true);
     }
 
     #[test]
@@ -55,6 +55,39 @@ mod test {
 
         impl JSExportClass for TestStruct {
             const CLASS_NAME: &'static str = "TestStruct";
+        }
+
+        let ctx = JSContext::new().unwrap();
+        let wrapped = JSValue::prototype_for::<TestStruct>(&ctx).unwrap();
+        ctx.global_object()
+            .set_property("TestValue", &wrapped)
+            .unwrap();
+
+        let result = ctx.evaluate("new TestValue()", None);
+
+        // assert_eq(result.is_err(), true);
+
+        let err_result = result.unwrap_err();
+        match err_result {
+            esperanto::EsperantoError::JavaScriptError(err) => {
+                // Can't easily inspect more than this because the JS engine implementation defines the specific
+                // error message.
+                assert_eq!(err.name, "TypeError");
+            }
+            _ => panic!("Unexpected result"),
+        }
+    }
+
+    #[test]
+    fn exports_safely_fails_with_no_constructor_but_with_function() {
+        struct TestStruct {}
+
+        impl JSExportClass for TestStruct {
+            const CLASS_NAME: &'static str = "TestStruct";
+            const CALL_AS_FUNCTION: Option<JSClassFunction> = Some(JSClassFunction {
+                num_args: 0,
+                func: |args, ctx| return Ok(JSValue::undefined(&ctx)),
+            });
         }
 
         let ctx = JSContext::new().unwrap();
@@ -291,12 +324,42 @@ mod test {
         let as_struct: Js<TestStruct> = result.as_native().unwrap();
         assert_eq!(as_struct.val, 230.0);
     }
+
     #[test]
     fn exports_safely_fails_with_no_function() {
         struct TestStruct {}
 
         impl JSExportClass for TestStruct {
             const CLASS_NAME: &'static str = "TestStruct";
+        }
+
+        let ctx = JSContext::new().unwrap();
+        let wrapped = JSValue::prototype_for::<TestStruct>(&ctx).unwrap();
+        ctx.global_object()
+            .set_property("TestValue", &wrapped)
+            .unwrap();
+
+        let result = ctx.evaluate("TestValue()", None);
+
+        let err_result = result.unwrap_err();
+        match err_result {
+            esperanto::EsperantoError::JavaScriptError(err) => {
+                assert_eq!(err.name, "TypeError");
+            }
+            _ => panic!("Unexpected result"),
+        }
+    }
+
+    #[test]
+    fn exports_safely_fails_with_no_function_but_with_constructor() {
+        struct TestStruct {}
+
+        impl JSExportClass for TestStruct {
+            const CLASS_NAME: &'static str = "TestStruct";
+            const CALL_AS_CONSTRUCTOR: Option<JSClassFunction> = Some(JSClassFunction {
+                num_args: 0,
+                func: |_, ctx| Ok(JSValue::undefined(&ctx)),
+            });
         }
 
         let ctx = JSContext::new().unwrap();

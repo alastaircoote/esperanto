@@ -9,6 +9,7 @@ use super::runtime_error::JSRuntimeError;
 pub struct JSRuntime<'r> {
     pub(crate) internal: JSRuntimeInternalImpl,
     _lifetime: PhantomData<&'r ()>,
+    release_on_drop: bool,
 }
 
 impl<'r> JSRuntime<'r> {
@@ -18,20 +19,24 @@ impl<'r> JSRuntime<'r> {
         Ok(JSRuntime {
             internal: new_runtime,
             _lifetime: PhantomData,
+            release_on_drop: true,
         })
     }
 
-    pub(crate) fn from_raw(raw: JSRuntimeInternalImpl) -> Self {
+    pub(crate) fn from_raw(raw: JSRuntimeInternalImpl, release_on_drop: bool) -> Self {
         JSRuntime {
             internal: raw,
             _lifetime: PhantomData,
+            release_on_drop,
         }
     }
 }
 
 impl Drop for JSRuntime<'_> {
     fn drop(&mut self) {
-        self.internal.release()
+        if self.release_on_drop {
+            self.internal.release()
+        }
     }
 }
 

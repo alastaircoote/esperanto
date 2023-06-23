@@ -5,8 +5,8 @@ name = "esperanto"
 version = "0.1.0"
 
 [features]
-# default = ["quickjs"]
-default = ["javascriptcore"]
+default = ["quickjs"]
+# default = ["javascriptcore"]
 javascriptcore = ["javascriptcore-sys"]
 quickjs = ["quickjs_android_suitable_sys"]
 
@@ -21,4 +21,4 @@ by_address = "1.0.4"
 [dependencies.quickjs_android_suitable_sys]
 features = ["dump_leaks"]
 optional = true
-version = "0.20220306.0"
+version = "0.20220306.2"
