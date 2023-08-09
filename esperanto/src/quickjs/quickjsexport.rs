@@ -2,40 +2,32 @@ use std::{convert::TryInto, ffi::CString, slice};
 
 use quickjs_android_suitable_sys::{
     JSClassCall, JSClassDef, JSContext as QuickJSContext, JSRuntime as QuickJSRuntime,
-    JSValue as QuickJSValue, JS_FreeValue__, JS_GetClassProto, JS_GetRuntime, JS_NewClass,
-    JS_NewClassID, JS_NewObject, JS_NewObjectClass, JS_NewObjectProtoClass, JS_SetClassProto,
-    JS_SetConstructorBit, JS_CALL_FLAG_CONSTRUCTOR,
+    JSValue as QuickJSValue, JS_GetClassProto, JS_GetOpaque, JS_GetRuntime, JS_NewClass,
+    JS_NewObjectClass, JS_SetClassProto, JS_SetConstructorBit, JS_CALL_FLAG_CONSTRUCTOR,
 };
 
 use crate::{
-    export::{
-        get_stored_prototype_info, store_prototype_info, JSClassFunction, JSExportStoredClassInfo,
+    export::{JSClassFunction, JSExportPrivateData},
+    quickjs::{
+        quickjs_class_storage::get_existing_class_id, quickjscontextpointer::QuickJSContextPointer,
     },
-    quickjs::quickjscontextpointer::QuickJSContextPointer,
     shared::{
-        errors::{ConversionError, EsperantoResult, JSExportError, JavaScriptError},
+        errors::{EsperantoResult, JSExportError, JavaScriptError},
         value::JSValueInternal,
     },
     EsperantoError, JSContext, JSExportClass, JSRuntime, JSValue, Retain,
 };
 
+use super::quickjs_class_storage::clear_class;
+
 pub(crate) type QuickJSClassID = u32;
 
-fn get_new_class_id() -> u32 {
-    let mut prototype_class_id: u32 = 0;
-    unsafe { JS_NewClassID(&mut prototype_class_id) };
-    return prototype_class_id;
-}
-
 pub(super) trait QuickJSExportExtensions: JSExportClass + Sized {
-    fn get_or_create_class_prototype(
-        in_context: *mut QuickJSContext,
-        runtime: *mut QuickJSRuntime,
-    ) -> EsperantoResult<JSExportStoredClassInfo> {
-        if let Some(existing) = get_stored_prototype_info::<Self>(runtime)? {
-            return Ok(existing);
-        }
-
+    fn create_prototype_class(
+        context: *mut QuickJSContext,
+        prototype_class_id: u32,
+    ) -> EsperantoResult<()> {
+        let runtime = unsafe { JS_GetRuntime(context) };
         let name_cstring = CString::new(Self::CLASS_NAME)?;
 
         let call: JSClassCall;
@@ -45,7 +37,7 @@ pub(super) trait QuickJSExportExtensions: JSExportClass + Sized {
             call = None;
         }
 
-        let prototype_def = JSClassDef {
+        let definition = JSClassDef {
             class_name: name_cstring.as_ptr(),
             call,
             finalizer: Some(finalize_prototype::<Self>),
@@ -53,32 +45,30 @@ pub(super) trait QuickJSExportExtensions: JSExportClass + Sized {
             exotic: std::ptr::null_mut(),
         };
 
-        let prototype_class_id = get_new_class_id();
-
-        // Then create a class from our definition using that ID:
-        if unsafe { JS_NewClass(runtime, prototype_class_id, &prototype_def) } != 0 {
+        if unsafe { JS_NewClass(runtime, prototype_class_id, &definition) } != 0 {
             return Err(JSExportError::UnexpectedBehaviour.into());
         }
 
-        // we (seemingly?) need to make sure our prototype has its own prototype set to Object. Grabbed
-        // the const value for JS_CLASS_OBJECT from here:
-        // https://github.com/bellard/quickjs/blob/2788d71e823b522b178db3b3660ce93689534e6d/quickjs.c#L120
+        // we (seemingly?) need to make sure our prototype has its own prototype set to Object.
 
-        const JS_CLASS_OBJECT: u32 = 1;
-        let obj_proto = unsafe { JS_GetClassProto(in_context, JS_CLASS_OBJECT) };
-        unsafe { JS_SetClassProto(in_context, prototype_class_id, obj_proto) };
+        let object = {
+            // Grabbed the const value for JS_CLASS_OBJECT from here:
+            // https://github.com/bellard/quickjs/blob/2788d71e823b522b178db3b3660ce93689534e6d/quickjs.c#L120
 
-        // Quirk in QuickJS API here? It defines JSClassId as u32 but NewObjectClass wants an i32
-        let asu32: i32 = prototype_class_id
-            .try_into()
-            .map_err(|_| JSExportError::UnexpectedBehaviour)?;
+            const JS_CLASS_OBJECT: u32 = 1;
+            unsafe { JS_GetClassProto(context, JS_CLASS_OBJECT) }
+        };
 
-        let prototype = unsafe { JS_NewObjectClass(in_context, asu32) };
+        unsafe { JS_SetClassProto(context, prototype_class_id, object) };
 
-        if Self::CALL_AS_CONSTRUCTOR.is_some() {
-            unsafe { JS_SetConstructorBit(in_context, prototype, 1) };
-        }
+        Ok(())
+    }
 
+    fn create_instance_class(
+        runtime: *mut QuickJSRuntime,
+        instance_class_id: u32,
+    ) -> EsperantoResult<()> {
+        let name_cstring = CString::new(Self::CLASS_NAME)?;
         let instance_def = JSClassDef {
             class_name: name_cstring.as_ptr(),
             call: None,
@@ -87,12 +77,23 @@ pub(super) trait QuickJSExportExtensions: JSExportClass + Sized {
             exotic: std::ptr::null_mut(),
         };
 
-        let instance_class_id = get_new_class_id();
         if unsafe { JS_NewClass(runtime, instance_class_id, &instance_def) } != 0 {
             return Err(JSExportError::UnexpectedBehaviour.into());
         }
+        Ok(())
+    }
 
-        store_prototype_info::<Self>(prototype, instance_class_id, runtime)
+    fn create_prototype(context: *mut QuickJSContext, prototype_class_id: u32) -> QuickJSValue {
+        // weird quirk in the QuickJS API: created class IDs are u32, JS_NewObjectClass requires
+        // i32. Assume it's just an oversight in the header.
+
+        let prototype = unsafe { JS_NewObjectClass(context, prototype_class_id as _) };
+
+        if Self::CALL_AS_CONSTRUCTOR.is_some() {
+            unsafe { JS_SetConstructorBit(context, prototype, 1) };
+        }
+
+        prototype
     }
 }
 
@@ -157,14 +158,16 @@ unsafe extern "C" fn class_prototype_call<T: JSExportClass>(
 
 pub(super) unsafe extern "C" fn finalize_prototype<T: JSExportClass>(
     runtime: *mut QuickJSRuntime,
-    value: QuickJSValue,
+    _: QuickJSValue,
 ) {
-    println!("finalize proto");
+    clear_class::<T>(runtime);
 }
 
 pub(super) unsafe extern "C" fn finalize_instance<T: JSExportClass>(
     runtime: *mut QuickJSRuntime,
     value: QuickJSValue,
 ) {
-    println!("finalize instance");
+    let class_id = get_existing_class_id::<T>(runtime).unwrap().unwrap();
+    let storage = unsafe { JS_GetOpaque(value, class_id) };
+    JSExportPrivateData::<T>::drop(storage);
 }

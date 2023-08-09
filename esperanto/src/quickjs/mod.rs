@@ -4,7 +4,7 @@ mod quickjscontext;
 // mod quickjscstr;
 #[macro_use]
 mod quickjsexport;
-mod quickjs_prototype_storage;
+mod quickjs_class_storage;
 mod quickjscontextpointer;
 mod quickjsruntime;
 mod quickjsvalue;

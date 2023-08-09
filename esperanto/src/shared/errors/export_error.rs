@@ -13,15 +13,11 @@ pub enum JSExportError {
     #[error("Could not process the argument number value provided by the runtime")]
     CouldNotConvertArgumentNumber(TryFromIntError),
 
-    #[error("Could not get a reference to the underlying native object")]
-    CouldNotGetNativeObject,
+    #[error(
+        "Could not get a reference to the underlying native object. Are you sure this is a {0}?"
+    )]
+    CouldNotGetNativeObject(&'static str),
 
     #[error("Something happened that we're not expecting at all")]
     UnexpectedBehaviour,
-
-    #[error("Expected native object to be {expected} but it was {actual}")]
-    IncorrectNativeType {
-        expected: &'static str,
-        actual: &'static str,
-    },
 }

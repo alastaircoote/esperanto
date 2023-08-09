@@ -29,14 +29,10 @@ impl<T: JSExportClass> JSExportPrivateData<T> {
 
     pub(crate) fn data_from_ptr<'a>(raw_pointer: *mut c_void) -> EsperantoResult<&'a T> {
         let as_ref = unsafe { (raw_pointer as *mut Self).as_ref() }
-            .ok_or(JSExportError::CouldNotGetNativeObject)?;
+            .ok_or(JSExportError::CouldNotGetNativeObject(T::CLASS_NAME))?;
 
         if as_ref.type_id != TypeId::of::<T>() {
-            return Err(JSExportError::IncorrectNativeType {
-                expected: T::CLASS_NAME,
-                actual: as_ref.class_name,
-            }
-            .into());
+            return Err(JSExportError::CouldNotGetNativeObject(T::CLASS_NAME).into());
         }
         return Ok(&as_ref.data);
     }

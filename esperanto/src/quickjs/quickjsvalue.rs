@@ -2,11 +2,11 @@ use std::ffi::{c_void, CStr, CString};
 
 use quickjs_android_suitable_sys::{
     JSValue as QuickJSValue, JS_Call, JS_CallConstructor, JS_DeleteProperty, JS_DupValue__,
-    JS_FreeAtom, JS_FreeCString, JS_FreeValue__, JS_GetOpaque, JS_GetPropertyStr, JS_GetRuntime,
-    JS_IsConstructor, JS_IsEqual__, JS_IsError, JS_IsInstanceOf, JS_IsObject__, JS_IsString__,
-    JS_NewAtom, JS_NewBool__, JS_NewError, JS_NewFloat64__, JS_NewObject, JS_NewObjectClass,
-    JS_NewObjectProtoClass, JS_NewString, JS_SetOpaque, JS_SetPropertyStr, JS_ToBool,
-    JS_ToCStringLen2, JS_ToFloat64, JS_UNDEFINED__,
+    JS_FreeAtom, JS_FreeCString, JS_FreeValue__, JS_GetClassProto, JS_GetOpaque, JS_GetPropertyStr,
+    JS_GetRuntime, JS_IsConstructor, JS_IsEqual__, JS_IsError, JS_IsInstanceOf, JS_IsObject__,
+    JS_IsString__, JS_NewAtom, JS_NewBool__, JS_NewError, JS_NewFloat64__, JS_NewObject,
+    JS_NewObjectClass, JS_NewObjectProtoClass, JS_NewString, JS_SetOpaque, JS_SetPropertyStr,
+    JS_ToBool, JS_ToCStringLen2, JS_ToFloat64, JS_UNDEFINED__,
 };
 
 use crate::{
@@ -22,7 +22,9 @@ use crate::{
 };
 
 use super::quickjscontextpointer::QuickJSContextPointer;
-use super::quickjsexport::QuickJSExportExtensions;
+use super::{
+    quickjs_class_storage::get_or_create_class_id, quickjsexport::QuickJSExportExtensions,
+};
 
 pub type QuickJSValueInternal = QuickJSValue;
 
@@ -115,12 +117,12 @@ impl JSValueInternal for QuickJSValueInternal {
         ctx: Self::ContextType,
         runtime: <Self::ContextType as JSContextInternal>::RuntimeType,
     ) -> EsperantoResult<Self> {
-        let info = <T as QuickJSExportExtensions>::get_or_create_class_prototype(*ctx, runtime)?;
+        let class_id = get_or_create_class_id::<T>(ctx)?;
 
-        Ok(info.prototype)
-        // let storage = get_classid_storage(runtime)?;
-        // let class_id = get_class_id::<T>(runtime, storage)?;
-        // get_or_create_class_prototype::<T>(class_id, *ctx)
+        // let instance = unsafe { JS_GetClassProto(*ctx, info.instance_class) };
+        Ok(unsafe { JS_GetClassProto(*ctx, class_id) })
+
+        // Ok(info.prototype)
     }
 
     fn from_native_class<T: JSExportClass>(
@@ -128,9 +130,10 @@ impl JSValueInternal for QuickJSValueInternal {
         ctx: Self::ContextType,
         runtime: <Self::ContextType as JSContextInternal>::RuntimeType,
     ) -> EsperantoResult<Self> {
-        let info = <T as QuickJSExportExtensions>::get_or_create_class_prototype(*ctx, runtime)?;
-        // let obj = unsafe { JS_NewObjectClass(*ctx, info.instance_class as _) };
-        let obj = unsafe { JS_NewObjectProtoClass(*ctx, info.prototype, info.instance_class) };
+        // let info = <T as QuickJSExportExtensions>::get_or_create_class_prototype(*ctx, runtime)?;
+        let class_id = get_or_create_class_id::<T>(ctx)?;
+        let obj = unsafe { JS_NewObjectClass(*ctx, class_id as _) };
+        // let obj = unsafe { JS_NewObjectProtoClass(*ctx, info.prototype, info.instance_class) };
         let ptr = JSExportPrivateData::from_instance(instance);
         unsafe { JS_SetOpaque(obj, ptr) };
 
@@ -154,10 +157,10 @@ impl JSValueInternal for QuickJSValueInternal {
         self,
         ctx: Self::ContextType,
     ) -> EsperantoResult<&'a T> {
-        let info =
-            <T as QuickJSExportExtensions>::get_or_create_class_prototype(*ctx, ctx.get_runtime())?;
-
-        let ptr = unsafe { JS_GetOpaque(self, info.instance_class) };
+        // let info =
+        // <T as QuickJSExportExtensions>::get_or_create_class_prototype(*ctx, ctx.get_runtime())?;
+        let class_id = get_or_create_class_id::<T>(ctx)?;
+        let ptr = unsafe { JS_GetOpaque(self, class_id) };
 
         JSExportPrivateData::<T>::data_from_ptr(ptr)
     }
@@ -306,7 +309,9 @@ impl JSValueInternal for QuickJSValueInternal {
         runtime: <Self::ContextType as JSContextInternal>::RuntimeType,
     ) -> EsperantoResult<Self> {
         let prototype = Self::native_prototype_for::<T>(ctx, runtime)?;
-        return prototype.get_property(ctx, CONSTRUCTOR_STRING);
+        let c = prototype.get_property(ctx, CONSTRUCTOR_STRING);
+        prototype.release(ctx);
+        c
     }
 }
 
