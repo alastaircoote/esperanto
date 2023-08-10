@@ -12,7 +12,7 @@ use super::{jscorecontextpointer::JSCoreContextPointer, jscorevalue};
 /// JavaScriptCore has different pointer types depending on whether the value is a value or
 /// an object (which makes sense: objects are mutable, values are not). We keep track of that,
 /// maybe unnecessarily?
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, Hash)]
 pub enum JSCoreValuePointer {
     Object(*mut OpaqueJSValue),
     Value(*const OpaqueJSValue),

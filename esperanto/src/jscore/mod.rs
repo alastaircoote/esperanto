@@ -3,7 +3,7 @@ mod exception;
 
 #[macro_use]
 mod jscoreexport;
-
+mod jscore_class_storage;
 mod jscorecontext;
 mod jscorecontextpointer;
 mod jscoreruntime;

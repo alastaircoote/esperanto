@@ -16,7 +16,6 @@ use javascriptcore_sys::{
 
 use crate::{
     export::JSExportPrivateData,
-    jscore::jscoreexport::get_class_for,
     shared::{
         context::JSContextInternal,
         errors::{EsperantoResult, JSExportError},
@@ -28,8 +27,9 @@ use crate::{
 use crate::shared::as_ptr::AsRawMutPtr;
 
 use super::{
-    jscorecontextpointer::JSCoreContextPointer, jscoreexport::constructor_extern,
-    jscorestring::JSCoreString, jscorevaluepointer::JSCoreValuePointer,
+    jscore_class_storage::get_or_create_class_info, jscorecontextpointer::JSCoreContextPointer,
+    jscoreexport::constructor_extern, jscorestring::JSCoreString,
+    jscorevaluepointer::JSCoreValuePointer,
 };
 
 pub(crate) type JSCoreValueInternal = JSCoreValuePointer;
@@ -114,12 +114,11 @@ impl JSValueInternal for JSCoreValueInternal {
     fn from_native_class<T: JSExportClass>(
         instance: T,
         ctx: Self::ContextType,
-        runtime: <Self::ContextType as JSContextInternal>::RuntimeType,
     ) -> EsperantoResult<Self> {
         let private_data = JSExportPrivateData::from_instance(instance);
-        let class = get_class_for::<T>(ctx)?;
+        let class = get_or_create_class_info::<T>(ctx)?;
 
-        let raw = unsafe { JSObjectMake(ctx, class.instance_class, private_data as _) };
+        let raw = unsafe { JSObjectMake(ctx, class.instance_class, private_data) };
         // let raw = unsafe { JSObjectMake(ctx, overall_class, std::ptr::null_mut()) };
         unsafe { JSValueProtect(ctx, raw) }
         unsafe { JSObjectSetPrototype(ctx, raw, class.prototype) }
@@ -251,19 +250,13 @@ impl JSValueInternal for JSCoreValueInternal {
         unsafe { JSValueMakeUndefined(ctx) }.into()
     }
 
-    fn native_prototype_for<T: JSExportClass>(
-        ctx: Self::ContextType,
-        runtime: <Self::ContextType as JSContextInternal>::RuntimeType,
-    ) -> EsperantoResult<Self> {
-        let class = get_class_for::<T>(ctx)?;
+    fn native_prototype_for<T: JSExportClass>(ctx: Self::ContextType) -> EsperantoResult<Self> {
+        let class = get_or_create_class_info::<T>(ctx)?;
         Ok(JSCoreValuePointer::Object(class.prototype))
     }
 
-    fn constructor_for<T: JSExportClass>(
-        ctx: Self::ContextType,
-        runtime: <Self::ContextType as JSContextInternal>::RuntimeType,
-    ) -> EsperantoResult<Self> {
-        let prototype = Self::native_prototype_for::<T>(ctx, runtime)?;
+    fn constructor_for<T: JSExportClass>(ctx: Self::ContextType) -> EsperantoResult<Self> {
+        let prototype = Self::native_prototype_for::<T>(ctx)?;
         let constructor = prototype.get_property(ctx, CONSTRUCTOR_STRING)?;
         Ok(constructor)
     }

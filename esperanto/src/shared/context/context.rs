@@ -23,13 +23,7 @@ enum JSRuntimeStore<'r> {
 pub struct JSContext<'c> {
     // The engine-specific implementation of JSContext
     pub(crate) internal: JSContextInternalImpl,
-
     runtime: JSRuntimeStore<'c>,
-    // It's very common to want to spin up a JSContext without caring about the JSRuntime
-    // it lives inside (e.g. using JSContext::new()). In that instance we do still have to
-    // create a runtime but rather than having the user be concerned about it we store it
-    // alongside the context with the same lifetime as the context.
-    // stored_runtime: Option<JSRuntime<'c>>,
 }
 
 impl<'r, 'c> JSContext<'c>
@@ -59,7 +53,7 @@ where
     /// Create a new JSContext in its own runtime
     pub fn new() -> EsperantoResult<Self> {
         let runtime = JSRuntime::new()?;
-        let raw = JSContextInternalImpl::new_in_runtime(runtime.internal)?;
+        let raw = JSContextInternalImpl::new_in_runtime(&runtime.internal)?;
         Ok(JSContext {
             internal: raw,
             runtime: JSRuntimeStore::StoredInternally(runtime),
@@ -73,7 +67,7 @@ where
     where
         'r: 'c,
     {
-        let raw = JSContextInternalImpl::new_in_runtime(in_runtime.internal)?;
+        let raw = JSContextInternalImpl::new_in_runtime(&in_runtime.internal)?;
         Ok(JSContext {
             internal: raw,
             runtime: JSRuntimeStore::Referenced(in_runtime),

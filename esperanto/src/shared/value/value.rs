@@ -94,10 +94,7 @@ impl<'c> JSValue<'c> {
     where
         T: JSExportClass,
     {
-        let ptr = JSValueInternalImpl::native_prototype_for::<T>(
-            in_context.internal,
-            in_context.get_runtime().internal,
-        )?;
+        let ptr = JSValueInternalImpl::native_prototype_for::<T>(in_context.internal)?;
         let val = JSValue::wrap_internal(ptr, in_context);
 
         Ok(Retain::wrap(val))
@@ -107,10 +104,7 @@ impl<'c> JSValue<'c> {
     where
         T: JSExportClass,
     {
-        let ptr = JSValueInternalImpl::constructor_for::<T>(
-            in_context.internal,
-            in_context.get_runtime().internal,
-        )?;
+        let ptr = JSValueInternalImpl::constructor_for::<T>(in_context.internal)?;
         let val = JSValue::wrap_internal(ptr, in_context);
 
         Ok(Retain::wrap(val))
@@ -123,11 +117,7 @@ impl<'c> JSValue<'c> {
     where
         T: JSExportClass,
     {
-        let ptr = JSValueInternalImpl::from_native_class(
-            instance,
-            in_context.internal,
-            in_context.get_runtime().internal,
-        )?;
+        let ptr = JSValueInternalImpl::from_native_class(instance, in_context.internal)?;
         let val = JSValue::wrap_internal(ptr, in_context);
         Ok(Retain::wrap(val))
     }

@@ -7,7 +7,7 @@ use crate::shared::{errors::EsperantoError, value::JSValueInternal};
 pub(crate) trait JSContextInternal: Sized {
     type RuntimeType: JSRuntimeInternal;
     type ValueType: JSValueInternal;
-    fn new_in_runtime(runtime: Self::RuntimeType) -> Result<Self, JSContextError>;
+    fn new_in_runtime(runtime: &Self::RuntimeType) -> Result<Self, JSContextError>;
     fn evaluate(
         self,
         script: CString,

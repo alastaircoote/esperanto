@@ -44,20 +44,13 @@ pub(crate) trait JSValueInternal: Sized + Copy {
 
     fn undefined(ctx: Self::ContextType) -> Self;
 
-    fn native_prototype_for<T: JSExportClass>(
-        ctx: Self::ContextType,
-        runtime: <Self::ContextType as JSContextInternal>::RuntimeType,
-    ) -> EsperantoResult<Self>;
+    fn native_prototype_for<T: JSExportClass>(ctx: Self::ContextType) -> EsperantoResult<Self>;
 
-    fn constructor_for<T: JSExportClass>(
-        ctx: Self::ContextType,
-        runtime: <Self::ContextType as JSContextInternal>::RuntimeType,
-    ) -> EsperantoResult<Self>;
+    fn constructor_for<T: JSExportClass>(ctx: Self::ContextType) -> EsperantoResult<Self>;
 
     fn from_native_class<T: JSExportClass>(
         instance: T,
         ctx: Self::ContextType,
-        runtime: <Self::ContextType as JSContextInternal>::RuntimeType,
     ) -> EsperantoResult<Self>;
 
     fn get_native_ref<'a, T: JSExportClass>(self, ctx: Self::ContextType)
