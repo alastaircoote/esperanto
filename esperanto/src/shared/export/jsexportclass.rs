@@ -3,26 +3,26 @@ use crate::{shared::errors::EsperantoResult, JSContext, JSValue, Retain};
 pub enum JSExportAttribute<'a> {
     Function(JSClassFunction),
     Property {
-        getter: &'a dyn for<'c> Fn(
-            &'c JSContext<'c>,
-            &'c JSValue<'c>,
-        ) -> EsperantoResult<Retain<JSValue<'c>>>,
+        getter: &'a dyn for<'r, 'c> Fn(
+            &'c JSContext<'r, 'c>,
+            &'c JSValue<'r, 'c>,
+        ) -> EsperantoResult<Retain<JSValue<'r, 'c>>>,
         setter: Option<
-            &'a dyn for<'c> Fn(
-                &'c JSValue<'c>,
-                &'c JSValue<'c>,
-                &'c JSContext<'c>,
-            ) -> EsperantoResult<JSValue<'c>>,
+            &'a dyn for<'r, 'c> Fn(
+                &'c JSValue<'r, 'c>,
+                &'c JSValue<'r, 'c>,
+                &'c JSContext<'r, 'c>,
+            ) -> EsperantoResult<JSValue<'r, 'c>>,
         >,
     },
 }
 
 pub struct JSClassFunction {
     pub num_args: i32,
-    pub func: for<'c, 'v> fn(
-        &'v Vec<JSValue<'c>>,
-        &'c JSContext<'c>,
-    ) -> EsperantoResult<Retain<JSValue<'c>>>,
+    pub func: for<'r, 'c, 'v> fn(
+        &'v [&'v JSValue<'r, 'c>],
+        &'c JSContext<'r, 'c>,
+    ) -> EsperantoResult<Retain<JSValue<'r, 'c>>>,
 }
 
 pub trait JSExportClass: 'static {

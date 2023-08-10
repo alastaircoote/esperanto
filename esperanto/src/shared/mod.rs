@@ -7,4 +7,5 @@ pub mod as_ptr;
 pub mod errors;
 pub mod export;
 pub mod try_as;
+mod util;
 pub mod value;

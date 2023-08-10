@@ -9,4 +9,6 @@ pub enum JSContextError {
     CouldNotParseScript,
     #[error("Cannot retain a JSValue from a different JSContext")]
     RetainingWithWrongContext,
+    #[error("Could not get internal context representation")]
+    CouldNotGetInternalRepresentation,
 }

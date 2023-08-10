@@ -11,7 +11,7 @@ mod jscorestring;
 mod jscorevalue;
 mod jscorevaluepointer;
 
-pub(crate) use jscorecontext::JSCoreContextInternal as JSContextInternalImpl;
+pub(crate) use jscorecontext::JSCoreContextInternal as ActiveJSContextImplementation;
 // pub use jscoreexport::JSCoreClassDefinition as JSClassDefinitionImpl;
 pub(crate) use jscoreruntime::JSCoreRuntimeInternal as JSRuntimeInternalImpl;
 pub(crate) use jscorevalue::JSCoreValueInternal as JSValueInternalImpl;

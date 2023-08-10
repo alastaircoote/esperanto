@@ -4,21 +4,21 @@ use javascriptcore_sys::{
     JSGlobalContextRelease, JSObjectGetPrivate, JSObjectSetPrivate, OpaqueJSContext, OpaqueJSValue,
 };
 
-use crate::shared::context::{EvaluateMetadata, JSContextError, JSContextInternal};
+use crate::shared::context::{EvaluateMetadata, JSContextError, JSContextImplementation};
 use crate::shared::value::JSValueInternal;
+use crate::EsperantoResult;
 
 use super::jscore_class_storage;
-use super::jscoreruntime::JSCoreRuntimeStorage;
 use super::{
-    jscorecontextpointer::JSCoreContextPointer, jscoreruntime::JSCoreRuntimeInternal,
-    jscorestring::JSCoreString, jscorevalue::JSCoreValueInternal,
+    jscoreruntime::JSCoreRuntimeInternal, jscorestring::JSCoreString,
+    jscorevalue::JSCoreValueInternal,
 };
 
 use crate::shared::as_ptr::AsRawMutPtr;
 
 pub(crate) type JSCoreContextInternal = *mut OpaqueJSContext;
 
-impl JSContextInternal for JSCoreContextInternal {
+impl JSContextImplementation for JSCoreContextInternal {
     type RuntimeType = JSCoreRuntimeInternal;
     type ValueType = JSCoreValueInternal;
     fn new_in_runtime(runtime: &Self::RuntimeType) -> Result<Self, JSContextError> {
@@ -30,8 +30,6 @@ impl JSContextInternal for JSCoreContextInternal {
         let ptr = unsafe { JSGlobalContextCreateInGroup(runtime.raw, global_object_class) };
 
         unsafe { JSClassRelease(global_object_class) };
-
-        jscore_class_storage::attach_storage(runtime.class_storage.as_ptr(), ptr);
 
         if ptr.is_null() {
             return Err(JSContextError::CouldNotCreateContext);
@@ -84,15 +82,15 @@ impl JSContextInternal for JSCoreContextInternal {
         unsafe { JSGlobalContextRelease(self) }
     }
 
-    fn get_runtime(self) -> Self::RuntimeType {
-        let storage =
-            unsafe { JSObjectGetPrivate(self.get_globalobject().try_as_object(self).unwrap()) };
+    // fn get_runtime(self) -> Self::RuntimeType {
+    //     let storage =
+    //         unsafe { JSObjectGetPrivate(self.get_globalobject().try_as_object(self).unwrap()) };
 
-        JSCoreRuntimeInternal {
-            raw: unsafe { JSContextGetGroup(self) },
-            class_storage: JSCoreRuntimeStorage::Referenced(storage as _),
-        }
-    }
+    //     JSCoreRuntimeInternal {
+    //         raw: unsafe { JSContextGetGroup(self) },
+    //         class_storage: JSCoreRuntimeStorage::Referenced(storage as _),
+    //     }
+    // }
 
     fn garbage_collect(self) {
         unsafe {
@@ -105,6 +103,20 @@ impl JSContextInternal for JSCoreContextInternal {
 
     fn get_globalobject(self) -> Self::ValueType {
         unsafe { JSContextGetGlobalObject(self) }.into()
+    }
+
+    fn get_private_data(self) -> EsperantoResult<*mut std::ffi::c_void> {
+        // JSC doesn't have context-private data but it does have storage in the global object.
+        // might need to think about what to do if we actually want to store something else there
+        // some day.
+
+        let global: Self::ValueType = unsafe { JSContextGetGlobalObject(self) }.into();
+        global.get_private_data(self)
+    }
+
+    fn set_private_data(self, data: *mut std::ffi::c_void) -> EsperantoResult<()> {
+        let global: Self::ValueType = unsafe { JSContextGetGlobalObject(self) }.into();
+        global.set_private_data(self, data)
     }
 }
 
@@ -131,7 +143,7 @@ mod test {
     // supposed to.
 
     fn get_protected_object_count(ctx: &JSContext) -> i32 {
-        let hmm = unsafe { JSGetMemoryUsageStatistics(ctx.internal) };
+        let hmm = unsafe { JSGetMemoryUsageStatistics(ctx.implementation()) };
         let val = JSValue::wrap_internal(hmm.into(), &ctx);
         let json = ctx
             .global_object()

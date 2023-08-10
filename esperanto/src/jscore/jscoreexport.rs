@@ -12,11 +12,9 @@ use crate::{
     export::{JSClassFunction, JSExportPrivateData},
     jscore::jscorecontext::JSCoreContextInternal,
     jscore::jscorevaluepointer::JSCoreValuePointer,
-    shared::{context::JSContextInternal, errors::JSExportError},
-    EsperantoResult, JSContext, JSExportClass, JSRuntime, JSValue, Retain,
+    shared::{context::JSContextImplementation, errors::JSExportError},
+    EsperantoError, EsperantoResult, JSContext, JSExportClass, JSRuntime, JSValue, Retain,
 };
-
-use super::JSContextInternalImpl;
 
 /// We can't implement sync for OpaqueJSClass because it's foreign.
 /// Instead we use this struct as a wrapper
@@ -125,12 +123,6 @@ pub(super) unsafe extern "C" fn finalize_prototype<T: JSExportClass>(val: *mut O
 //     Ok(storage)
 // }
 
-fn get_wrapped_context<'c>(ctx: &'c *mut OpaqueJSContext) -> JSContext<'c> {
-    let ctx = JSCoreContextInternal::from(*ctx);
-    let runtime = JSRuntime::from_raw(ctx.get_runtime(), false);
-    JSContext::from_raw_storing_runtime(ctx, runtime)
-}
-
 unsafe fn execute_function<T: JSExportClass, ReturnType>(
     ctx: *const OpaqueJSContext,
     argc: usize,
@@ -141,7 +133,8 @@ unsafe fn execute_function<T: JSExportClass, ReturnType>(
     empty_result: fn(*const OpaqueJSContext) -> ReturnType,
 ) -> ReturnType {
     let global_context = unsafe { JSContextGetGlobalContext(ctx) };
-    let context = get_wrapped_context(&global_context);
+
+    let context = JSContext::wrap_raw(global_context).unwrap();
     let result: EsperantoResult<Retain<JSValue>>;
 
     if let Some(function) = function {
@@ -149,7 +142,10 @@ unsafe fn execute_function<T: JSExportClass, ReturnType>(
             .iter()
             .map(|raw| JSValue::wrap_internal(JSCoreValuePointer::Value(*raw), &context))
             .collect();
-        let func_result = (function.func)(&args, &context);
+
+        let arg_refs: Vec<&JSValue> = args.iter().map(|a| a).collect();
+
+        let func_result = (function.func)(arg_refs.as_slice(), &context);
         result = func_result
     } else {
         result = Err(JSExportError::ConstructorCalledOnNonConstructableClass(T::CLASS_NAME).into())

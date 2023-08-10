@@ -11,178 +11,178 @@ use crate::{
     JSContext, JSValue, Retain,
 };
 
-pub trait TryJSValueFrom<'c>: Sized {
-    fn try_jsvalue_from(value: Self, in_context: &'c JSContext) -> ValueResult<'c>;
-}
-
-pub trait JSValueFrom<'c>: Sized {
-    fn jsvalue_from(value: Self, in_context: &'c JSContext<'c>) -> Retain<JSValue<'c>>;
-}
-
-pub trait TryConvertJSValue<'c>: Sized {
-    fn try_from_jsvalue(value: &JSValue<'c>) -> EsperantoResult<Self>;
-}
-
-// impl<T> TryFrom<&JSValue<'_>> for T {}
-
-// impl<T: TryFromJSValue> TryInto<T> for &JSValue {}
-
-impl<'c, Target> TryJSValueFrom<'c> for Target
+pub trait TryJSValueFrom<'r, 'c>: Sized
 where
-    Target: JSValueFrom<'c>,
+    'c: 'r,
+{
+    fn try_jsvalue_from(value: Self, in_context: &'c JSContext) -> ValueResult<'r, 'c>;
+}
+
+pub trait JSValueFrom<'r, 'c>: Sized {
+    fn jsvalue_from(value: Self, in_context: &'c JSContext<'c, 'c>) -> Retain<JSValue<'r, 'c>>;
+}
+
+pub trait TryConvertJSValue<'r, 'c>: Sized {
+    fn try_from_jsvalue(value: &JSValue<'r, 'c>) -> EsperantoResult<Self>;
+}
+
+// Rather than repeat all these lifetime requirements a million times over
+// we'll just use a macro
+
+macro_rules! try_to_js_value {
+    ($target_type:ty, ($value: ident, $in_context:ident) => $body:expr) => {
+        impl<'r, 'c> TryJSValueFrom<'r, 'c> for $target_type
+        where
+            'c: 'r,
+        {
+            fn try_jsvalue_from(
+                $value: $target_type,
+                $in_context: &'c JSContext,
+            ) -> ValueResult<'r, 'c> {
+                $body
+            }
+        }
+    };
+}
+
+macro_rules! try_from_js_value {
+    ($target_type:ty, ($value: ident) => $body:expr) => {
+        impl TryConvertJSValue<'_, '_> for $target_type {
+            fn try_from_jsvalue($value: &JSValue<'_, '_>) -> EsperantoResult<Self> {
+                $body
+            }
+        }
+    };
+}
+
+impl<'r, 'c, Target> TryJSValueFrom<'r, 'c> for Target
+where
+    Target: JSValueFrom<'r, 'c>,
+    'c: 'r,
 {
     fn try_jsvalue_from(
         value: Target,
         in_context: &'c JSContext,
-    ) -> EsperantoResult<Retain<JSValue<'c>>> {
+    ) -> EsperantoResult<Retain<JSValue<'r, 'c>>> {
         Ok(Self::jsvalue_from(value, in_context))
     }
 }
 
 // String
 
-impl TryConvertJSValue<'_> for String {
-    fn try_from_jsvalue(value: &JSValue<'_>) -> EsperantoResult<Self> {
-        let cstring = value.internal.as_cstring(value.context.internal)?;
-        let str = cstring
-            .to_str()
-            .map_err(|e| ConversionError::CouldNotConvertFromJSString(e))?;
+try_to_js_value! {&str, (value, in_context) => {
+    let cstring = CString::new(value).map_err(|e| ConversionError::CouldNotConvertToJSString(e))?;
+    let ptr = JSValueInternalImpl::from_cstring(&cstring, in_context.implementation());
+    let val = JSValue::wrap_internal(ptr, in_context);
+    Ok(Retain::wrap(val))
+}}
 
-        Ok(str.to_string())
-    }
-}
+try_to_js_value! {String, (value, in_context) => {
+    <&str>::try_jsvalue_from(value.as_str(), in_context)
+}}
 
-impl<'c> TryJSValueFrom<'c> for &str {
-    fn try_jsvalue_from(value: &str, in_context: &'c JSContext) -> ValueResult<'c> {
-        let cstring =
-            CString::new(value).map_err(|e| ConversionError::CouldNotConvertToJSString(e))?;
+try_from_js_value! {String, (value) => {
+    let cstring = value.internal.as_cstring(value.context.implementation())?;
+    let str = cstring
+        .to_str()
+        .map_err(|e| ConversionError::CouldNotConvertFromJSString(e))?;
 
-        let ptr = JSValueInternalImpl::from_cstring(&cstring, in_context.internal);
-        let val = JSValue::wrap_internal(ptr, in_context);
-        Ok(Retain::wrap(val))
-    }
-}
+    Ok(str.to_owned())
+}}
 
 // f64
 
-impl<'c> TryJSValueFrom<'c> for f64 {
-    fn try_jsvalue_from(value: f64, in_context: &'c JSContext) -> ValueResult<'c> {
-        let ptr = JSValueInternalImpl::from_number(value, in_context.internal)?;
-        let val = JSValue::wrap_internal(ptr, in_context);
-        Ok(Retain::wrap(val))
-    }
-}
+try_to_js_value! {f64, (value, in_context) => {
+    let ptr = JSValueInternalImpl::from_number(value, in_context.implementation())?;
+    let val = JSValue::wrap_internal(ptr, in_context);
+    Ok(Retain::wrap(val))
+}}
 
-impl TryConvertJSValue<'_> for f64 {
-    fn try_from_jsvalue(value: &JSValue<'_>) -> EsperantoResult<Self> {
-        let n = value.internal.as_number(value.context.internal)?;
-        Ok(n)
-    }
-}
+try_from_js_value! {f64, (value) => {
+    let n = value.internal.as_number(value.context.implementation())?;
+    Ok(n)
+}}
 
 // i32
 
-impl<'c> TryJSValueFrom<'c> for i32 {
-    fn try_jsvalue_from(value: i32, in_context: &'c JSContext) -> ValueResult<'c> {
-        f64::try_jsvalue_from(value as f64, in_context)
-    }
-}
+try_to_js_value! {i32, (value, in_context) => {
+    f64::try_jsvalue_from(value as f64, in_context)
+}}
 
-impl TryConvertJSValue<'_> for i32 {
-    fn try_from_jsvalue(value: &JSValue<'_>) -> EsperantoResult<Self> {
-        let n: f64 = value.try_convert()?;
-        Ok(n as i32)
-    }
-}
+try_from_js_value! {i32, (value) => {
+    let n: f64 = value.try_convert()?;
+    Ok(n as i32)
+}}
 
 // bool
 
-impl<'c> TryJSValueFrom<'c> for bool {
-    fn try_jsvalue_from(value: bool, in_context: &'c JSContext) -> ValueResult<'c> {
-        let ptr = JSValueInternalImpl::from_bool(value, in_context.internal)?;
-        let val = JSValue::wrap_internal(ptr, in_context);
-        Ok(Retain::wrap(val))
-    }
-}
+try_to_js_value! {bool, (value, in_context) => {
+    let ptr = JSValueInternalImpl::from_bool(value, in_context.implementation())?;
+    let val = JSValue::wrap_internal(ptr, in_context);
+    Ok(Retain::wrap(val))
+}}
 
-impl TryConvertJSValue<'_> for bool {
-    fn try_from_jsvalue(value: &JSValue<'_>) -> EsperantoResult<Self> {
-        value.internal.as_bool(value.context.internal)
-    }
-}
+try_from_js_value! {bool, (value) => {
+    value.internal.as_bool(value.context.implementation())
+}}
 
 // Error
 
-impl<'c> TryJSValueFrom<'c> for EsperantoError {
-    fn try_jsvalue_from(value: Self, in_context: &'c crate::JSContext<'c>) -> ValueResult {
-        let (name, message): (&str, String) = match &value {
-            Self::RuntimeError(err) => ("RuntimeError", err.to_string()),
-            Self::CatchExceptionError(err) => ("CatchExceptionError", err.to_string()),
-            Self::ContextError(err) => ("ContextError", err.to_string()),
-            Self::ConversionError(err) => ("ConversionError", err.to_string()),
-            Self::ExportError(err) => ("ExportError", err.to_string()),
-            Self::ValueError(err) => ("ValueError", err.to_string()),
-            Self::JavaScriptError(err) => (&err.name, err.message.to_string()),
-        };
+try_to_js_value! {EsperantoError, (value, in_context) => {
+    let (name, message): (&str, String) = match &value {
+        Self::RuntimeError(err) => ("RuntimeError", err.to_string()),
+        Self::CatchExceptionError(err) => ("CatchExceptionError", err.to_string()),
+        Self::ContextError(err) => ("ContextError", err.to_string()),
+        Self::ConversionError(err) => ("ConversionError", err.to_string()),
+        Self::ExportError(err) => ("ExportError", err.to_string()),
+        Self::ValueError(err) => ("ValueError", err.to_string()),
+        Self::JavaScriptError(err) => (&err.name, err.message.to_string()),
+    };
 
-        return Ok(Retain::wrap(JSValue::new_error(
-            name, &message, in_context,
-        )?));
+    return Ok(Retain::wrap(JSValue::new_error(
+        name, &message, in_context,
+    )?));
+}}
+
+try_from_js_value! {JavaScriptError, (value) => {
+    if value.is_error()? == false {
+        return Err(ConversionError::JSValueWasNotAnError.into());
     }
-}
 
-impl TryConvertJSValue<'_> for JavaScriptError {
-    fn try_from_jsvalue(value: &JSValue<'_>) -> EsperantoResult<Self> {
-        if value.is_error()? == false {
-            return Err(ConversionError::JSValueWasNotAnError.into());
-        }
+    let name: String = value.get_property("name")?.try_convert()?;
+    let msg: String = value.get_property("message")?.try_convert()?;
 
-        let name: String = value.get_property("name")?.try_convert()?;
-        let msg: String = value.get_property("message")?.try_convert()?;
+    return Ok(JavaScriptError::new(name, msg));
+}}
 
-        return Ok(JavaScriptError::new(name, msg));
-    }
-}
+// impl TryConvertJSValue<'_, '_> for EsperantoError {
+//     fn try_from_jsvalue(value: &JSValue<'_, '_>) -> EsperantoResult<Self> {
+//         let js_err: Result<JavaScriptError, EsperantoError> = value.try_convert();
 
-impl TryConvertJSValue<'_> for EsperantoError {
-    fn try_from_jsvalue(value: &JSValue<'_>) -> EsperantoResult<Self> {
-        let js_err: Result<JavaScriptError, EsperantoError> = value.try_convert();
+//         match js_err {
+//             Ok(js_err) => Ok(EsperantoError::JavaScriptError(js_err)),
+//             Err(native_error) => Err(native_error),
+//         }
+//     }
+// }
 
-        match js_err {
-            Ok(js_err) => Ok(EsperantoError::JavaScriptError(js_err)),
-            Err(native_error) => Err(native_error),
-        }
-    }
-}
+// // Native
 
-// Native
-
-impl<'c, T> TryConvertJSValue<'c> for Js<'c, T>
-where
-    T: JSExportClass,
-{
-    fn try_from_jsvalue(value: &JSValue<'c>) -> EsperantoResult<Self> {
-        value.as_native()
-    }
-}
-
-impl<'c, T> TryJSValueFrom<'c> for Js<'c, T>
-where
-    T: JSExportClass,
-{
-    fn try_jsvalue_from(value: Self, _: &'c crate::JSContext<'c>) -> ValueResult {
-        Ok(Js::get_value(&value).retain())
-    }
-}
-
-// impl<'c, T> TryJSValueFrom<'c, T> for JSValueRef<'c>
+// impl<'r, 'c, T> TryConvertJSValue<'r, 'c> for Js<'r, 'c, T>
 // where
 //     T: JSExportClass,
 // {
-//     fn try_new_value_from(value: T, in_context: &'c JSContext) -> EsperantoResult<Self> {
-//         let ptr = JSValueInternalImpl::from_native_class(value, &in_context.internal)?;
-//         let val = JSValueRef::wrap_internal(ptr, in_context);
-//         Ok(val)
+//     fn try_from_jsvalue(value: &JSValue<'r, 'c>) -> EsperantoResult<Self> {
+//         value.as_native()
+//     }
+// }
+
+// impl<'r, 'c, T> TryJSValueFrom<'r, 'c> for Js<'r, 'c, T>
+// where
+//     T: JSExportClass,
+// {
+//     fn try_jsvalue_from(value: Self, _: &'c crate::JSContext) -> ValueResult<'r, 'c> {
+//         Ok(Js::get_value(&value).retain())
 //     }
 // }
 

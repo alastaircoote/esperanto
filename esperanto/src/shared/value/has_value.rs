@@ -1,11 +1,11 @@
 use crate::{JSValue, Retain};
 
-pub trait HasJSValue {
-    fn get_value<'a>(&'a self) -> &'a JSValue<'a>;
+pub trait HasJSValue<'r, 'c> {
+    fn get_value(&'c self) -> &'c JSValue<'r, 'c>;
 }
 
-impl<'c> HasJSValue for &JSValue<'c> {
-    fn get_value<'a>(&'a self) -> &'a JSValue<'a> {
+impl<'r, 'c> HasJSValue<'r, 'c> for &JSValue<'r, 'c> {
+    fn get_value(&'c self) -> &'c JSValue<'r, 'c> {
         self
     }
 }

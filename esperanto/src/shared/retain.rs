@@ -29,14 +29,14 @@ impl<T: Retainable> Retain<T> {
     }
 }
 
-impl<'c> Retainable for JSValue<'c> {
+impl Retainable for JSValue<'_, '_> {
     // fn retain(&self) -> Self {
     //     let new_retained_value = self.internal.retain(self.context.internal);
     //     return JSValue::wrap_internal(new_retained_value, self.context);
     // }
 
     fn release(&mut self) {
-        self.internal.release(self.context.internal);
+        self.internal.release(self.context.implementation());
     }
 
     // fn deref(&self) -> Self {
@@ -78,8 +78,8 @@ where
     }
 }
 
-impl<'c> HasJSValue for Retain<JSValue<'c>> {
-    fn get_value<'a>(&'a self) -> &'a JSValue<'c> {
+impl<'r, 'c> HasJSValue<'r, 'c> for Retain<JSValue<'r, 'c>> {
+    fn get_value(&'c self) -> &'c JSValue<'r, 'c> {
         &self.retained_value
     }
 }

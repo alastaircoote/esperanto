@@ -1,11 +1,11 @@
-use std::ffi::{CStr, CString};
+use std::ffi::{c_void, CStr, CString};
 
-use crate::shared::context::JSContextInternal;
+use crate::shared::context::JSContextImplementation;
 use crate::shared::errors::{EsperantoError, EsperantoResult, JavaScriptError};
 use crate::JSExportClass;
 
 pub(crate) trait JSValueInternal: Sized + Copy {
-    type ContextType: JSContextInternal + Copy;
+    type ContextType: JSContextImplementation + Copy;
 
     fn as_cstring(self, ctx: Self::ContextType) -> EsperantoResult<CString>;
     fn from_cstring(value: &CString, ctx: Self::ContextType) -> Self;
@@ -94,4 +94,7 @@ pub(crate) trait JSValueInternal: Sized + Copy {
     fn equals(self, other: Self, ctx: Self::ContextType) -> bool;
     fn is_instanceof(self, target: Self, ctx: Self::ContextType) -> EsperantoResult<bool>;
     fn is_object(self, ctx: Self::ContextType) -> bool;
+
+    fn get_private_data(self, ctx: Self::ContextType) -> EsperantoResult<*mut c_void>;
+    fn set_private_data(self, ctx: Self::ContextType, data: *mut c_void) -> EsperantoResult<()>;
 }

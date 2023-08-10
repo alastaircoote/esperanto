@@ -67,8 +67,8 @@ impl From<*const OpaqueJSValue> for JSCoreValuePointer {
     }
 }
 
-impl From<JSValue<'_>> for *const OpaqueJSValue {
-    fn from(val: JSValue<'_>) -> Self {
+impl From<JSValue<'_, '_>> for *const OpaqueJSValue {
+    fn from(val: JSValue<'_, '_>) -> Self {
         val.internal.as_value()
     }
 }

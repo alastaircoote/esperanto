@@ -7,19 +7,19 @@ use std::{
 use javascriptcore_sys::{
     JSClassCreate, JSClassDefinition, JSObjectCallAsConstructor, JSObjectCallAsFunction,
     JSObjectDeleteProperty, JSObjectGetPrivate, JSObjectGetProperty, JSObjectMake,
-    JSObjectMakeConstructor, JSObjectMakeError, JSObjectMakeFunction, JSObjectSetProperty,
-    JSObjectSetPrototype, JSValueIsInstanceOfConstructor, JSValueIsObject, JSValueIsStrictEqual,
-    JSValueIsString, JSValueMakeBoolean, JSValueMakeNumber, JSValueMakeString,
-    JSValueMakeUndefined, JSValueProtect, JSValueToBoolean, JSValueToNumber, JSValueToStringCopy,
-    JSValueUnprotect, OpaqueJSContext, OpaqueJSString, OpaqueJSValue,
+    JSObjectMakeConstructor, JSObjectMakeError, JSObjectMakeFunction, JSObjectSetPrivate,
+    JSObjectSetProperty, JSObjectSetPrototype, JSValueIsInstanceOfConstructor, JSValueIsObject,
+    JSValueIsStrictEqual, JSValueIsString, JSValueMakeBoolean, JSValueMakeNumber,
+    JSValueMakeString, JSValueMakeUndefined, JSValueProtect, JSValueToBoolean, JSValueToNumber,
+    JSValueToStringCopy, JSValueUnprotect, OpaqueJSContext, OpaqueJSString, OpaqueJSValue,
 };
 
 use crate::{
     export::JSExportPrivateData,
     shared::{
-        context::JSContextInternal,
+        context::JSContextImplementation,
         errors::{EsperantoResult, JSExportError},
-        value::JSValueInternal,
+        value::{JSValueError, JSValueInternal},
     },
     JSExportClass,
 };
@@ -298,6 +298,19 @@ impl JSValueInternal for JSCoreValueInternal {
         let error_name = CString::new("Error")?;
         let error_type = ctx.get_globalobject().get_property(ctx, &error_name)?;
         self.is_instanceof(error_type, ctx)
+    }
+
+    fn get_private_data(self, ctx: Self::ContextType) -> EsperantoResult<*mut c_void> {
+        let as_obj = self.try_as_object(ctx)?;
+        Ok(unsafe { JSObjectGetPrivate(as_obj) })
+    }
+
+    fn set_private_data(self, ctx: Self::ContextType, data: *mut c_void) -> EsperantoResult<()> {
+        let as_obj = self.try_as_object(ctx)?;
+        if unsafe { JSObjectSetPrivate(as_obj, data) } == false {
+            return Err(JSValueError::CouldNotStorePrivateData.into());
+        }
+        Ok(())
     }
 }
 

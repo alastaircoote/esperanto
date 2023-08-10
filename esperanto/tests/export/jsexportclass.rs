@@ -2,7 +2,7 @@
 mod test {
     use esperanto::errors::{JSExportError, JavaScriptError};
     use esperanto::export::{JSClassFunction, JSExportAttribute, JSExportName, Js};
-    use esperanto::{EsperantoError, JSRuntime, JSValue};
+    use esperanto::{EsperantoError, EsperantoResult, JSRuntime, JSValue, Retain};
     use esperanto::{JSContext, JSExportClass};
     use phf::phf_ordered_map;
     use std::ops::Deref;
@@ -22,6 +22,16 @@ mod test {
         assert_eq!(wrapped.is_instance_of(&prototype).unwrap(), true);
     }
 
+    const fn constrain<F>(f: F) -> F
+    where
+        F: for<'r, 'c, 'v> Fn(
+            &'v [&'v JSValue<'r, 'c>],
+            &'c JSContext<'r, 'c>,
+        ) -> EsperantoResult<Retain<JSValue<'r, 'c>>>,
+    {
+        f
+    }
+
     #[test]
     fn exports_calls_constructor_successfully() {
         struct TestStruct {}
@@ -30,7 +40,7 @@ mod test {
             const CLASS_NAME: JSExportName = "TestStruct";
             const CALL_AS_CONSTRUCTOR: Option<JSClassFunction> = Some(JSClassFunction {
                 num_args: 1,
-                func: |_, ctx| {
+                func: |args: &[&JSValue], ctx| {
                     let item = TestStruct {};
                     // return JSValue::new_function("return hi", vec![], &ctx);
                     return JSValue::new_wrapped_native(item, ctx);

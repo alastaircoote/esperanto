@@ -13,4 +13,7 @@ pub enum JSValueError {
 
     #[error("You must use 'new' when running a constructor function.")]
     MustUseNewWithConstuctor,
+
+    #[error("Could not store private data in this value")]
+    CouldNotStorePrivateData,
 }
