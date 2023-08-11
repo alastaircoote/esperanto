@@ -16,7 +16,7 @@ pub(crate) struct JSExportPrivateData<T> {
     pub(crate) data: T,
 }
 
-impl<'r: 'c, 'c, T: JSExportClass<'r, 'c>> JSExportPrivateData<T> {
+impl<'r: 'c, 'c, T: JSExportClass> JSExportPrivateData<T> {
     pub(crate) fn from_instance(instance: T) -> *mut c_void {
         let wrapped = JSExportPrivateData {
             class_name: T::CLASS_NAME,

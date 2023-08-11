@@ -18,6 +18,7 @@ use super::{
     jscoreexport::{
         call_as_func_extern, constructor_extern, finalize_instance, finalize_prototype,
     },
+    jscoreruntime::JSCoreRuntimeInternal,
 };
 
 #[derive(Eq, PartialEq, Hash, Copy, Clone, Debug)]
@@ -38,14 +39,12 @@ pub(super) fn attach_storage(
 }
 
 pub(super) fn get_or_create_class_info<T: JSExportClass>(
+    from_runtime: &JSCoreRuntimeInternal,
     in_context: JSCoreContextInternal,
 ) -> EsperantoResult<JSClassStorage> {
     let type_id = TypeId::of::<T>();
-    let global_object = unsafe { JSContextGetGlobalObject(in_context) };
-    let storage_ptr =
-        unsafe { JSObjectGetPrivate(global_object) } as *const RefCell<JSCoreClassStorage>;
 
-    let mut storage_mut_ref = unsafe { storage_ptr.as_ref() }.unwrap().borrow_mut();
+    let mut storage_mut_ref = from_runtime.class_storage.borrow_mut();
 
     if let Some(existing) = storage_mut_ref.get(&type_id) {
         return Ok(*existing);
@@ -80,9 +79,11 @@ pub(super) fn get_or_create_class_info<T: JSExportClass>(
     let prototype_class = unsafe { JSClassCreate(&prototype_def) };
     let instance_class = unsafe { JSClassCreate(&instance_def) };
 
+    let runtime_ref: *const JSCoreRuntimeInternal = from_runtime;
+
     // We store the pointer to the context in the prototype private data because we need it
     // in the finalizer.
-    let prototype = unsafe { JSObjectMake(in_context, prototype_class, in_context as _) };
+    let prototype = unsafe { JSObjectMake(in_context, prototype_class, runtime_ref as _) };
 
     // Now that we've created our prototype we can release the class: we only ever need one prototype per class
     // unsafe { JSClassRelease(prototype_class) };

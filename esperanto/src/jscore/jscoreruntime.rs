@@ -44,6 +44,10 @@ impl JSRuntimeInternal for JSCoreRuntimeInternal {
 
     fn release(&mut self) {
         unsafe { JSContextGroupRelease(self.raw) }
+        #[cfg(debug_assertions)]
+        {
+            assert_eq!(self.class_storage.borrow().len(), 0)
+        }
     }
 }
 

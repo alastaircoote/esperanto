@@ -94,9 +94,12 @@ where
 
     pub fn prototype_for<T>(in_context: &'c JSContext<'c, 'c>) -> ValueResult
     where
-        T: JSExportClass<'r, 'c>,
+        T: JSExportClass,
     {
-        let ptr = JSValueInternalImpl::native_prototype_for::<T>(in_context.implementation())?;
+        let ptr = JSValueInternalImpl::native_prototype_for::<T>(
+            in_context.implementation(),
+            &in_context.get_runtime().internal,
+        )?;
         let val = JSValue::wrap_internal(ptr, in_context);
 
         Ok(Retain::wrap(val))
@@ -104,9 +107,12 @@ where
 
     pub fn constructor_for<T>(in_context: &'c JSContext<'c, 'c>) -> ValueResult
     where
-        T: JSExportClass<'r, 'c>,
+        T: JSExportClass,
     {
-        let ptr = JSValueInternalImpl::constructor_for::<T>(in_context.implementation())?;
+        let ptr = JSValueInternalImpl::constructor_for::<T>(
+            in_context.implementation(),
+            &in_context.get_runtime().internal,
+        )?;
         let val = JSValue::wrap_internal(ptr, in_context);
 
         Ok(Retain::wrap(val))
@@ -117,14 +123,18 @@ where
         in_context: &'c JSContext<'r, 'c>,
     ) -> EsperantoResult<Retain<JSValue<'r, 'c>>>
     where
-        T: JSExportClass<'r, 'c>,
+        T: JSExportClass,
     {
-        let ptr = JSValueInternalImpl::from_native_class(instance, in_context.implementation())?;
+        let ptr = JSValueInternalImpl::from_native_class(
+            instance,
+            in_context.implementation(),
+            &in_context.get_runtime().internal,
+        )?;
         let val = JSValue::wrap_internal(ptr, in_context);
         Ok(Retain::wrap(val))
     }
 
-    pub fn as_native<T: JSExportClass<'r, 'c>>(&self) -> EsperantoResult<Js<'r, 'c, T>> {
+    pub fn as_native<T: JSExportClass>(&self) -> EsperantoResult<Js<'r, 'c, T>> {
         // self.internal.get_native_ref(self.context.internal)
         let retained = self.retain();
         Js::new(retained)

@@ -11,8 +11,9 @@ use lazy_static::lazy_static;
 use crate::{
     export::{JSClassFunction, JSExportPrivateData},
     jscore::jscorecontext::JSCoreContextInternal,
+    jscore::jscoreruntime::JSCoreRuntimeInternal,
     jscore::jscorevaluepointer::JSCoreValuePointer,
-    shared::{context::JSContextImplementation, errors::JSExportError},
+    shared::{context::JSContextImplementation, errors::JSExportError, value::JSValueInternal},
     EsperantoError, EsperantoResult, JSContext, JSExportClass, JSRuntime, JSValue, Retain,
 };
 
@@ -36,98 +37,23 @@ unsafe impl Send for JSClassStorage {}
 
 type ClassMap = RwLock<HashMap<(TypeId, JSContextWrapper), JSClassStorage>>;
 
-lazy_static! {
-    static ref JS_CLASSES: ClassMap = RwLock::new(HashMap::new());
-}
-
-pub(super) unsafe extern "C" fn finalize_instance<'r: 'c, 'c, T: JSExportClass<'r, 'c>>(
-    val: *mut OpaqueJSValue,
-) {
+pub(super) unsafe extern "C" fn finalize_instance<T: JSExportClass>(val: *mut OpaqueJSValue) {
+    println!("finalize instance");
     let ptr = JSObjectGetPrivate(val);
     JSExportPrivateData::<T>::drop(ptr);
 }
 
-pub(super) unsafe extern "C" fn finalize_prototype<'r: 'c, 'c, T: JSExportClass<'r, 'c>>(
-    val: *mut OpaqueJSValue,
-) {
+pub(super) unsafe extern "C" fn finalize_prototype<T: JSExportClass>(val: *mut OpaqueJSValue) {
     // The prototype is no longer in use so we should remove it from our class
     // storage.
-
-    let context = JSObjectGetPrivate(val) as *mut OpaqueJSContext;
-
-    JS_CLASSES
-        .write()
-        .unwrap()
-        .remove(&(TypeId::of::<T>(), JSContextWrapper(context)));
+    let private = unsafe { JSObjectGetPrivate(val) } as *const JSCoreRuntimeInternal;
+    let mut storage = private.as_ref().unwrap().class_storage.borrow_mut();
+    // let ctx = JSContext::borrow_from_implementation(private).unwrap();
+    // let mut storage = ctx.get_runtime().internal.class_storage.borrow_mut();
+    storage.remove(&TypeId::of::<T>());
 }
 
-// pub(super) fn get_class_for<T: JSExportClass>(
-//     in_context: *mut OpaqueJSContext,
-// ) -> EsperantoResult<JSClassStorage> {
-//     let type_id = TypeId::of::<T>();
-//     let wrapped_context = JSContextWrapper(in_context);
-
-//     if let Some(already_created) = JS_CLASSES
-//         .read()
-//         .map_err(|_| JSExportError::UnexpectedBehaviour)?
-//         .get(&(type_id, wrapped_context))
-//     {
-//         // We've already created the class definition for this JSExportClass so let's
-//         // just return it:
-//         return Ok(*already_created);
-//     }
-
-//     // Otherwise we need to make a new definition. We actually need to create *two* definitions
-//     //
-//     // - the prototype definition
-//     // - the instance definition
-//     //
-//     // The prototype actually contains most of what we want: the functions that get called, the
-//     // properties, etc etc. The instance definition is really only needed to a) get the name right
-//     // and b) allow us to attach private data (JSC only lets you attach private data to objects
-//     // that use a custom class) and c) to finalize (and drop) instances
-//     let name_as_c_string = CString::new(T::CLASS_NAME)?;
-
-//     let mut prototype_def = JSClassDefinition::default();
-//     prototype_def.className = name_as_c_string.as_ptr();
-
-//     let mut instance_def = prototype_def;
-
-//     if T::CALL_AS_CONSTRUCTOR.is_some() {
-//         prototype_def.callAsConstructor = Some(constructor_extern::<T>);
-//     }
-//     if T::CALL_AS_FUNCTION.is_some() {
-//         prototype_def.callAsFunction = Some(call_as_func_extern::<T>);
-//     }
-
-//     instance_def.finalize = Some(finalize_instance::<T>);
-//     prototype_def.finalize = Some(finalize_prototype::<T>);
-
-//     let prototype_class = unsafe { JSClassCreate(&prototype_def) };
-//     let instance_class = unsafe { JSClassCreate(&instance_def) };
-
-//     // We store the pointer to the context in the prototype private data because we need it
-//     // in the finalizer.
-//     let prototype = unsafe { JSObjectMake(in_context, prototype_class, in_context as _) };
-
-//     // Now that we've created our prototype we can release the class: we only ever need one prototype per class
-//     unsafe { JSClassRelease(prototype_class) };
-
-//     let storage = JSClassStorage {
-//         prototype,
-//         instance_class,
-//     };
-
-//     let mut writable = JS_CLASSES
-//         .write()
-//         .map_err(|_| JSExportError::UnexpectedBehaviour)?;
-
-//     writable.insert((type_id, wrapped_context), storage.clone());
-
-//     Ok(storage)
-// }
-
-unsafe fn execute_function<'r: 'c, 'c, T: JSExportClass<'r, 'c>, ReturnType>(
+unsafe fn execute_function<'r: 'c, 'c, T: JSExportClass, ReturnType>(
     ctx: *const OpaqueJSContext,
     argc: usize,
     argv: *const *const OpaqueJSValue,
@@ -165,7 +91,7 @@ unsafe fn execute_function<'r: 'c, 'c, T: JSExportClass<'r, 'c>, ReturnType>(
         })
 }
 
-pub(super) unsafe extern "C" fn call_as_func_extern<'r: 'c, 'c, T: JSExportClass<'r, 'c>>(
+pub(super) unsafe extern "C" fn call_as_func_extern<'r: 'c, 'c, T: JSExportClass>(
     ctx: *const OpaqueJSContext,
     _function: *mut OpaqueJSValue,
     _this_object: *mut OpaqueJSValue,
@@ -184,7 +110,7 @@ pub(super) unsafe extern "C" fn call_as_func_extern<'r: 'c, 'c, T: JSExportClass
     )
 }
 
-pub(super) unsafe extern "C" fn constructor_extern<'r: 'c, 'c, T: JSExportClass<'r, 'c>>(
+pub(super) unsafe extern "C" fn constructor_extern<'r: 'c, 'c, T: JSExportClass>(
     ctx: *const OpaqueJSContext,
     _constructor_val: *mut OpaqueJSValue,
     argc: usize,

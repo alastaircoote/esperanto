@@ -122,3 +122,9 @@ where
         unsafe { raw.as_ref() }.ok_or(JSContextError::CouldNotGetInternalRepresentation.into())
     }
 }
+
+impl Drop for JSContext<'_, '_> {
+    fn drop(&mut self) {
+        self.implementation().release()
+    }
+}

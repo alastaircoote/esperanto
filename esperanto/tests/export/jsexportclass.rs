@@ -22,16 +22,6 @@ mod test {
         assert_eq!(wrapped.is_instance_of(&prototype).unwrap(), true);
     }
 
-    const fn constrain<F>(f: F) -> F
-    where
-        F: for<'r, 'c, 'v> Fn(
-            &'v [&'v JSValue<'r, 'c>],
-            &'c JSContext<'r, 'c>,
-        ) -> EsperantoResult<Retain<JSValue<'r, 'c>>>,
-    {
-        f
-    }
-
     #[test]
     fn exports_calls_constructor_successfully() {
         struct TestStruct {}
@@ -463,32 +453,32 @@ mod test {
         unsafe { assert_eq!(IS_DESTROYED, true) };
     }
 
-    #[ignore]
-    #[test]
-    fn export_attribute_property_getters_work() {
-        struct TestStruct {}
+    // #[ignore]
+    // #[test]
+    // fn export_attribute_property_getters_work() {
+    //     struct TestStruct {}
 
-        impl JSExportClass for TestStruct {
-            const CLASS_NAME: &'static str = "TestStruct";
-            const ATTRIBUTES: esperanto::export::JSExportAttributes = Some(phf_ordered_map!(
-                "testAttribute" => JSExportAttribute::Property {
-                    getter: &| ctx, this_obj | {
-                        JSValue::try_new_from(123.0, &ctx)
-                    },
-                    setter: None
-                }
-            ));
-        }
+    //     impl JSExportClass for TestStruct {
+    //         const CLASS_NAME: &'static str = "TestStruct";
+    //         const ATTRIBUTES: esperanto::export::JSExportAttributes = Some(phf_ordered_map!(
+    //             "testAttribute" => JSExportAttribute::Property {
+    //                 getter: | ctx, this_obj | {
+    //                     JSValue::try_new_from(123.0, &ctx)
+    //                 },
+    //                 setter: None
+    //             }
+    //         ));
+    //     }
 
-        let ctx = JSContext::new().unwrap();
-        let wrapped = JSValue::constructor_for::<TestStruct>(&ctx).unwrap();
-        ctx.global_object()
-            .set_property("TestValue", &wrapped)
-            .unwrap();
+    //     let ctx = JSContext::new().unwrap();
+    //     let wrapped = JSValue::constructor_for::<TestStruct>(&ctx).unwrap();
+    //     ctx.global_object()
+    //         .set_property("TestValue", &wrapped)
+    //         .unwrap();
 
-        let result = ctx.evaluate("TestValue.testAttribute", None).unwrap();
-        assert!(JSValue::undefined(&ctx).value() != result.value());
-        let number: f64 = result.try_convert().unwrap();
-        assert_eq!(number, 123.0);
-    }
+    //     let result = ctx.evaluate("TestValue.testAttribute", None).unwrap();
+    //     assert!(JSValue::undefined(&ctx).value() != result.value());
+    //     let number: f64 = result.try_convert().unwrap();
+    //     assert_eq!(number, 123.0);
+    // }
 }

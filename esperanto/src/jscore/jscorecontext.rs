@@ -185,7 +185,7 @@ mod test {
     fn retains_and_releases_native_classes() {
         struct TestStruct {}
 
-        impl<'r: 'c, 'c> JSExportClass<'r, 'c> for TestStruct {
+        impl JSExportClass for TestStruct {
             const CLASS_NAME: &'static str = "TestStruct";
         }
 

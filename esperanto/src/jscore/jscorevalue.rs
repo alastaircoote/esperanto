@@ -111,16 +111,18 @@ impl JSValueInternal for JSCoreValueInternal {
         Ok(result.into())
     }
 
-    fn from_native_class<'r: 'c, 'c, T: JSExportClass<'r, 'c>>(
+    fn from_native_class<T: JSExportClass>(
         instance: T,
         ctx: Self::ContextType,
+        runtime: &<Self::ContextType as JSContextImplementation>::RuntimeType,
     ) -> EsperantoResult<Self> {
         let private_data = JSExportPrivateData::from_instance(instance);
-        let class = get_or_create_class_info::<T>(ctx)?;
+        let class = get_or_create_class_info::<T>(runtime, ctx)?;
 
         let raw = unsafe { JSObjectMake(ctx, class.instance_class, private_data) };
         // let raw = unsafe { JSObjectMake(ctx, overall_class, std::ptr::null_mut()) };
-        unsafe { JSValueProtect(ctx, raw) }
+        // unsafe { JSValueProtect(ctx, raw) }
+
         unsafe { JSObjectSetPrototype(ctx, raw, class.prototype) }
 
         return Ok(JSCoreValuePointer::Object(raw));
@@ -250,17 +252,19 @@ impl JSValueInternal for JSCoreValueInternal {
         unsafe { JSValueMakeUndefined(ctx) }.into()
     }
 
-    fn native_prototype_for<'r: 'c, 'c, T: JSExportClass<'r, 'c>>(
+    fn native_prototype_for<T: JSExportClass>(
         ctx: Self::ContextType,
+        runtime: &<Self::ContextType as JSContextImplementation>::RuntimeType,
     ) -> EsperantoResult<Self> {
-        let class = get_or_create_class_info::<T>(ctx)?;
+        let class = get_or_create_class_info::<T>(runtime, ctx)?;
         Ok(JSCoreValuePointer::Object(class.prototype))
     }
 
-    fn constructor_for<'r: 'c, 'c, T: JSExportClass<'r, 'c>>(
+    fn constructor_for<T: JSExportClass>(
         ctx: Self::ContextType,
+        runtime: &<Self::ContextType as JSContextImplementation>::RuntimeType,
     ) -> EsperantoResult<Self> {
-        let prototype = Self::native_prototype_for::<T>(ctx)?;
+        let prototype = Self::native_prototype_for::<T>(ctx, runtime)?;
         let constructor = prototype.get_property(ctx, CONSTRUCTOR_STRING)?;
         Ok(constructor)
     }
@@ -279,7 +283,7 @@ impl JSValueInternal for JSCoreValueInternal {
         })
     }
 
-    fn get_native_ref<'a, 'r: 'c, 'c, T: JSExportClass<'r, 'c>>(
+    fn get_native_ref<'a, T: JSExportClass>(
         self,
         ctx: Self::ContextType,
     ) -> EsperantoResult<&'a T> {
