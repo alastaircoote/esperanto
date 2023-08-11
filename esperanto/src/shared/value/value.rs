@@ -45,7 +45,7 @@ impl Display for JSValue<'_, '_> {
 
 impl<'r, 'c> JSValue<'r, 'c>
 where
-    'c: 'r,
+    'r: 'c,
 {
     pub fn set_property(&self, name: &str, value: &Self) -> EsperantoResult<()> {
         let name_cstring =
@@ -83,7 +83,7 @@ where
 
     pub(crate) fn wrap_internal(
         val: JSValueInternalImpl,
-        new_context: &'c JSContext<'c, 'c>,
+        new_context: &'c JSContext<'r, 'c>,
     ) -> JSValue<'r, 'c> {
         JSValue {
             internal: val,
@@ -94,7 +94,7 @@ where
 
     pub fn prototype_for<T>(in_context: &'c JSContext<'c, 'c>) -> ValueResult
     where
-        T: JSExportClass,
+        T: JSExportClass<'r, 'c>,
     {
         let ptr = JSValueInternalImpl::native_prototype_for::<T>(in_context.implementation())?;
         let val = JSValue::wrap_internal(ptr, in_context);
@@ -104,7 +104,7 @@ where
 
     pub fn constructor_for<T>(in_context: &'c JSContext<'c, 'c>) -> ValueResult
     where
-        T: JSExportClass,
+        T: JSExportClass<'r, 'c>,
     {
         let ptr = JSValueInternalImpl::constructor_for::<T>(in_context.implementation())?;
         let val = JSValue::wrap_internal(ptr, in_context);
@@ -117,14 +117,14 @@ where
         in_context: &'c JSContext<'r, 'c>,
     ) -> EsperantoResult<Retain<JSValue<'r, 'c>>>
     where
-        T: JSExportClass,
+        T: JSExportClass<'r, 'c>,
     {
         let ptr = JSValueInternalImpl::from_native_class(instance, in_context.implementation())?;
         let val = JSValue::wrap_internal(ptr, in_context);
         Ok(Retain::wrap(val))
     }
 
-    pub fn as_native<T: JSExportClass>(&self) -> EsperantoResult<Js<'r, 'c, T>> {
+    pub fn as_native<T: JSExportClass<'r, 'c>>(&self) -> EsperantoResult<Js<'r, 'c, T>> {
         // self.internal.get_native_ref(self.context.internal)
         let retained = self.retain();
         Js::new(retained)
@@ -207,7 +207,7 @@ where
 
     // Seems kind of silly for undefined to be a retain since it never gets garbage collected
     // but it's actually difficult for us to provide anything different. Will have to think on it.
-    pub fn undefined(in_context: &'c JSContext) -> Retain<Self> {
+    pub fn undefined(in_context: &'c JSContext<'r, 'c>) -> Retain<Self> {
         Retain::wrap(Self::wrap_internal(
             JSValueInternalImpl::undefined(in_context.implementation()),
             in_context,

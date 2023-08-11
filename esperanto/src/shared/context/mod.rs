@@ -1,7 +1,6 @@
 mod context;
 mod context_error;
 mod context_implementation;
-mod context_internals;
 mod evaluate_metadata;
 
 pub use context::JSContext;

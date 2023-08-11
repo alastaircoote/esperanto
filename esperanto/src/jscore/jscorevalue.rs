@@ -111,7 +111,7 @@ impl JSValueInternal for JSCoreValueInternal {
         Ok(result.into())
     }
 
-    fn from_native_class<T: JSExportClass>(
+    fn from_native_class<'r: 'c, 'c, T: JSExportClass<'r, 'c>>(
         instance: T,
         ctx: Self::ContextType,
     ) -> EsperantoResult<Self> {
@@ -250,12 +250,16 @@ impl JSValueInternal for JSCoreValueInternal {
         unsafe { JSValueMakeUndefined(ctx) }.into()
     }
 
-    fn native_prototype_for<T: JSExportClass>(ctx: Self::ContextType) -> EsperantoResult<Self> {
+    fn native_prototype_for<'r: 'c, 'c, T: JSExportClass<'r, 'c>>(
+        ctx: Self::ContextType,
+    ) -> EsperantoResult<Self> {
         let class = get_or_create_class_info::<T>(ctx)?;
         Ok(JSCoreValuePointer::Object(class.prototype))
     }
 
-    fn constructor_for<T: JSExportClass>(ctx: Self::ContextType) -> EsperantoResult<Self> {
+    fn constructor_for<'r: 'c, 'c, T: JSExportClass<'r, 'c>>(
+        ctx: Self::ContextType,
+    ) -> EsperantoResult<Self> {
         let prototype = Self::native_prototype_for::<T>(ctx)?;
         let constructor = prototype.get_property(ctx, CONSTRUCTOR_STRING)?;
         Ok(constructor)
@@ -275,7 +279,7 @@ impl JSValueInternal for JSCoreValueInternal {
         })
     }
 
-    fn get_native_ref<'a, T: JSExportClass>(
+    fn get_native_ref<'a, 'r: 'c, 'c, T: JSExportClass<'r, 'c>>(
         self,
         ctx: Self::ContextType,
     ) -> EsperantoResult<&'a T> {

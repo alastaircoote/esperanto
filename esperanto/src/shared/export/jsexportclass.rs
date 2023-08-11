@@ -1,17 +1,19 @@
+use std::marker::PhantomData;
+
 use crate::{shared::errors::EsperantoResult, JSContext, JSValue, Retain};
 
-pub enum JSExportAttribute<'a> {
+pub enum JSExportAttribute {
     Function(JSClassFunction),
     Property {
-        getter: &'a dyn for<'r, 'c> Fn(
+        getter: for<'r, 'c, 'v> fn(
             &'c JSContext<'r, 'c>,
-            &'c JSValue<'r, 'c>,
+            &'v JSValue<'r, 'c>,
         ) -> EsperantoResult<Retain<JSValue<'r, 'c>>>,
         setter: Option<
-            &'a dyn for<'r, 'c> Fn(
-                &'c JSValue<'r, 'c>,
-                &'c JSValue<'r, 'c>,
-                &'c JSContext<'r, 'c>,
+            for<'r, 'c, 'v> fn(
+                &'v JSValue<'r, 'c>,
+                &'v JSValue<'r, 'c>,
+                &'v JSContext<'r, 'c>,
             ) -> EsperantoResult<JSValue<'r, 'c>>,
         >,
     },
@@ -32,5 +34,5 @@ pub trait JSExportClass: 'static {
     const CALL_AS_FUNCTION: Option<JSClassFunction> = None;
 }
 
-pub type JSExportAttributes = Option<phf::OrderedMap<&'static str, JSExportAttribute<'static>>>;
+pub type JSExportAttributes = Option<phf::OrderedMap<&'static str, JSExportAttribute>>;
 pub type JSExportName = &'static str;

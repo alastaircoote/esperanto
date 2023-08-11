@@ -6,7 +6,7 @@ use crate::{shared::value::JSValueInternal, EsperantoResult, JSExportClass, JSVa
 use std::ops::Deref;
 
 #[derive(Debug)]
-pub struct Js<'r, 'c, T: JSExportClass> {
+pub struct Js<'r, 'c: 'r, T: JSExportClass<'r, 'c>> {
     value: Retain<JSValue<'r, 'c>>,
     _phantom: PhantomData<T>,
     // reference: &'c T,
@@ -14,7 +14,8 @@ pub struct Js<'r, 'c, T: JSExportClass> {
 
 impl<'r, 'c, T> Js<'r, 'c, T>
 where
-    T: JSExportClass,
+    T: JSExportClass<'r, 'c>,
+    'c: 'r,
 {
     pub(crate) fn new(wrapping: Retain<JSValue<'r, 'c>>) -> EsperantoResult<Self> {
         // This is weird. But Deref can't fail, so we make sure we can successfully
@@ -44,7 +45,8 @@ where
 
 impl<'r, 'c, T> Deref for Js<'r, 'c, T>
 where
-    T: JSExportClass,
+    T: JSExportClass<'r, 'c>,
+    'c: 'r,
 {
     type Target = T;
 
@@ -55,7 +57,8 @@ where
 
 impl<'r, 'c, T> AsRef<T> for Js<'r, 'c, T>
 where
-    T: JSExportClass,
+    T: JSExportClass<'r, 'c>,
+    'c: 'r,
 {
     fn as_ref(&self) -> &T {
         self.deref()

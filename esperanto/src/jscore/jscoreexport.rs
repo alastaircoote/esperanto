@@ -40,12 +40,16 @@ lazy_static! {
     static ref JS_CLASSES: ClassMap = RwLock::new(HashMap::new());
 }
 
-pub(super) unsafe extern "C" fn finalize_instance<T: JSExportClass>(val: *mut OpaqueJSValue) {
+pub(super) unsafe extern "C" fn finalize_instance<'r: 'c, 'c, T: JSExportClass<'r, 'c>>(
+    val: *mut OpaqueJSValue,
+) {
     let ptr = JSObjectGetPrivate(val);
     JSExportPrivateData::<T>::drop(ptr);
 }
 
-pub(super) unsafe extern "C" fn finalize_prototype<T: JSExportClass>(val: *mut OpaqueJSValue) {
+pub(super) unsafe extern "C" fn finalize_prototype<'r: 'c, 'c, T: JSExportClass<'r, 'c>>(
+    val: *mut OpaqueJSValue,
+) {
     // The prototype is no longer in use so we should remove it from our class
     // storage.
 
@@ -123,18 +127,19 @@ pub(super) unsafe extern "C" fn finalize_prototype<T: JSExportClass>(val: *mut O
 //     Ok(storage)
 // }
 
-unsafe fn execute_function<T: JSExportClass, ReturnType>(
+unsafe fn execute_function<'r: 'c, 'c, T: JSExportClass<'r, 'c>, ReturnType>(
     ctx: *const OpaqueJSContext,
     argc: usize,
     argv: *const *const OpaqueJSValue,
     exception: *mut *const OpaqueJSValue,
     function: &Option<JSClassFunction>,
-    transform: fn(&JSValue, *const OpaqueJSContext) -> EsperantoResult<ReturnType>,
+    transform: fn(&JSValue<'r, 'c>, *const OpaqueJSContext) -> EsperantoResult<ReturnType>,
     empty_result: fn(*const OpaqueJSContext) -> ReturnType,
 ) -> ReturnType {
     let global_context = unsafe { JSContextGetGlobalContext(ctx) };
 
-    let context = JSContext::wrap_raw(global_context).unwrap();
+    let context = JSContext::borrow_from_implementation(global_context).unwrap();
+
     let result: EsperantoResult<Retain<JSValue>>;
 
     if let Some(function) = function {
@@ -160,7 +165,7 @@ unsafe fn execute_function<T: JSExportClass, ReturnType>(
         })
 }
 
-pub(super) unsafe extern "C" fn call_as_func_extern<T: JSExportClass>(
+pub(super) unsafe extern "C" fn call_as_func_extern<'r: 'c, 'c, T: JSExportClass<'r, 'c>>(
     ctx: *const OpaqueJSContext,
     _function: *mut OpaqueJSValue,
     _this_object: *mut OpaqueJSValue,
@@ -179,7 +184,7 @@ pub(super) unsafe extern "C" fn call_as_func_extern<T: JSExportClass>(
     )
 }
 
-pub(super) unsafe extern "C" fn constructor_extern<T: JSExportClass>(
+pub(super) unsafe extern "C" fn constructor_extern<'r: 'c, 'c, T: JSExportClass<'r, 'c>>(
     ctx: *const OpaqueJSContext,
     _constructor_val: *mut OpaqueJSValue,
     argc: usize,

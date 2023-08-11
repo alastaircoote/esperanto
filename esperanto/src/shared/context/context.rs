@@ -1,14 +1,15 @@
 use std::ffi::CString;
 use std::marker::PhantomData;
 
-use super::context_internals::JSContextInternals;
 use super::{context_error::JSContextError, evaluate_metadata::EvaluateMetadata};
 use crate::shared::engine_impl::ActiveJSContextImplementation;
 use crate::shared::util::StoredOrReferenced;
-use crate::shared::value::{JSValueInternal, ValueResult};
+use crate::shared::value::ValueResult;
 use crate::shared::{context::JSContextImplementation, errors::EsperantoResult};
 use crate::shared::{runtime::JSRuntime, value::JSValue};
 use crate::Retain;
+
+type StoredOrReferencedRuntime<'r> = StoredOrReferenced<'r, JSRuntime<'r>>;
 
 /**
  * This is the environment in which we actually evaluate JavaScript. It can belong to a
@@ -17,37 +18,46 @@ use crate::Retain;
  */
 #[derive(Debug, Eq, PartialEq)]
 pub struct JSContext<'r, 'c> {
-    internals: StoredOrReferenced<'c, JSContextInternals<'r, 'c>>,
+    // The engine-specific implementation of JSContext
+    pub(super) implementation: ActiveJSContextImplementation,
+    pub(super) runtime: StoredOrReferencedRuntime<'r>,
+    _lifetime: &'c PhantomData<()>,
 }
 
 impl<'r, 'c> JSContext<'r, 'c>
 where
-    'c: 'r,
+    'r: 'c,
 {
-    /// Create a new JSContext in its own runtime
-    pub fn new() -> EsperantoResult<Self> {
-        let runtime = Box::new(JSRuntime::new()?);
+    fn create_and_store_in_implementation(
+        runtime: StoredOrReferencedRuntime<'r>,
+    ) -> EsperantoResult<Box<Self>> {
         let implementation = ActiveJSContextImplementation::new_in_runtime(&runtime.internal)?;
-        let internals = JSContextInternals::create_and_store(implementation, runtime.into());
+        let ctx = JSContext {
+            implementation,
+            runtime: runtime.into(),
+            _lifetime: &PhantomData,
+        };
 
-        Ok(JSContext {
-            internals: internals.into(),
-        })
+        let boxed_context = Box::new(ctx);
+        let ptr_to_box: *const JSContext = boxed_context.as_ref();
+        implementation.set_private_data(ptr_to_box as _)?;
+        Ok(boxed_context)
+    }
+
+    /// Create a new JSContext in its own runtime
+    pub fn new() -> EsperantoResult<Box<Self>> {
+        let runtime = Box::new(JSRuntime::new()?);
+        Self::create_and_store_in_implementation(runtime.into())
     }
 
     /// Create a JSContext in an existing runtime.
     /// # Arguments
     /// * `in_runtime`: A reference to the runtime we want to create a JSContext in.
-    pub fn new_in_runtime(in_runtime: &'r JSRuntime<'r>) -> EsperantoResult<Self>
+    pub fn new_in_runtime(in_runtime: &'r JSRuntime<'r>) -> EsperantoResult<Box<Self>>
     where
         'r: 'c,
     {
-        let implementation = ActiveJSContextImplementation::new_in_runtime(&in_runtime.internal)?;
-        let internals = JSContextInternals::create_and_store(implementation, in_runtime.into());
-
-        Ok(JSContext {
-            internals: internals.into(),
-        })
+        Self::create_and_store_in_implementation(in_runtime.into())
     }
 
     /// Take a string, convert it into executable JavaScript, then execute it.
@@ -73,7 +83,7 @@ where
     }
 
     pub(crate) fn implementation(&self) -> ActiveJSContextImplementation {
-        self.internals.implementation
+        self.implementation
     }
 
     /// Manually run garbage collection. Is hidden because not all implementations expose a public way
@@ -95,7 +105,7 @@ where
     }
 
     pub fn get_runtime(&'c self) -> &JSRuntime {
-        &self.internals.runtime
+        &self.runtime
     }
 }
 
@@ -105,11 +115,10 @@ impl<'r, 'c> JSContext<'r, 'c>
 where
     'r: 'c,
 {
-    pub(crate) fn wrap_raw<'lifetime>(
-        reference: ActiveJSContextImplementation,
-    ) -> EsperantoResult<Self> {
-        Ok(JSContext {
-            internals: JSContextInternals::get_from_global_object(reference)?.into(),
-        })
+    pub(crate) fn borrow_from_implementation(
+        ptr: ActiveJSContextImplementation,
+    ) -> EsperantoResult<&'c Self> {
+        let raw = ptr.get_private_data()? as *const Self;
+        unsafe { raw.as_ref() }.ok_or(JSContextError::CouldNotGetInternalRepresentation.into())
     }
 }
