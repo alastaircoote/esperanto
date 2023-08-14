@@ -1,13 +1,13 @@
 use std::ffi::{c_void, CString};
 
 use super::{context_error::JSContextError, evaluate_metadata::EvaluateMetadata};
-use crate::shared::runtime::JSRuntimeInternal;
-use crate::shared::{errors::EsperantoError, value::JSValueInternal};
+use crate::shared::runtime::JSRuntimeImplementation;
+use crate::shared::{errors::EsperantoError, value::JSValueImplementation};
 use crate::EsperantoResult;
 
 pub(crate) trait JSContextImplementation: Sized {
-    type RuntimeType: JSRuntimeInternal;
-    type ValueType: JSValueInternal;
+    type RuntimeType: JSRuntimeImplementation;
+    type ValueType: JSValueImplementation;
     fn new_in_runtime(runtime: &Self::RuntimeType) -> Result<Self, JSContextError>;
     fn evaluate(
         self,

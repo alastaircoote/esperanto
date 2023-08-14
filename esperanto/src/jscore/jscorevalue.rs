@@ -5,9 +5,8 @@ use std::{
 };
 
 use javascriptcore_sys::{
-    JSClassCreate, JSClassDefinition, JSObjectCallAsConstructor, JSObjectCallAsFunction,
-    JSObjectDeleteProperty, JSObjectGetPrivate, JSObjectGetProperty, JSObjectMake,
-    JSObjectMakeConstructor, JSObjectMakeError, JSObjectMakeFunction, JSObjectSetPrivate,
+    JSObjectCallAsConstructor, JSObjectCallAsFunction, JSObjectDeleteProperty, JSObjectGetPrivate,
+    JSObjectGetProperty, JSObjectMake, JSObjectMakeError, JSObjectMakeFunction, JSObjectSetPrivate,
     JSObjectSetProperty, JSObjectSetPrototype, JSValueIsInstanceOfConstructor, JSValueIsObject,
     JSValueIsStrictEqual, JSValueIsString, JSValueMakeBoolean, JSValueMakeNumber,
     JSValueMakeString, JSValueMakeUndefined, JSValueProtect, JSValueToBoolean, JSValueToNumber,
@@ -18,25 +17,24 @@ use crate::{
     export::JSExportPrivateData,
     shared::{
         context::JSContextImplementation,
-        errors::{EsperantoResult, JSExportError},
-        value::{JSValueError, JSValueInternal},
+        errors::EsperantoResult,
+        value::{JSValueError, JSValueImplementation},
     },
-    JSExportClass,
+    JSContext, JSExportClass, JSValue,
 };
 
 use crate::shared::as_ptr::AsRawMutPtr;
 
 use super::{
-    jscore_class_storage::get_or_create_class_info, jscorecontextpointer::JSCoreContextPointer,
-    jscoreexport::constructor_extern, jscorestring::JSCoreString,
+    jscore_class_storage::JSClassStorage, jscorestring::JSCoreString,
     jscorevaluepointer::JSCoreValuePointer,
 };
 
 pub(crate) type JSCoreValueInternal = JSCoreValuePointer;
 
-static CONSTRUCTOR_STRING: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"constructor\0") };
+// static CONSTRUCTOR_STRING: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"constructor\0") };
 
-impl JSValueInternal for JSCoreValueInternal {
+impl JSValueImplementation for JSCoreValueInternal {
     type ContextType = *mut OpaqueJSContext;
 
     fn retain(self, ctx: Self::ContextType) -> Self {
@@ -113,17 +111,28 @@ impl JSValueInternal for JSCoreValueInternal {
 
     fn from_native_class<T: JSExportClass>(
         instance: T,
-        ctx: Self::ContextType,
-        runtime: &<Self::ContextType as JSContextImplementation>::RuntimeType,
+        wrapped_ctx: &JSContext,
     ) -> EsperantoResult<Self> {
         let private_data = JSExportPrivateData::from_instance(instance);
-        let class = get_or_create_class_info::<T>(runtime, ctx)?;
+        let class = JSClassStorage::get::<T>(wrapped_ctx)?;
 
-        let raw = unsafe { JSObjectMake(ctx, class.instance_class, private_data) };
+        let raw = unsafe {
+            JSObjectMake(
+                wrapped_ctx.implementation(),
+                class.instance_class,
+                private_data,
+            )
+        };
         // let raw = unsafe { JSObjectMake(ctx, overall_class, std::ptr::null_mut()) };
         // unsafe { JSValueProtect(ctx, raw) }
 
-        unsafe { JSObjectSetPrototype(ctx, raw, class.prototype) }
+        unsafe {
+            JSObjectSetPrototype(
+                wrapped_ctx.implementation(),
+                raw,
+                class.get_prototype(wrapped_ctx).internal.as_value(),
+            )
+        }
 
         return Ok(JSCoreValuePointer::Object(raw));
     }
@@ -252,22 +261,20 @@ impl JSValueInternal for JSCoreValueInternal {
         unsafe { JSValueMakeUndefined(ctx) }.into()
     }
 
-    fn native_prototype_for<T: JSExportClass>(
-        ctx: Self::ContextType,
-        runtime: &<Self::ContextType as JSContextImplementation>::RuntimeType,
-    ) -> EsperantoResult<Self> {
-        let class = get_or_create_class_info::<T>(runtime, ctx)?;
-        Ok(JSCoreValuePointer::Object(class.prototype))
+    fn native_prototype_for<'r: 'c, 'c, T: JSExportClass>(
+        wrapped_ctx: &'c JSContext<'r, 'c>,
+    ) -> EsperantoResult<JSValue<'r, 'c>> {
+        let class = JSClassStorage::get::<T>(wrapped_ctx)?;
+        let value = class.get_prototype(wrapped_ctx);
+        Ok(value)
     }
 
-    fn constructor_for<T: JSExportClass>(
-        ctx: Self::ContextType,
-        runtime: &<Self::ContextType as JSContextImplementation>::RuntimeType,
-    ) -> EsperantoResult<Self> {
-        let prototype = Self::native_prototype_for::<T>(ctx, runtime)?;
-        let constructor = prototype.get_property(ctx, CONSTRUCTOR_STRING)?;
-        Ok(constructor)
-    }
+    // fn constructor_for<T: JSExportClass>(wrapped_ctx: &JSContext) -> EsperantoResult<Self> {
+    //     let prototype = Self::native_prototype_for::<T>(wrapped_ctx)?;
+    //     let constructor =
+    //         prototype.get_property(wrapped_ctx.implementation(), CONSTRUCTOR_STRING)?;
+    //     Ok(constructor)
+    // }
 
     fn equals(self, other: Self, ctx: Self::ContextType) -> bool {
         unsafe { JSValueIsStrictEqual(ctx, self.as_value(), other.as_value()) }
@@ -275,11 +282,7 @@ impl JSValueInternal for JSCoreValueInternal {
 
     fn is_instanceof(self, target: Self, ctx: Self::ContextType) -> EsperantoResult<bool> {
         check_jscore_exception!(ctx, exception => {
-            // seems kind of weird that JSC exposes instanceof constructor when in JS we actually
-            // check against the prototype. For consistency let's assume the user is passing a
-            // prototype here and grab the constructor:
-            let constructor = target.get_property(ctx, CONSTRUCTOR_STRING)?;
-            unsafe { JSValueIsInstanceOfConstructor(ctx, self.as_value(), constructor.try_as_object(ctx)?, exception) }
+            unsafe { JSValueIsInstanceOfConstructor(ctx, self.as_value(), target.try_as_object(ctx)?, exception) }
         })
     }
 

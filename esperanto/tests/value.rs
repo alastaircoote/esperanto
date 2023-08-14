@@ -2,7 +2,7 @@
 mod value_tests {
 
     use esperanto::errors::JSValueError;
-    use esperanto::{EsperantoError, JSContext, JSValue, TryConvertJSValue};
+    use esperanto::{EsperantoError, JSContext, JSRuntime, JSValue, TryConvertJSValue};
 
     #[test]
     fn sets_properties() {
@@ -203,5 +203,23 @@ mod value_tests {
         let other_instance = ctx.evaluate("new NotThisClass()", None).unwrap();
         let other_is_instance = other_instance.is_instance_of(&class).unwrap();
         assert_eq!(other_is_instance, false)
+    }
+
+    #[test]
+    fn can_transfer_across_contexts() {
+        let runtime = JSRuntime::new().unwrap();
+        let ctx1 = JSContext::new_in_runtime(&runtime).unwrap();
+        let ctx2 = JSContext::new_in_runtime(&runtime).unwrap();
+
+        let value = JSValue::try_new_from("TEST VALUE", &ctx1).unwrap();
+        let transferred = value.transfer_to_context(&ctx2);
+        drop(value);
+        drop(ctx1);
+        assert_eq!(transferred.to_string(), "TEST VALUE");
+        {
+            let ctx3 = JSContext::new().unwrap();
+            let hmm = transferred.transfer_to_context(&ctx3);
+            assert_eq!(hmm.to_string(), "TEST VALUE");
+        }
     }
 }

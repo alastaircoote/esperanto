@@ -1,11 +1,9 @@
 use std::ffi::CString;
 
 use super::value::ValueResult;
-use super::JSValueInternal;
-use crate::export::Js;
+use super::JSValueImplementation;
 use crate::shared::errors::JavaScriptError;
 use crate::shared::{engine_impl::JSValueInternalImpl, errors::EsperantoError};
-use crate::JSExportClass;
 use crate::{
     shared::errors::{ConversionError, EsperantoResult},
     JSContext, JSValue, Retain,
@@ -13,16 +11,16 @@ use crate::{
 
 pub trait TryJSValueFrom<'r, 'c>: Sized
 where
-    'c: 'r,
+    'r: 'c,
 {
-    fn try_jsvalue_from(value: Self, in_context: &'c JSContext) -> ValueResult<'r, 'c>;
+    fn try_jsvalue_from(value: Self, in_context: &'c JSContext<'r, 'c>) -> ValueResult<'r, 'c>;
 }
 
-pub trait JSValueFrom<'r, 'c>: Sized {
-    fn jsvalue_from(value: Self, in_context: &'c JSContext<'c, 'c>) -> Retain<JSValue<'r, 'c>>;
+pub trait JSValueFrom<'r: 'c, 'c>: Sized {
+    fn jsvalue_from(value: Self, in_context: &'c JSContext<'r, 'c>) -> Retain<JSValue<'r, 'c>>;
 }
 
-pub trait TryConvertJSValue<'r, 'c>: Sized {
+pub trait TryConvertJSValue<'r: 'c, 'c>: Sized {
     fn try_from_jsvalue(value: &JSValue<'r, 'c>) -> EsperantoResult<Self>;
 }
 
@@ -33,11 +31,11 @@ macro_rules! try_to_js_value {
     ($target_type:ty, ($value: ident, $in_context:ident) => $body:expr) => {
         impl<'r, 'c> TryJSValueFrom<'r, 'c> for $target_type
         where
-            'c: 'r,
+            'r: 'c,
         {
             fn try_jsvalue_from(
                 $value: $target_type,
-                $in_context: &'c JSContext,
+                $in_context: &'c JSContext<'r, 'c>,
             ) -> ValueResult<'r, 'c> {
                 $body
             }
@@ -47,7 +45,7 @@ macro_rules! try_to_js_value {
 
 macro_rules! try_from_js_value {
     ($target_type:ty, ($value: ident) => $body:expr) => {
-        impl TryConvertJSValue<'_, '_> for $target_type {
+        impl<'r: 'c, 'c> TryConvertJSValue<'r, 'c> for $target_type {
             fn try_from_jsvalue($value: &JSValue<'_, '_>) -> EsperantoResult<Self> {
                 $body
             }
@@ -58,11 +56,11 @@ macro_rules! try_from_js_value {
 impl<'r, 'c, Target> TryJSValueFrom<'r, 'c> for Target
 where
     Target: JSValueFrom<'r, 'c>,
-    'c: 'r,
+    'r: 'c,
 {
     fn try_jsvalue_from(
         value: Target,
-        in_context: &'c JSContext,
+        in_context: &'c JSContext<'r, 'c>,
     ) -> EsperantoResult<Retain<JSValue<'r, 'c>>> {
         Ok(Self::jsvalue_from(value, in_context))
     }

@@ -1,18 +1,16 @@
 #[cfg(test)]
 mod test {
     use esperanto::errors::{JSExportError, JavaScriptError};
-    use esperanto::export::{JSClassFunction, JSExportAttribute, JSExportName, Js};
-    use esperanto::{EsperantoError, EsperantoResult, JSRuntime, JSValue, Retain};
+    use esperanto::export::{JSClassFunction, Js};
+    use esperanto::{EsperantoError, JSValue};
     use esperanto::{JSContext, JSExportClass};
-    use phf::phf_ordered_map;
-    use std::ops::Deref;
 
     #[test]
     fn exports_sets_prototype() {
         struct TestStruct {}
 
         impl JSExportClass for TestStruct {
-            const CLASS_NAME: JSExportName = "TestStruct";
+            const CLASS_NAME: &'static str = "TestStruct";
         }
 
         let test = TestStruct {};
@@ -27,10 +25,10 @@ mod test {
         struct TestStruct {}
 
         impl JSExportClass for TestStruct {
-            const CLASS_NAME: JSExportName = "TestStruct";
+            const CLASS_NAME: &'static str = "TestStruct";
             const CALL_AS_CONSTRUCTOR: Option<JSClassFunction> = Some(JSClassFunction {
                 num_args: 1,
-                func: |args: &[&JSValue], ctx| {
+                func: |_: &[&JSValue], ctx| {
                     let item = TestStruct {};
                     // return JSValue::new_function("return hi", vec![], &ctx);
                     return JSValue::new_wrapped_native(item, ctx);
@@ -86,7 +84,7 @@ mod test {
             const CLASS_NAME: &'static str = "TestStruct";
             const CALL_AS_FUNCTION: Option<JSClassFunction> = Some(JSClassFunction {
                 num_args: 0,
-                func: |args, ctx| return Ok(JSValue::undefined(&ctx)),
+                func: |_, ctx| return Ok(JSValue::undefined(&ctx)),
             });
         }
 
@@ -275,7 +273,7 @@ mod test {
             const CLASS_NAME: &'static str = "TestStruct";
             const CALL_AS_FUNCTION: Option<JSClassFunction> = Some(JSClassFunction {
                 num_args: 2,
-                func: |args, ctx| {
+                func: |_, ctx| {
                     let obj = TestStruct {};
                     // return JSValue::try_new_from(123.0, &ctx);
                     return JSValue::new_wrapped_native(obj, &ctx);
@@ -445,11 +443,12 @@ mod test {
         // manually calling GC on JSC doesn't seem to actually do anything. So instead
         // we rely on destroying the context to trigger the drop
 
-        {
-            let str = TestStruct {};
-            let ctx = JSContext::new().unwrap();
-            JSValue::new_wrapped_native(str, &ctx).unwrap();
-        }
+        // {
+        let str = TestStruct {};
+        let ctx = JSContext::new().unwrap();
+        JSValue::new_wrapped_native(str, &ctx).unwrap();
+        ctx.garbage_collect();
+        // }
         unsafe { assert_eq!(IS_DESTROYED, true) };
     }
 

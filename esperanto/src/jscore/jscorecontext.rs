@@ -1,14 +1,13 @@
 use javascriptcore_sys::{
-    JSClassCreate, JSClassDefinition, JSClassRelease, JSContextGetGlobalObject, JSContextGetGroup,
-    JSContextRef, JSEvaluateScript, JSGarbageCollect, JSGlobalContextCreateInGroup,
-    JSGlobalContextRelease, JSObjectGetPrivate, JSObjectSetPrivate, OpaqueJSContext, OpaqueJSValue,
+    JSClassCreate, JSClassDefinition, JSClassRelease, JSContextGetGlobalObject, JSEvaluateScript,
+    JSGarbageCollect, JSGlobalContextCreateInGroup, JSGlobalContextRelease, OpaqueJSContext,
+    OpaqueJSValue,
 };
 
 use crate::shared::context::{EvaluateMetadata, JSContextError, JSContextImplementation};
-use crate::shared::value::JSValueInternal;
+use crate::shared::value::JSValueImplementation;
 use crate::EsperantoResult;
 
-use super::jscore_class_storage;
 use super::{
     jscoreruntime::JSCoreRuntimeInternal, jscorestring::JSCoreString,
     jscorevalue::JSCoreValueInternal,
@@ -24,6 +23,7 @@ impl JSContextImplementation for JSCoreContextInternal {
     fn new_in_runtime(runtime: &Self::RuntimeType) -> Result<Self, JSContextError> {
         // Eventually we'll want to provide custom global objects. But for now let's just use a default
         // but not *the* default because we can't store private data against that.
+
         let global_object_class_def = JSClassDefinition::default();
         let global_object_class = unsafe { JSClassCreate(&global_object_class_def) };
 
@@ -34,6 +34,7 @@ impl JSContextImplementation for JSCoreContextInternal {
         if ptr.is_null() {
             return Err(JSContextError::CouldNotCreateContext);
         }
+
         Ok(ptr.into())
     }
 
@@ -79,6 +80,7 @@ impl JSContextImplementation for JSCoreContextInternal {
     // }
 
     fn release(self) {
+        println!("RELEASE CONTEXT??");
         unsafe { JSGlobalContextRelease(self) }
     }
 
@@ -94,7 +96,7 @@ impl JSContextImplementation for JSCoreContextInternal {
 
     fn garbage_collect(self) {
         unsafe {
-            // JSSynchronousGarbageCollectForDebugging(JSContextGetGroup(self) as _);
+            // JSSynchronousGarbageCollectForDebugging(self);
             // JSSynchronousEdenCollectForDebugging(self);
             // JSReportExtraMemoryCost(self, 9999999999);
             JSGarbageCollect(self);
@@ -134,6 +136,8 @@ mod test {
 
     use crate::{JSContext, JSExportClass, JSValue};
 
+    // use super::JSSynchronousGarbageCollectForDebugging;
+
     #[link(name = "JavaScriptCore", kind = "framework")]
     extern "C" {
         fn JSGetMemoryUsageStatistics(ctx: *const OpaqueJSContext) -> *mut OpaqueJSValue;
@@ -141,6 +145,27 @@ mod test {
 
     // These are some sanity check tests to make sure we're retaining/releasing like we're
     // supposed to.
+
+    // #[test]
+    // fn can_manually_garbage_collect() {
+    //     let group = unsafe { JSContextGroupCreate() };
+
+    //     let global_object_class_def = JSClassDefinition::default();
+    //     let global_object_class = unsafe { JSClassCreate(&global_object_class_def) };
+    //     // unsafe { JSClassRelease(global_object_class) };
+
+    //     // let ctx = unsafe { JSGlobalContextCreate(std::ptr::null_mut()) };
+    //     let ctx = unsafe { JSGlobalContextCreateInGroup(group, global_object_class) };
+
+    //     let obj = unsafe { JSObjectMake(ctx, std::ptr::null_mut(), std::ptr::null_mut()) };
+    //     unsafe { JSValueUnprotect(ctx, obj) };
+
+    //     unsafe { JSSynchronousGarbageCollectForDebugging(ctx) };
+    //     unsafe { JSObjectGetPrototype(ctx, obj) };
+
+    //     unsafe { JSGlobalContextRelease(ctx) };
+    //     unsafe { JSContextGroupRelease(group) };
+    // }
 
     fn get_protected_object_count(ctx: &JSContext) -> i32 {
         let hmm = unsafe { JSGetMemoryUsageStatistics(ctx.implementation()) };

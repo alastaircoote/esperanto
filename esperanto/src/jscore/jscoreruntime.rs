@@ -2,34 +2,19 @@ use std::{any::TypeId, cell::RefCell, collections::HashMap, ops::Deref};
 
 use javascriptcore_sys::{JSContextGroupCreate, JSContextGroupRelease, OpaqueJSContextGroup};
 
-use crate::shared::runtime::{JSRuntimeError, JSRuntimeInternal};
+use crate::shared::runtime::{JSRuntimeError, JSRuntimeImplementation};
 
-use super::jscore_class_storage::JSCoreClassStorage;
-
-// #[derive(Debug)]
-// pub(crate) enum JSCoreRuntimeStorage {
-//     Source(Box<RefCell<JSCoreClassStorage>>),
-//     Referenced(*const RefCell<JSCoreClassStorage>),
-// }
-
-// impl JSCoreRuntimeStorage {
-//     pub(super) fn as_ptr(&self) -> *const RefCell<JSCoreClassStorage> {
-//         match self {
-//             JSCoreRuntimeStorage::Source(refcell) => Box::as_ref(refcell),
-//             JSCoreRuntimeStorage::Referenced(r) => *r,
-//         }
-//     }
-// }
+use super::jscore_class_storage::JSClassStorage;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct JSCoreRuntimeInternal {
     pub(super) raw: *const OpaqueJSContextGroup,
-    pub(super) class_storage: RefCell<JSCoreClassStorage>,
+    pub(super) class_storage: RefCell<HashMap<TypeId, JSClassStorage>>,
 }
 
 // pub type JSCoreRuntimeInternal = *const OpaqueJSContextGroup;
 
-impl JSRuntimeInternal for JSCoreRuntimeInternal {
+impl JSRuntimeImplementation for JSCoreRuntimeInternal {
     fn new() -> Result<Self, JSRuntimeError> {
         let raw = unsafe { JSContextGroupCreate() };
         if raw.is_null() {
@@ -43,6 +28,7 @@ impl JSRuntimeInternal for JSCoreRuntimeInternal {
     }
 
     fn release(&mut self) {
+        println!("RUNTIME RELEASE");
         unsafe { JSContextGroupRelease(self.raw) }
         #[cfg(debug_assertions)]
         {

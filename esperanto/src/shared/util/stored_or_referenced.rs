@@ -1,4 +1,4 @@
-use std::{cell::Ref, ops::Deref};
+use std::ops::Deref;
 
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum StoredOrReferenced<'lifetime, StoredType>

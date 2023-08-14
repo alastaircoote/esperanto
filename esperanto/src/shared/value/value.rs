@@ -5,14 +5,13 @@ use crate::{
     shared::{
         context::JSContext,
         errors::{ConversionError, EsperantoResult},
-        retain::Retainable,
     },
     JSExportClass, Retain, TryJSValueFrom,
 };
 
 use crate::shared::engine_impl::JSValueInternalImpl;
 
-use super::{value_internal::JSValueInternal, TryConvertJSValue};
+use super::{value_implementation::JSValueImplementation, TryConvertJSValue};
 
 #[derive(Debug, Eq)]
 pub struct JSValue<'r, 'c> {
@@ -96,11 +95,7 @@ where
     where
         T: JSExportClass,
     {
-        let ptr = JSValueInternalImpl::native_prototype_for::<T>(
-            in_context.implementation(),
-            &in_context.get_runtime().internal,
-        )?;
-        let val = JSValue::wrap_internal(ptr, in_context);
+        let val = JSValueInternalImpl::native_prototype_for::<T>(in_context)?;
 
         Ok(Retain::wrap(val))
     }
@@ -109,13 +104,7 @@ where
     where
         T: JSExportClass,
     {
-        let ptr = JSValueInternalImpl::constructor_for::<T>(
-            in_context.implementation(),
-            &in_context.get_runtime().internal,
-        )?;
-        let val = JSValue::wrap_internal(ptr, in_context);
-
-        Ok(Retain::wrap(val))
+        Self::prototype_for::<T>(in_context)?.get_property("constructor")
     }
 
     pub fn new_wrapped_native<T>(
@@ -125,11 +114,7 @@ where
     where
         T: JSExportClass,
     {
-        let ptr = JSValueInternalImpl::from_native_class(
-            instance,
-            in_context.implementation(),
-            &in_context.get_runtime().internal,
-        )?;
+        let ptr = JSValueInternalImpl::from_native_class(instance, in_context)?;
         let val = JSValue::wrap_internal(ptr, in_context);
         Ok(Retain::wrap(val))
     }
@@ -248,7 +233,6 @@ where
     pub fn try_new_from<T>(value: T, in_context: &'c JSContext<'r, 'c>) -> ValueResult<'r, 'c>
     where
         T: TryJSValueFrom<'r, 'c>,
-        'c: 'r,
     {
         return T::try_jsvalue_from(value, in_context);
     }
@@ -257,6 +241,25 @@ where
         let new_retained = self.internal.retain(self.context.implementation());
         return Retain::wrap(Self::wrap_internal(new_retained, self.context));
     }
+
+    pub fn transfer_to_context<'n>(
+        &self,
+        new_context: &'n JSContext<'r, 'n>,
+    ) -> Retain<JSValue<'r, 'n>>
+    where
+        'r: 'n,
+    {
+        let new_retain = self.internal.retain(new_context.implementation());
+        Retain::wrap(JSValue::<'r, 'n>::wrap_internal(new_retain, new_context))
+    }
+
+    // pub fn transfer<'a, 'o>(
+    //     value: &'a JSValue<'r, 'o>,
+    //     to_context: &'c JSContext<'r, 'c>,
+    // ) -> Retain<Self> {
+    //     let new_retain = value.internal.retain(to_context.implementation());
+    //     Retain::wrap(JSValue::wrap_internal(new_retain, &to_context))
+    // }
 }
 
 impl<'r, 'c, RawValueType> From<(RawValueType, &'c JSContext<'r, 'c>)> for JSValue<'r, 'c>

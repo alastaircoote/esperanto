@@ -1,4 +1,4 @@
-use std::{any::TypeId, ffi::c_void, os::macos::raw};
+use std::{any::TypeId, ffi::c_void};
 
 use crate::{shared::errors::JSExportError, EsperantoResult, JSExportClass};
 

@@ -1,41 +1,18 @@
-use std::{any::TypeId, collections::HashMap, ffi::CString, hash::Hash, slice, sync::RwLock};
+use std::slice;
 
 use javascriptcore_sys::{
-    JSClassCreate, JSClassDefinition, JSClassRelease, JSContextGetGlobalContext, JSContextGetGroup,
-    JSContextGroupRetain, JSGlobalContextRetain, JSObjectGetPrivate, JSObjectMake,
-    JSValueMakeUndefined, OpaqueJSClass, OpaqueJSContext, OpaqueJSValue,
+    JSContextGetGlobalContext, JSObjectGetPrivate, JSObjectMake, JSValueMakeUndefined,
+    OpaqueJSContext, OpaqueJSValue,
 };
-// use javascriptcore_sys::JSClassDefinition;
-use lazy_static::lazy_static;
 
 use crate::{
     export::{JSClassFunction, JSExportPrivateData},
-    jscore::jscorecontext::JSCoreContextInternal,
-    jscore::jscoreruntime::JSCoreRuntimeInternal,
     jscore::jscorevaluepointer::JSCoreValuePointer,
-    shared::{context::JSContextImplementation, errors::JSExportError, value::JSValueInternal},
-    EsperantoError, EsperantoResult, JSContext, JSExportClass, JSRuntime, JSValue, Retain,
+    shared::errors::JSExportError,
+    EsperantoResult, JSContext, JSExportClass, JSValue, Retain,
 };
 
-/// We can't implement sync for OpaqueJSClass because it's foreign.
-/// Instead we use this struct as a wrapper
-#[derive(Eq, PartialEq, Hash, Copy, Clone)]
-struct JSContextWrapper(*mut OpaqueJSContext);
-#[derive(Eq, PartialEq, Hash, Copy, Clone)]
-pub(crate) struct JSClassStorage {
-    pub(crate) prototype: *mut OpaqueJSValue,
-    pub(crate) instance_class: *mut OpaqueJSClass,
-}
-
-/// JavaScriptCore docs state that the API is thread-safe:
-/// https://developer.apple.com/documentation/javascriptcore/jsvirtualmachine#
-/// so we're OK to impl Sync and Send here.
-unsafe impl Sync for JSContextWrapper {}
-unsafe impl Send for JSContextWrapper {}
-unsafe impl Sync for JSClassStorage {}
-unsafe impl Send for JSClassStorage {}
-
-type ClassMap = RwLock<HashMap<(TypeId, JSContextWrapper), JSClassStorage>>;
+use super::jscore_class_storage::JSClassStorage;
 
 pub(super) unsafe extern "C" fn finalize_instance<T: JSExportClass>(val: *mut OpaqueJSValue) {
     println!("finalize instance");
@@ -46,11 +23,7 @@ pub(super) unsafe extern "C" fn finalize_instance<T: JSExportClass>(val: *mut Op
 pub(super) unsafe extern "C" fn finalize_prototype<T: JSExportClass>(val: *mut OpaqueJSValue) {
     // The prototype is no longer in use so we should remove it from our class
     // storage.
-    let private = unsafe { JSObjectGetPrivate(val) } as *const JSCoreRuntimeInternal;
-    let mut storage = private.as_ref().unwrap().class_storage.borrow_mut();
-    // let ctx = JSContext::borrow_from_implementation(private).unwrap();
-    // let mut storage = ctx.get_runtime().internal.class_storage.borrow_mut();
-    storage.remove(&TypeId::of::<T>());
+    JSClassStorage::remove::<T>(val);
 }
 
 unsafe fn execute_function<'r: 'c, 'c, T: JSExportClass, ReturnType>(

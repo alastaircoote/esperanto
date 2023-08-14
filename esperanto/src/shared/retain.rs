@@ -1,4 +1,4 @@
-use super::value::{HasJSValue, JSValueInternal};
+use super::value::{HasJSValue, JSValueImplementation};
 use crate::JSValue;
 use std::ops::Deref;
 

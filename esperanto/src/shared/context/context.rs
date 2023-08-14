@@ -21,6 +21,8 @@ pub struct JSContext<'r, 'c> {
     // The engine-specific implementation of JSContext
     pub(super) implementation: ActiveJSContextImplementation,
     pub(super) runtime: StoredOrReferencedRuntime<'r>,
+    // Our actual implementation has no lifetime, we're constructing
+    // one manually. So we use PhantomData to store that lifetime.
     _lifetime: &'c PhantomData<()>,
 }
 
@@ -31,7 +33,8 @@ where
     fn create_and_store_in_implementation(
         runtime: StoredOrReferencedRuntime<'r>,
     ) -> EsperantoResult<Box<Self>> {
-        let implementation = ActiveJSContextImplementation::new_in_runtime(&runtime.internal)?;
+        let implementation =
+            ActiveJSContextImplementation::new_in_runtime(&runtime.implementation())?;
         let ctx = JSContext {
             implementation,
             runtime: runtime.into(),
@@ -53,10 +56,7 @@ where
     /// Create a JSContext in an existing runtime.
     /// # Arguments
     /// * `in_runtime`: A reference to the runtime we want to create a JSContext in.
-    pub fn new_in_runtime(in_runtime: &'r JSRuntime<'r>) -> EsperantoResult<Box<Self>>
-    where
-        'r: 'c,
-    {
+    pub fn new_in_runtime(in_runtime: &'r JSRuntime<'r>) -> EsperantoResult<Box<Self>> {
         Self::create_and_store_in_implementation(in_runtime.into())
     }
 

@@ -1,13 +1,9 @@
-use std::{convert::TryFrom, ops::Deref};
-
 use javascriptcore_sys::{JSValueIsObject, OpaqueJSContext, OpaqueJSValue};
 
 use crate::{
     shared::{errors::EsperantoResult, value::JSValueError},
     JSValue,
 };
-
-use super::{jscorecontextpointer::JSCoreContextPointer, jscorevalue};
 
 /// JavaScriptCore has different pointer types depending on whether the value is a value or
 /// an object (which makes sense: objects are mutable, values are not). We keep track of that,
@@ -57,13 +53,13 @@ impl PartialEq for JSCoreValuePointer {
 
 impl From<*mut OpaqueJSValue> for JSCoreValuePointer {
     fn from(val: *mut OpaqueJSValue) -> Self {
-        JSCoreValuePointer::Object(unsafe { val.as_mut().unwrap() })
+        JSCoreValuePointer::Object(val)
     }
 }
 
 impl From<*const OpaqueJSValue> for JSCoreValuePointer {
     fn from(val: *const OpaqueJSValue) -> Self {
-        JSCoreValuePointer::Value(unsafe { val.as_ref().unwrap() })
+        JSCoreValuePointer::Value(val)
     }
 }
 

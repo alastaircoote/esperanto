@@ -2,9 +2,9 @@ use std::ffi::{c_void, CStr, CString};
 
 use crate::shared::context::JSContextImplementation;
 use crate::shared::errors::{EsperantoError, EsperantoResult, JavaScriptError};
-use crate::JSExportClass;
+use crate::{JSContext, JSExportClass, JSValue};
 
-pub(crate) trait JSValueInternal: Sized + Copy {
+pub(crate) trait JSValueImplementation: Sized + Copy {
     type ContextType: JSContextImplementation + Copy;
 
     fn as_cstring(self, ctx: Self::ContextType) -> EsperantoResult<CString>;
@@ -44,20 +44,15 @@ pub(crate) trait JSValueInternal: Sized + Copy {
 
     fn undefined(ctx: Self::ContextType) -> Self;
 
-    fn native_prototype_for<T: JSExportClass>(
-        ctx: Self::ContextType,
-        runtime: &<Self::ContextType as JSContextImplementation>::RuntimeType,
-    ) -> EsperantoResult<Self>;
+    fn native_prototype_for<'r: 'c, 'c, T: JSExportClass>(
+        wrapped_ctx: &'c JSContext<'r, 'c>,
+    ) -> EsperantoResult<JSValue<'r, 'c>>;
 
-    fn constructor_for<T: JSExportClass>(
-        ctx: Self::ContextType,
-        runtime: &<Self::ContextType as JSContextImplementation>::RuntimeType,
-    ) -> EsperantoResult<Self>;
+    // fn constructor_for<T: JSExportClass>(wrapped_ctx: &JSContext) -> EsperantoResult<Self>;
 
     fn from_native_class<T: JSExportClass>(
         instance: T,
-        ctx: Self::ContextType,
-        runtime: &<Self::ContextType as JSContextImplementation>::RuntimeType,
+        wrapped_ctx: &JSContext,
     ) -> EsperantoResult<Self>;
 
     fn get_native_ref<'a, T: JSExportClass>(self, ctx: Self::ContextType)

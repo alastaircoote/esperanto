@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use crate::{shared::errors::EsperantoResult, JSContext, JSValue, Retain};
 
 pub enum JSExportAttribute {
@@ -13,7 +11,7 @@ pub enum JSExportAttribute {
             for<'r, 'c, 'v> fn(
                 &'v JSValue<'r, 'c>,
                 &'v JSValue<'r, 'c>,
-                &'v JSContext<'r, 'c>,
+                &'c JSContext<'r, 'c>,
             ) -> EsperantoResult<JSValue<'r, 'c>>,
         >,
     },

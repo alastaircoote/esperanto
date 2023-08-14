@@ -1,4 +1,4 @@
-use crate::{JSValue, Retain};
+use crate::JSValue;
 
 pub trait HasJSValue<'r, 'c> {
     fn get_value(&'c self) -> &'c JSValue<'r, 'c>;
