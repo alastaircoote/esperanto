@@ -115,7 +115,7 @@ impl JSValueImplementation for JSCoreValueInternal {
         runtime: &<Self::ContextType as JSContextImplementation>::RuntimeType,
     ) -> EsperantoResult<Self> {
         let private_data = JSExportPrivateData::from_instance(instance);
-        let class = JSClassStorage::get::<T>(ctx, runtime)?;
+        let class = JSClassStorage::get_or_create::<T>(ctx, runtime)?;
 
         // The "create rule"
         // https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFMemoryMgmt/Concepts/Ownership.html#//apple_ref/doc/uid/20001148-103029
@@ -261,7 +261,7 @@ impl JSValueImplementation for JSCoreValueInternal {
         ctx: Self::ContextType,
         runtime: &<Self::ContextType as JSContextImplementation>::RuntimeType,
     ) -> EsperantoResult<Self> {
-        let class = JSClassStorage::get::<T>(ctx, runtime)?;
+        let class = JSClassStorage::get_or_create::<T>(ctx, runtime)?;
         let value = class.prototype;
         Ok(value.into())
     }

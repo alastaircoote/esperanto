@@ -15,15 +15,15 @@ use crate::{
 use super::jscore_class_storage::JSClassStorage;
 
 pub(super) unsafe extern "C" fn finalize_instance<T: JSExportClass>(val: *mut OpaqueJSValue) {
-    println!("finalize instance");
     let ptr = JSObjectGetPrivate(val);
     JSExportPrivateData::<T>::drop(ptr);
 }
 
 pub(super) unsafe extern "C" fn finalize_prototype<T: JSExportClass>(val: *mut OpaqueJSValue) {
     // The prototype is no longer in use so we should remove it from our class
-    // storage.
-    JSClassStorage::remove::<T>(val);
+    // storage. Since this is called by the JS side we can't do anything fancy with errors.
+    // If something goes wrong we just panic.
+    JSClassStorage::remove::<T>(val).unwrap();
 }
 
 unsafe fn execute_function<'r: 'c, 'c, T: JSExportClass, ReturnType>(

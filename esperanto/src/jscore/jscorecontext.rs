@@ -65,33 +65,14 @@ impl JSContextImplementation for JSCoreContextInternal {
             }
         })?;
 
-        // let hmm = JSCoreString::from_retained_ptr(script_jsstring.raw);
-        // drop(hmm);
-
         let wrapped = JSCoreValueInternal::from(result);
 
         Ok(wrapped.retain(self.into()))
-        // result.retain();
-        // Ok(result)
     }
-
-    // fn retain(&self) -> Self {
-    //     unsafe { JSGlobalContextRetain(*self) }
-    // }
 
     fn release(self) {
         unsafe { JSGlobalContextRelease(self) }
     }
-
-    // fn get_runtime(self) -> Self::RuntimeType {
-    //     let storage =
-    //         unsafe { JSObjectGetPrivate(self.get_globalobject().try_as_object(self).unwrap()) };
-
-    //     JSCoreRuntimeInternal {
-    //         raw: unsafe { JSContextGetGroup(self) },
-    //         class_storage: JSCoreRuntimeStorage::Referenced(storage as _),
-    //     }
-    // }
 
     fn garbage_collect(self) {
         unsafe {
