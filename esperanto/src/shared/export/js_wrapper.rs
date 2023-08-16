@@ -1,5 +1,3 @@
-use lazy_static::__Deref;
-
 use crate::{
     shared::value::JSValueImplementation, EsperantoResult, JSExportClass, JSValue, Retain,
 };

@@ -443,12 +443,12 @@ mod test {
         // manually calling GC on JSC doesn't seem to actually do anything. So instead
         // we rely on destroying the context to trigger the drop
 
-        // {
-        let str = TestStruct {};
-        let ctx = JSContext::new().unwrap();
-        JSValue::new_wrapped_native(str, &ctx).unwrap();
-        ctx.garbage_collect();
-        // }
+        {
+            let str = TestStruct {};
+            let ctx = JSContext::new().unwrap();
+            JSValue::new_wrapped_native(str, &ctx).unwrap();
+            // ctx.garbage_collect();
+        }
         unsafe { assert_eq!(IS_DESTROYED, true) };
     }
 

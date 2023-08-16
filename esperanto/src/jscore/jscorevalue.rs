@@ -20,7 +20,7 @@ use crate::{
         errors::EsperantoResult,
         value::{JSValueError, JSValueImplementation},
     },
-    JSContext, JSExportClass, JSValue,
+    JSExportClass,
 };
 
 use crate::shared::as_ptr::AsRawMutPtr;
@@ -111,28 +111,24 @@ impl JSValueImplementation for JSCoreValueInternal {
 
     fn from_native_class<T: JSExportClass>(
         instance: T,
-        wrapped_ctx: &JSContext,
+        ctx: Self::ContextType,
+        runtime: &<Self::ContextType as JSContextImplementation>::RuntimeType,
     ) -> EsperantoResult<Self> {
         let private_data = JSExportPrivateData::from_instance(instance);
-        let class = JSClassStorage::get::<T>(wrapped_ctx)?;
+        let class = JSClassStorage::get::<T>(ctx, runtime)?;
 
-        let raw = unsafe {
-            JSObjectMake(
-                wrapped_ctx.implementation(),
-                class.instance_class,
-                private_data,
-            )
-        };
-        // let raw = unsafe { JSObjectMake(ctx, overall_class, std::ptr::null_mut()) };
-        // unsafe { JSValueProtect(ctx, raw) }
+        // The "create rule"
+        // https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFMemoryMgmt/Concepts/Ownership.html#//apple_ref/doc/uid/20001148-103029
+        // states that a method with "Create" in is already owned (i.e. retained) but it looks like "Make"
+        // isn't because this object does not appear to be retained. Which honestly doesn't make a lot of sense
+        // to me but oh well
 
-        unsafe {
-            JSObjectSetPrototype(
-                wrapped_ctx.implementation(),
-                raw,
-                class.get_prototype(wrapped_ctx).internal.as_value(),
-            )
-        }
+        let raw = unsafe { JSObjectMake(ctx, class.instance_class, private_data) };
+
+        // So let's retain it:
+
+        unsafe { JSValueProtect(ctx, raw) }
+        unsafe { JSObjectSetPrototype(ctx, raw, class.prototype) }
 
         return Ok(JSCoreValuePointer::Object(raw));
     }
@@ -262,11 +258,12 @@ impl JSValueImplementation for JSCoreValueInternal {
     }
 
     fn native_prototype_for<'r: 'c, 'c, T: JSExportClass>(
-        wrapped_ctx: &'c JSContext<'r, 'c>,
-    ) -> EsperantoResult<JSValue<'r, 'c>> {
-        let class = JSClassStorage::get::<T>(wrapped_ctx)?;
-        let value = class.get_prototype(wrapped_ctx);
-        Ok(value)
+        ctx: Self::ContextType,
+        runtime: &<Self::ContextType as JSContextImplementation>::RuntimeType,
+    ) -> EsperantoResult<Self> {
+        let class = JSClassStorage::get::<T>(ctx, runtime)?;
+        let value = class.prototype;
+        Ok(value.into())
     }
 
     // fn constructor_for<T: JSExportClass>(wrapped_ctx: &JSContext) -> EsperantoResult<Self> {

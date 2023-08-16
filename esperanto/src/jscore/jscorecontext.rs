@@ -80,7 +80,6 @@ impl JSContextImplementation for JSCoreContextInternal {
     // }
 
     fn release(self) {
-        println!("RELEASE CONTEXT??");
         unsafe { JSGlobalContextRelease(self) }
     }
 
@@ -141,6 +140,7 @@ mod test {
     #[link(name = "JavaScriptCore", kind = "framework")]
     extern "C" {
         fn JSGetMemoryUsageStatistics(ctx: *const OpaqueJSContext) -> *mut OpaqueJSValue;
+        // fn JSSynchronousGarbageCollectForDebugging(ctx: *mut OpaqueJSContext) -> ();
     }
 
     // These are some sanity check tests to make sure we're retaining/releasing like we're
@@ -170,20 +170,28 @@ mod test {
     fn get_protected_object_count(ctx: &JSContext) -> i32 {
         let hmm = unsafe { JSGetMemoryUsageStatistics(ctx.implementation()) };
         let val = JSValue::wrap_internal(hmm.into(), &ctx);
-        let json = ctx
-            .global_object()
-            .get_property("JSON")
-            .unwrap()
-            .get_property("stringify")
-            .unwrap()
-            .call_as_function(vec![
-                &val,
-                &JSValue::undefined(&ctx),
-                &JSValue::try_new_from(2.0, &ctx).unwrap(),
-            ])
-            .unwrap();
+        // let json = ctx
+        //     .global_object()
+        //     .get_property("JSON")
+        //     .unwrap()
+        //     .get_property("stringify")
+        //     .unwrap()
+        //     .call_as_function(vec![
+        //         &val,
+        //         &JSValue::undefined(&ctx),
+        //         &JSValue::try_new_from(2.0, &ctx).unwrap(),
+        //     ])
+        //     .unwrap();
 
-        println!("{}", json.to_string());
+        // println!("{}", json.to_string());
+        // println!(
+        //     "whaa {}",
+        //     val.get_property("objectTypeCounts")
+        //         .unwrap()
+        //         .get_property("Object")
+        //         .unwrap()
+        //         .to_string()
+        // );
         let num_js = val.get_property("protectedObjectCount").unwrap();
         return num_js.try_convert().unwrap();
     }
@@ -213,10 +221,11 @@ mod test {
         impl JSExportClass for TestStruct {
             const CLASS_NAME: &'static str = "TestStruct";
         }
-
         let ctx = JSContext::new().unwrap();
         let start = get_protected_object_count(&ctx);
         let object = JSValue::new_wrapped_native(TestStruct {}, &ctx).unwrap();
+        // ensure we aren't also retaining the prototype:
+        assert_eq!(get_protected_object_count(&ctx), start + 1);
         drop(object);
         assert_eq!(get_protected_object_count(&ctx), start);
     }

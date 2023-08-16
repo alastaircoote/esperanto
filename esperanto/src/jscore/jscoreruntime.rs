@@ -28,7 +28,6 @@ impl JSRuntimeImplementation for JSCoreRuntimeInternal {
     }
 
     fn release(&mut self) {
-        println!("RUNTIME RELEASE");
         unsafe { JSContextGroupRelease(self.raw) }
         #[cfg(debug_assertions)]
         {

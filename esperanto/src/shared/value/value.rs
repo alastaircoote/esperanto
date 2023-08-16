@@ -91,16 +91,20 @@ where
         }
     }
 
-    pub fn prototype_for<T>(in_context: &'c JSContext<'c, 'c>) -> ValueResult
+    pub fn prototype_for<T>(in_context: &'c JSContext<'r, 'c>) -> ValueResult<'r, 'c>
     where
         T: JSExportClass,
     {
-        let val = JSValueInternalImpl::native_prototype_for::<T>(in_context)?;
+        let runtime = in_context.get_runtime();
+        let val = JSValueInternalImpl::native_prototype_for::<T>(
+            in_context.implementation(),
+            runtime.implementation(),
+        )?;
 
-        Ok(Retain::wrap(val))
+        Ok(Retain::wrap(Self::wrap_internal(val, in_context)))
     }
 
-    pub fn constructor_for<T>(in_context: &'c JSContext<'c, 'c>) -> ValueResult
+    pub fn constructor_for<T>(in_context: &'c JSContext<'r, 'c>) -> ValueResult<'r, 'c>
     where
         T: JSExportClass,
     {
@@ -114,7 +118,12 @@ where
     where
         T: JSExportClass,
     {
-        let ptr = JSValueInternalImpl::from_native_class(instance, in_context)?;
+        let runtime = in_context.get_runtime();
+        let ptr = JSValueInternalImpl::from_native_class(
+            instance,
+            in_context.implementation(),
+            runtime.implementation(),
+        )?;
         let val = JSValue::wrap_internal(ptr, in_context);
         Ok(Retain::wrap(val))
     }
